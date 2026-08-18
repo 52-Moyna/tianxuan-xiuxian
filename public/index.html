@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>天玄修仙录 · 本地修仙模拟器</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<canvas id="bg-particles"></canvas>
+
+<div id="app">
+
+  <!-- ============ 标题界面（主页） ============ -->
+  <section id="screen-title" class="screen">
+    <div class="title-veil" aria-hidden="true"></div>
+    <div class="title-inner">
+      <div class="title-seal" aria-hidden="true">
+        <svg viewBox="0 0 100 100" class="seal-ring"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="38"/></svg>
+        <span class="seal-char">玄</span>
+      </div>
+      <p class="title-eyebrow">太古遗卷 · 修仙模拟</p>
+      <h1 class="title-name">天玄修仙录</h1>
+      <p class="title-sub">单人月令回合制 · 开放世界修仙模拟器</p>
+      <p class="title-poem">太古纪元终结，万族并立<br>一缕仙缘在手，你的传说由此落笔</p>
+
+      <div class="title-actions">
+        <button id="btn-continue" class="btn-major ghost hidden">
+          <span class="ma-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 8-8"/><path d="M4 12V6M4 12l3-3"/></svg></span>
+          <span class="ma-text"><b>续写仙途</b><i>读取本地存档，再续前缘</i></span>
+        </button>
+        <button id="btn-new" class="btn-major primary">
+          <span class="ma-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3l2.2 5.6L20 9l-4.5 4 1.3 6L12 16.8 7.2 19l1.3-6L4 9l5.8-.4z"/></svg></span>
+          <span class="ma-text"><b>开启新仙途</b><i>从一介凡人，问道长生</i></span>
+        </button>
+      </div>
+
+      <!-- 多存档槽选择 -->
+      <div id="slot-panel" class="slot-panel">
+        <div class="slot-panel-head">
+          <span class="slot-panel-title">选择存档</span>
+          <button id="btn-new-slot" class="tbtn" title="新增一个独立存档">＋ 新建存档</button>
+        </div>
+        <div id="slot-list" class="slot-list"></div>
+      </div>
+
+      <nav class="title-tools">
+        <button id="btn-guide-title" class="tbtn">新手玩法说明</button>
+        <span class="tbtn-sep"></span>
+        <button id="btn-theme-title" class="tbtn">切换日夜</button>
+      </nav>
+
+      <footer class="title-foot">
+        <span id="title-author">作者 babyQ</span>
+        <span class="foot-sep">｜</span>
+        <span>依据《Ref修仙模拟器 V8.1.3》设定</span>
+        <span class="foot-sep">｜</span>
+        <span>存档目录 <code id="title-savedir">—</code></span>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ============ 角色创建 ============ -->
+  <section id="screen-create" class="screen hidden">
+    <div class="create-wrap">
+      <div class="create-head">
+        <div id="create-progress" class="create-progress">第 1 步</div>
+        <h2 id="create-title">角色创建</h2>
+      </div>
+      <div id="create-body" class="create-body"></div>
+      <div class="create-actions">
+        <button id="btn-create-back" class="btn">返回标题</button>
+        <button id="btn-prev" class="btn hidden">◀ 上一步</button>
+        <button id="btn-next" class="btn btn-gold">下一步 ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 游戏主界面 ============ -->
+  <section id="screen-game" class="screen hidden">
+    <!-- 顶栏 -->
+    <header id="game-topbar" class="topbar">
+      <div class="tb-brand">
+        <span class="tb-seal" aria-hidden="true">玄</span>
+        <span class="tb-name">天玄修仙录</span>
+      </div>
+      <span class="tb-divider"></span>
+      <div class="tb-meta">
+        <span id="tb-time" class="tb-chip"></span>
+        <span id="tb-loc" class="tb-chip"></span>
+      </div>
+      <span class="tb-spacer"></span>
+      <div class="tb-res">
+        <span id="tb-stones" class="tb-chip tb-stones"></span>
+        <span id="tb-code" class="tb-chip tb-code"></span>
+      </div>
+      <div class="tb-acts">
+        <button id="btn-goto-destiny" class="btn btn-sm" title="返回决策罗盘">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"/></svg>
+          <span>仙途</span>
+        </button>
+        <button id="btn-save" class="btn btn-sm btn-gold">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg>
+          <span>存档</span>
+        </button>
+        <button id="btn-theme" class="btn btn-sm" title="切换日夜主题">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14a8 8 0 1 1-9-11 6 6 0 0 0 9 11z"/></svg>
+          <span id="btn-theme-label">切换日间</span>
+        </button>
+        <button class="side-tab on" data-tab="logs" title="游戏日志">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg><span>日志</span>
+        </button>
+        <button class="side-tab" data-tab="settings" title="设置">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span>设置</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 主体：左导航 / 仙籍卡 / 中央整页视图 / 右侧详情抽屉 -->
+    <main id="game-main" class="game-main">
+      <nav class="gm-rail" aria-label="功能导航">
+        <button class="side-tab on" data-tab="destiny">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21L10 3M18 21L14 3M12 6v12"/></svg><span>仙途</span>
+        </button>
+        <button class="side-tab" data-tab="items">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg><span>行囊</span>
+        </button>
+        <button class="side-tab" data-tab="npcs">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg><span>道缘</span>
+        </button>
+        <button class="side-tab" data-tab="codex">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0zM14 4c3-1.5 6-1.5 9 0v13c-3-1.5-6-1.5-9 0z"/></svg><span>图鉴</span>
+        </button>
+        <button class="side-tab" data-tab="map">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3L3 5v16l6-2 6 2 6-2V3l-6 2-6-2zM9 3v16M15 5v16"/></svg><span>地图</span>
+        </button>
+        <button class="side-tab" data-tab="realm">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19l5-9 4 6 3-5 6 8z"/></svg><span>境界</span>
+        </button>
+        <button class="side-tab" data-tab="achv">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/></svg><span>成就</span>
+        </button>
+        <button class="side-tab" data-tab="beasts">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 14l-3-3 .7-.7L11 14.6V7h1v7.6l2.3-2.3.7.7-3 3z"/><circle cx="12" cy="12" r="3"/></svg><span>灵兽</span>
+        </button>
+        <button class="side-tab" data-tab="cave">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12H3zM9 21v-6h6v6M7 11h2M15 11h2"/></svg><span>洞府</span>
+        </button>
+      </nav>
+
+      <!-- 仙籍英雄卡 -->
+      <aside id="panel-status" class="panel hero-card">
+        <div class="hero-id">
+          <div id="hero-avatar" class="hero-avatar" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/></svg>
+          </div>
+          <div class="hero-idtext">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div id="st-name" class="hero-name">—</div>
+              <button class="btn btn-xs" id="btn-edit-profile" title="编辑角色信息">✏️</button>
+            </div>
+            <div id="st-realm" class="hero-realm">凡人境·第1层</div>
+            <div id="st-signature" class="hero-signature"></div>
+          </div>
+        </div>
+
+        <!-- 英雄卡生命体征：骨龄 / 寿元余 / 气血 / 伤势（头像下方） -->
+        <div class="hero-vitals">
+          <div class="vital-row" id="st-age-row">
+            <svg class="vi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg>
+            <span class="vital-label">骨龄</span><b id="st-age">—</b>
+          </div>
+          <div class="vital-row" id="st-life-row">
+            <svg class="vi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-9a4 4 0 0 1 7-2.5A4 4 0 0 1 19 12c0 4.5-7 9-7 9z"/></svg>
+            <span class="vital-label">寿元余</span><b id="st-life">—</b>
+          </div>
+          <div class="vital-row hp-row" id="st-hp-row">
+            <svg class="vi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-9a4 4 0 0 1 7-2.5A4 4 0 0 1 19 12c0 4.5-7 9-7 9z"/></svg>
+            <span class="vital-label">气血</span>
+            <div class="hp-wrap"><div class="hp-bar-outer hp-bar-lg"><span class="hp-bar-inner" id="st-hp-fill"></span></div><span class="hp-pct" id="st-hp-pct"></span></div>
+          </div>
+          <div class="vital-row wound-row" id="st-wound-row" style="display:none">
+            <svg class="vi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.5 3-1 5.5-1 8s2.5 4 2.5 7-1 4-3.5 5"/></svg>
+            <span class="vital-label">伤势</span><b id="st-wound">—</b>
+          </div>
+        </div>
+
+        <div class="hero-exp">
+          <div class="exp-bar"><i id="st-exp-bar"></i></div>
+          <div id="st-exp-text" class="exp-text">修为 0 / 50</div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l9-9M13 5l6 6-3 3-6-6zM3 21l3-3 2 2-3 3z"/></svg><span class="stat-label">战力</span><b id="st-power">1</b></div>
+          <div class="stat"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.5 6 .5-4.5 4 1.3 6-5.3-3-5.3 3 1.3-6L4 8.5l6-.5z"/></svg><span class="stat-label">评级</span><b id="st-rating">凡尘</b></div>
+          <div class="stat root-stat">
+            <div class="stat-main"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-9M12 12c0-4 3-6 6-5M12 12c0-4-3-6-6-5M12 12l4 4M12 12l-4 4"/></svg><span class="stat-label">灵根</span></div>
+            <div id="st-root" class="stat-value">—</div>
+          </div>
+          <div class="stat yun-stat">
+            <div class="stat-main"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l1.8 5.2L19 11l-5.2 1.8L12 18l-1.8-5.2L5 11l5.2-1.8z"/></svg><span class="stat-label">道韵</span></div>
+            <div id="st-yun" class="stat-value">—</div>
+          </div>
+          <div class="stat wide"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span class="stat-label">功法</span><b id="st-tech">—</b></div>
+          <div class="stat wide"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/></svg><span class="stat-label">装备</span><b id="st-equip">—</b></div>
+          <div class="stat wide"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg><span class="stat-label">洞府</span><b id="st-cave">—</b></div>
+          <div class="stat wide"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-3 3-6-6zM3 21l8-8M11 13l-3 3-4-4 3-3"/></svg><span class="stat-label">百艺</span><b id="st-arts">—</b></div>
+        </div>
+
+        <div class="hero-section-label">道基</div>
+        <div id="daoji-list" class="daoji-list"></div>
+
+        <div class="hero-section-label">装备</div>
+        <div id="equip-section" class="equip-section"></div>
+      </aside>
+
+      <!-- 中央整页视图：点击左导航即整页跳转渲染 -->
+      <section id="panel-center" class="center-view">
+        <div id="center-body" class="center-body"></div>
+      </section>
+
+      <!-- 右侧详情抽屉：始终展示当前仙籍/导航对应的辅助信息 -->
+      <aside id="panel-side" class="panel side-drawer">
+        <div id="side-body" class="side-body"></div>
+      </aside>
+    </main>
+  </section>
+</div>
+
+  <!-- ============ 启动加载层（道果旋纹） ============ -->
+  <div id="boot-loader">
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <div class="boot-tip">天玄历 · 载入仙途…</div>
+  </div>
+
+<div id="modal-root" class="hidden"></div>
+<div id="codex-modal" class="modal-overlay" hidden></div>
+<div id="toast-root"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
