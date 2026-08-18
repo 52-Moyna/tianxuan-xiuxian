@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -389,6 +389,60 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 越级（diff>5）：下限不低于 5
   const cross = S.calcWinRate(g, 2000, 40).rate;
   ok(cross >= 5 && cross <= 95, `越级胜率落于[5,95]（${cross}）`);
+}
+
+/* ---------- 外出历练数值重铸（地域危险度 → 妖兽等级脱钩玩家战力） ---------- */
+{
+  // 1) 妖兽等级由地域危险度决定，且各 danger 组的下界最小值随 danger 严格递增（确定性）
+  const ranges = {};
+  for (const rid of Object.keys(REGION_TRAVEL)) ranges[rid] = beastLevelRange(rid, false);
+  const byDanger = {};
+  for (const [rid, r] of Object.entries(ranges)) {
+    const d = REGION_TRAVEL[rid].danger;
+    (byDanger[d] = byDanger[d] || []).push(r.min);
+  }
+  const dKeys = Object.keys(byDanger).map(Number).sort((a, b) => a - b);
+  let inc = true;
+  for (let i = 1; i < dKeys.length; i++) {
+    if (Math.min(...byDanger[dKeys[i]]) <= Math.min(...byDanger[dKeys[i - 1]])) inc = false;
+  }
+  ok(inc, '妖兽等级下界随地域危险度严格递增');
+  ok(ranges['haiwai'].min > ranges['zhongzhou'].max, '最高危区妖兽等级下界高于最低危区上界');
+
+  // 2) 低境界玩家进入高危险度区域胜率 < 20%
+  const weak = S.createNewGame({ name: '弱修', gender: '男', raceId: 'human', ageId: 'young', regionId: 'haiwai', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  weak.player.level = 5; weak.player.power = S.calcPower(weak);
+  const pvWeak = S.previewBattle(weak, S.makeEnemy(weak, { beast: true }), 'yaoshou').finalRate;
+  ok(pvWeak < 20, `低境界(level5)入高危区(haiwai)预估胜率<20%（${pvWeak}）`);
+
+  // 3) 高境界玩家进入低危险度区域胜率 > 80%
+  const strong = S.createNewGame({ name: '强修', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  strong.player.level = 85; strong.player.power = Math.max(S.calcPower(strong), 3000);
+  const pvStrong = S.previewBattle(strong, S.makeEnemy(strong, { beast: true }), 'yaoshou').finalRate;
+  ok(pvStrong > 80, `高境界(level85)入低危区(zhongzhou)预估胜率>80%（${pvStrong}）`);
+
+  // 4) 妖兽等级落在地域区间内（多次生成）
+  const mid = S.createNewGame({ name: '中修', gender: '男', raceId: 'human', ageId: 'young', regionId: 'donghuang', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  const rng = beastLevelRange('donghuang', false);
+  let inRange = true;
+  for (let i = 0; i < 30; i++) {
+    const e = S.makeEnemy(mid, { beast: true });
+    if (e.level < rng.min || e.level > rng.max) { inRange = false; break; }
+  }
+  ok(inRange, `妖兽等级落在地域区间[${rng.min},${rng.max}]内`);
+
+  // 5) 危险区掉落更丰（同等级妖兽，内丹价值随 danger 递增，确定性）
+  const loDrop = S.generateBeastDrops(weak, { name: '试', level: 10, danger: 2, beast: true });
+  const hiDrop = S.generateBeastDrops(strong, { name: '试', level: 10, danger: 5, beast: true });
+  const loNei = loDrop.find((d) => d.名称.endsWith('内丹'))?.价值 || 0;
+  const hiNei = hiDrop.find((d) => d.名称.endsWith('内丹'))?.价值 || 0;
+  ok(hiNei > loNei, `高危区妖兽内丹价值更高（d5=${hiNei} > d2=${loNei}）`);
+
+  // 6) 危险区失败惩罚更重（纯函数，确定性）
+  const p2 = S.beastDefeatPenalty(2, {});
+  const p5 = S.beastDefeatPenalty(5, {});
+  ok(p5.wounded > p2.wounded, `危险区失败伤势更重（d5=${p5.wounded} > d2=${p2.wounded}）`);
+  ok(p5.loseStones > 0 && p2.loseStones === 0, '危险区(d>=4)失败额外被劫灵石');
 }
 
 /* ---------- 灵草园·灵泉浇灌 + 收获安全 ---------- */

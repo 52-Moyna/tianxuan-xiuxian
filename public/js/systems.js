@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity } from './life.js';
+import { ensureLifeState, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -684,23 +684,41 @@ export function winRateFeedback(rate) {
 
 /**
  * 生成一个对手（妖兽或修士）。
- * 平衡改动：怪物战力围绕玩家当前综合战力浮动（而非旧版 level+随机），
- * 使战斗胜率始终落在合理区间——普通敌人略弱可胜，强敌略强有挑战，
- * 且怪物随玩家成长而变强，保证全程有张力。
+ * 平衡改动（外出历练数值重铸）：妖兽强度由「地域危险度」决定，与玩家战力脱钩——
+ * 低境界修士踏入高危地域（如海外仙岛）可能撞见远超自身的大妖，胜率极低；
+ * 高境界修士回到低危地域（如中州）则可碾压。风险与收益匹配：危险区掉落更丰。
+ * NPC/债主等非野兽对手仍保留原战力浮动逻辑，避免切磋/因果战崩坏。
  */
 export function makeEnemy(state, opts = {}) {
   const p = state.player;
+  if (opts.beast) {
+    const regionId = state.world.regionId || 'zhongzhou';
+    const { min, max } = beastLevelRange(regionId, opts.stronger);
+    const lv = Math.max(1, Rng.int(min, max));
+    const danger = (REGION_TRAVEL[regionId]?.danger) || 2;
+    let power = beastPowerOfLevel(lv, danger);
+    if (opts.stronger) power = Math.round(power * 1.15); // 秘境/护宝妖兽再上浮
+    const pool = BEASTS.filter((b) => b.lv[0] <= lv + 15 && b.lv[1] >= lv - 15);
+    const beast = Rng.pick(pool.length ? pool : BEASTS.slice(0, 2));
+    return { name: beast.name, level: lv, power, beast: true, realm: realmLevelName(lv), danger, regionId };
+  }
+  // 非野兽对手（NPC/债主/拍卖对手等）：保留原战力浮动逻辑
   const lvBand = opts.stronger ? Rng.int(0, 10) : Rng.int(-3, 5);
   const lv = Math.max(1, p.level + lvBand);
   const ratio = opts.stronger ? Rng.float(0.9, 1.2) : Rng.float(0.78, 1.05);
   const power = Math.max(1, Math.round(p.power * ratio));
-  if (opts.beast) {
-    const pool = BEASTS.filter((b) => b.lv[0] <= p.level + 15);
-    const beast = Rng.pick(pool.length ? pool : BEASTS.slice(0, 2));
-    return { name: beast.name, level: lv, power, beast: true, realm: realmLevelName(lv) };
-  }
   const name = Rng.pick(NPC_SURNAMES) + Rng.pick(NPC_GIVEN);
   return { name, level: lv, power, beast: false, realm: realmLevelName(lv), trait: Rng.pick(NPC_TRAITS) };
+}
+
+/** 妖兽/历练战斗失败时的惩罚（伤势与是否丢灵石），确定性，便于测试与复用。 */
+export function beastDefeatPenalty(danger, { ally = false, tactic = 'normal' } = {}) {
+  const d = Math.min(5, Math.max(2, danger || 2));
+  const dPen = Math.max(0, d - 2);
+  let wounded = ally ? 1 : (tactic === 'defend' ? 1 : 2);
+  wounded += dPen;
+  const loseStones = d >= 4 ? 0.08 * (d - 3) : 0;
+  return { wounded, loseStones };
 }
 
 /** 结算战斗。type 见 BATTLE_TYPES。返回完整战报 */
@@ -859,8 +877,15 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     if (type === 'qiecuo') {
       logs.push('切磋落败，点到为止，并无实质损失。');
     } else if (enemy.beast || type === 'yaoshou') {
+      // 危险度越高，失败惩罚越重（伤势更深、险地更可能被劫灵石）
+      const danger = enemy.danger || (REGION_TRAVEL[state.world.regionId]?.danger) || 2;
+      const pen = beastDefeatPenalty(danger, { ally: allyAided, tactic });
       logs.push('你重伤遁走，需休养数月（本月行动收益减半）。');
-      state.flags.wounded = allyAided ? 1 : (tactic === 'defend' ? 1 : 2);
+      state.flags.wounded = pen.wounded;
+      if (pen.loseStones > 0) {
+        const lost = Math.round(totalStones(state) * pen.loseStones);
+        if (lost > 0) { spendStones(state, lost); logs.push(`险地溃败，被劫去灵石约${lost}。`); }
+      }
     } else {
       const gap = (enemy.power - p.power) / Math.max(1, p.power);
       let back, loseRate;
@@ -1023,9 +1048,12 @@ export function generateCompass(state) {
     opts.push({ icon: '🏔️', tag: '因缘', title: '秘境出世！抢先探索', desc: '高风险高回报，可能遭遇护宝妖兽。', action: { type: 'event', kind: 'mystic' }, risk: true });
   }
 
-  // —— 历练探索 ——
-  opts.push({ icon: '🗡️', tag: '历练', title: '外出历练，猎杀妖兽', desc: '获取妖兽材料与修为经验。', action: { type: 'explore', kind: 'hunt' } });
-  opts.push({ icon: '🌄', tag: '历练', title: '游历四方，寻访机缘', desc: '随缘而遇，或有所获。', action: { type: 'explore', kind: 'wander' } });
+  // —— 历练探索（显示当前地域危险度与建议境界，让玩家感知风险） ——
+  const _regionId = state.world.regionId || 'zhongzhou';
+  const _reg = REGION_TRAVEL[_regionId] || REGION_TRAVEL.zhongzhou;
+  const _dangerHint = `危险度${_reg.danger}/5｜建议${realmLevelName(_reg.realmReq || 1)}`;
+  opts.push({ icon: '🗡️', tag: '历练', title: '外出历练，猎杀妖兽', desc: `获取妖兽材料与修为经验。当前：${state.world.region}（${_dangerHint}）`, action: { type: 'explore', kind: 'hunt' } });
+  opts.push({ icon: '🌄', tag: '历练', title: '游历四方，寻访机缘', desc: `随缘而遇，或有所获。当前：${state.world.region}（${_dangerHint}）`, action: { type: 'explore', kind: 'wander' } });
 
   // —— 道缘经营（仅对已结识之人推送拜访选项；未结识者通过游历/寻访逐步解锁） ——
   const known = knownNpcs(state);
@@ -1858,8 +1886,11 @@ export function generateBeastDrops(state, enemy) {
   ensureLifeState(state);
   const drops = [];
   const lv = enemy.level || 1;
+  // 危险度倍率：越凶险的地域，妖兽材料数量与价值越高（风险收益匹配）
+  const danger = enemy.danger || (REGION_TRAVEL[state.world.regionId]?.danger) || 2;
+  const dangerMul = 1 + (danger - 2) * 0.2; // d2→1.0, d3→1.2, d4→1.4, d5→1.6
   // 必掉内丹
-  drops.push({ 名称: `${enemy.name}内丹`, 类型: '材料', 数量: 1, 描述: '妖兽精华，可炼丹、炼器或出售。', 价值: Math.max(20, lv * 8) });
+  drops.push({ 名称: `${enemy.name}内丹`, 类型: '材料', 数量: 1, 描述: '妖兽精华，可炼丹、炼器或出售。', 价值: Math.round(Math.max(20, lv * 8) * dangerMul) });
   // 按妖兽等级概率掉额外材料
   const pool = [
     { tpl: MATERIAL_TYPES.find((m) => m.id === 'lingcao'), chance: 0.5 },
@@ -1870,14 +1901,14 @@ export function generateBeastDrops(state, enemy) {
   ];
   for (const { tpl, chance } of pool) {
     if (tpl && Rng.chance(chance)) {
-      const qty = Rng.int(1, Math.max(2, Math.floor(lv / 15) + 1));
-      drops.push({ 名称: `妖兽${tpl.name}`, 类型: tpl.type, 数量: qty, 描述: tpl.desc, 价值: Math.round(tpl.value * (1 + lv / 50)) });
+      const qty = Math.max(1, Math.round(Rng.int(1, Math.max(2, Math.floor(lv / 15) + 1)) * dangerMul));
+      drops.push({ 名称: `妖兽${tpl.name}`, 类型: tpl.type, 数量: qty, 描述: tpl.desc, 价值: Math.round(tpl.value * (1 + lv / 50) * dangerMul) });
     }
   }
   // 低概率掉装备/法宝胚
   if (Rng.chance(0.15 + Math.min(0.15, lv / 200))) {
     const slot = Rng.pick(['weapon', 'armor', 'boots', 'accessory']);
-    const item = generateEquip(state, slot, Math.max(1, Math.round(lv / 12)));
+    const item = generateEquip(state, slot, Math.max(1, Math.round((lv / 12) * dangerMul)));
     drops.push({ 名称: item.名称, 类型: '装备', 数量: 1, 描述: item.描述, 效果: { equipSlot: slot, equipLevel: item.等级 }, 价值: item.价值, _equip: item });
   }
   return drops;

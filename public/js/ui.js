@@ -1139,7 +1139,7 @@ function battleModal(battle) {
       <div class="battle-intro">${battle.intro}</div>
       <div class="enemy-card">
         <div class="enemy-name">${battle.enemy.name}</div>
-        <div class="enemy-info">${battle.enemy.realm} ｜ 战力约 ${battle.enemy.power}</div>
+        <div class="enemy-info">${battle.enemy.realm} ｜ 战力约 ${battle.enemy.power}${battle.enemy.danger ? ` ｜ 危险度${battle.enemy.danger}/5` : ''}</div>
       </div>
       <div class="battle-feedback" id="battle-feedback">「${S.winRateFeedback(S.previewBattle(st, battle.enemy, battle.type, 'normal').finalRate)}」</div>
       <div class="battle-preview-rate" id="battle-preview-rate"></div>

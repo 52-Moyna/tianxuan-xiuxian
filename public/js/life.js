@@ -1,5 +1,5 @@
 import { ensureCodexState, discoverItem, ensureBeastState, ensureSectState, ensureAuctionState, setBonusFlags, rollPillQuality } from './codex.js';
-import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES } from './data.js';
+import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES, REALMS } from './data.js';
 
 /**
  * life.js - 修仙生活系统
@@ -17,6 +17,35 @@ export const REGION_TRAVEL = {
   lingnan: { neighbors: ['donghuang', 'nanming'], cost: 90, months: 1, specialty: '灵植与毒材', flavor: '百越雨林里，灵植商人背着竹篓穿行。', danger: 4, realmReq: 2 },
   haiwai: { neighbors: ['donghuang', 'beiming'], cost: 180, months: 2, specialty: '遗府与奇珍', flavor: '海雾深处偶尔显出上古仙岛的轮廓。', danger: 5, realmReq: 5 },
 };
+
+/**
+ * 地域危险度 → 妖兽等级区间（与玩家战力脱钩）。
+ * realmReq(1-5) 映射为该地域基准境界的最小等级；danger(2-5) 作为等级上浮系数。
+ * 返回确定性区间 [min, max]，便于测试断言且不引入随机。
+ */
+export function beastLevelRange(regionId, stronger = false) {
+  const reg = REGION_TRAVEL[regionId] || REGION_TRAVEL.zhongzhou;
+  const req = Math.min(5, Math.max(1, reg.realmReq || 1));
+  const danger = Math.min(5, Math.max(2, reg.danger || 2));
+  const realm = REALMS[req - 1] || REALMS[0];
+  // 地域基准等级 = 该地域「要求境界」下限 + 危险度上浮；区间宽度随危险度增大，
+  // 使低境界玩家撞上的多为同级偏上妖兽（可争胜负），高境界玩家回低危区则碾压。
+  const base = realm.min + (danger - 1) * 8;
+  const spread = danger * 4 + 2;
+  let min = Math.max(1, base - spread);
+  let max = Math.max(1, base + spread);
+  if (stronger) { min += 8; max += 8; }
+  max = Math.min(100, max);
+  if (max < min) max = min;
+  return { min, max };
+}
+
+/** 妖兽战力：由等级推导，与玩家 calcPower 同口径（每级约 4.5 战力，无装备/灵兽加成），
+ *  仅叠加少量危险度微调，使高危区妖兽略凶悍而不失控。确定性，无随机。 */
+export function beastPowerOfLevel(level, danger = 2) {
+  const d = Math.min(5, Math.max(2, danger || 2));
+  return Math.max(1, Math.round(level * 4.5) + (d - 2) * 8);
+}
 
 export const REGION_MARKET = {
   zhongzhou: [
@@ -92,6 +121,7 @@ const REGION_NAMES = {
   zhongzhou: '中州圣城', donghuang: '东荒妖域', nanming: '南明离火域',
   xiji: '西极玄冰域', beiming: '北冥瀚海', lingnan: '岭南百越', haiwai: '海外仙岛',
 };
+
 
 function isRealEquipment(item) {
   return item && typeof item === 'object' && item.名称 && item.名称 !== '无' && item.名称 !== '赤手空拳';
