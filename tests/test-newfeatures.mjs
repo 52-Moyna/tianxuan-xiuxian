@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -558,6 +558,29 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(g.cave.garden[0].irrigatedThisMonth === 0, '月度生长后浇灌额度已重置');
   ok(g.cave.garden[0].progress === Math.min(g.cave.garden[0].grow, before + 1), '月度自然生长 +1');
   ok(irrigateHerb(g, 0).ok, '重置后本月可再次浇灌');
+}
+
+/* ---------- 灵泉涌动（灵草被动加速，洞府 Lv.5+，确定性） ---------- */
+{
+  ok(HERB_SPRING_LEVEL === 5, '灵泉涌动阈值 HERB_SPRING_LEVEL=5');
+  ok(typeof herbSpringBonus === 'function', 'herbSpringBonus 已导出为函数');
+  // 低洞府等级无加成，高等级 +1 加成
+  const low = S.createNewGame({ name: '灵泉低', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(low); low.cave.level = 0;
+  ok(herbSpringBonus(low) === 0, '洞府 Lv.0 灵泉加成=0');
+  const high = S.createNewGame({ name: '灵泉高', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(high); high.cave.level = 5;
+  ok(herbSpringBonus(high) === 1, '洞府 Lv.5 灵泉加成=1');
+  // growHerbs 自然生长受灵泉影响：低等级 +1，高等级 +2（确定性，无 omen）
+  const g1 = S.createNewGame({ name: '灵泉生长低', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g1); g1.cave.level = 0; g1.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 0, grow: 5, planted: 'x', irrigatedThisMonth: 0 }];
+  growHerbs(g1);
+  ok(g1.cave.garden[0].progress === 1, '洞府 Lv.0 月度自然生长 +1');
+  const g2 = S.createNewGame({ name: '灵泉生长高', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g2); g2.cave.level = 5; g2.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 0, grow: 5, planted: 'x', irrigatedThisMonth: 0 }];
+  growHerbs(g2);
+  ok(g2.cave.garden[0].progress === 2, '洞府 Lv.5 灵泉涌动，月度自然生长 +2');
+  ok(g2.cave.garden[0].irrigatedThisMonth === 0, '灵泉下跨月浇灌额度重置正常');
 }
 
 /* ---------- 观星卜算（数据驱动罗盘选项，确定性收益） ---------- */

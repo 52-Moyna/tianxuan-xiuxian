@@ -494,8 +494,9 @@ export function harvestHerb(state, idx) {
 /** 月度生长：所有灵草进度 +1（于 settleMonth 调用）；同时重置本月浇灌额度 */
 export function growHerbs(state) {
   ensureLifeState(state);
+  const spring = herbSpringBonus(state);
   for (const h of state.cave.garden) {
-    if (h.progress < h.grow) h.progress += 1 + omenAdd(state, 'garden');
+    if (h.progress < h.grow) h.progress += 1 + omenAdd(state, 'garden') + spring;
     h.irrigatedThisMonth = 0;
   }
 }
@@ -504,6 +505,15 @@ export function growHerbs(state) {
 export const HERB_IRRIGATE_COST = 15;
 /** 单株每月可浇灌次数上限：防止用灵石无限瞬间催熟，保留「时间」维度 */
 export const HERB_IRRIGATE_CAP_PER_MONTH = 2;
+/** 灵泉涌动阈值：洞府达到此等级（Lv.5+），灵泉自然涌动，灵草每月额外 +1 自然生长 */
+export const HERB_SPRING_LEVEL = 5;
+/**
+ * 灵泉自然加成：洞府灵泉涌动后，每株灵草月度自然生长额外 +1（确定性，无 RNG）。
+ * 与浇灌（付费单次 +1）互补：高等级洞府的灵草园收获更快，是洞府长线投资的回报之一。
+ */
+export function herbSpringBonus(state) {
+  return (state.cave?.level || 0) >= HERB_SPRING_LEVEL ? 1 : 0;
+}
 
 /* ============================================================
  * 天机运势（观星卜算所得，下月生效，跨月由 systems.nextMonth 过期清理）
