@@ -1323,6 +1323,42 @@ export function resolveWanderEvent(state) {
   try { return ev.run(state) || { logs: [] }; } catch (err) { return { logs: ['游历途中发生了一点意外，但你安然归来。'] }; }
 }
 
+/**
+ * 观星卜算·星盘点评（确定性，状态感知）。
+ * 依据玩家当前处境给出一句具体可执行的修行建议，不依赖 RNG，故测试无 flaky。
+ * @param {object} state
+ * @returns {string}
+ */
+export function divinationFortune(state) {
+  const p = state.player || {};
+  const w = state.world || {};
+  const garden = (state.cave && Array.isArray(state.cave.garden)) ? state.cave.garden : [];
+  const tox = Number(state.flags?.pillToxicity || 0);
+  if (typeof p.lifespan === 'number' && typeof p.age === 'number' && p.lifespan - p.age <= 15) {
+    return '命星黯淡，寿元将尽——速寻延寿仙丹或冲击大境界，方可逆转乾象。';
+  }
+  if (tox >= 30) {
+    return '丹毒如附骨之疽，星盘示警：宜停炉服丹以化毒，莫贪速成而损道基。';
+  }
+  const ripe = garden.filter((h) => h.progress >= h.grow).length;
+  if (ripe > 0) {
+    return `洞府灵草 ${ripe} 株已熟，星辉指引：择晴日采收，方得药性全盛。`;
+  }
+  const growing = garden.filter((h) => h.progress < h.grow).length;
+  if (growing > 0) {
+    return '灵田尚需滋养，星盘显象：可引灵泉浇灌，促其早结灵果。';
+  }
+  if (totalStones(state) < 200) {
+    return '财库星光微弱，宜远游历练或入市易货，积攒修行资粮。';
+  }
+  const y = p.daoYun;
+  if (y && y.id !== 'none' && y.level < 10 && y.exp >= y.level * 100 * 0.8) {
+    return '道韵将圆满，星象昭昭：闭关静修可一举破关，慎勿外骛。';
+  }
+  const pool = DIVINATION.fortunes;
+  return pool[w.year % pool.length];
+}
+
 /** 执行罗盘行动。返回 { logs, battle? , breakthrough? } */
 export function performAction(state, option, extra = {}) {
   const a = option.action;
@@ -1454,7 +1490,7 @@ export function performAction(state, option, extra = {}) {
       // 先结算当月确定性收益，再置运势，避免自身当月收益被运势二次放大
       addDaoYunExp(state, DIVINATION.daoYun, logs);
       addDaoBaseExp(state, '悟性', DIVINATION.wuxing, logs);
-      const fortune = Rng.pick(DIVINATION.fortunes);
+      const fortune = divinationFortune(state);
       const omen = Rng.pick(DIVINATION.omens);
       const w = state.world;
       let ey = w.year, em = w.month + 1;

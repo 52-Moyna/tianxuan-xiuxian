@@ -610,6 +610,29 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   g4.flags.omen = { kind: 'cultivate', icon: '📿', label: '道韵加持', desc: '测试', mul: 1.18, add: 0, expireYear: 9999, expireMonth: 12 };
   ok(omenMul(g4, 'cultivate') === 1.18, '匹配 kind 时 omenMul 返回加成');
   ok(omenMul(g4, 'trade') === 1, '非匹配 kind 时 omenMul 为 1');
+  // 状态感知星盘点评（确定性，无 RNG）
+  ok(typeof S.divinationFortune === 'function', 'divinationFortune 已导出');
+  const g5 = S.createNewGame({ name: '点评·丹毒', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g5);
+  g5.flags.pillToxicity = 40;
+  const f_tox = S.divinationFortune(g5);
+  ok(typeof f_tox === 'string' && f_tox.length > 0, '星盘点评返回非空字符串');
+  ok(f_tox.includes('丹毒'), '丹毒缠身时点评为解毒警示');
+  const g6 = S.createNewGame({ name: '点评·采收', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g6);
+  plantHerb(g6, 'lingcao');
+  g6.cave.garden[0].progress = g6.cave.garden[0].grow;
+  ok(S.divinationFortune(g6).includes('采收'), '灵草已熟时点评为采收指引');
+  const g7 = S.createNewGame({ name: '点评·灵石', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g7);
+  g7.currencies = { '下品灵石': 100 };
+  ok(S.divinationFortune(g7).includes('历练'), '灵石匮乏时点评为历练/易货建议');
+  const g8 = S.createNewGame({ name: '点评·默认', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g8);
+  const fa = S.divinationFortune(g8), fb = S.divinationFortune(g8);
+  ok(fa === fb, '星盘点评确定性（同状态同结果，无 RNG）');
+  ok(fa.length > 0, '默认处境星盘点评非空');
+
 }
 
 

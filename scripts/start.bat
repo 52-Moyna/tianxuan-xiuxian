@@ -3,7 +3,7 @@
 :: Double-click to play; double-click stop.bat when done.
 
 set "DP=%~dp0"
-set "SVR=%DP%server.js"
+set "SVR=%DP%..\server.js"
 
 :: --- Locate Node.js ---
 set "NODE="
