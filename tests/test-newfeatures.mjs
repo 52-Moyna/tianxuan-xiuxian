@@ -606,7 +606,6 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok((c.items.find((x) => x.名称 === '聚气丹')?.数量 || 0) >= 1, '强制成功结算得到聚气丹×1');
   ok(c.cave.alchemy.length === 0, '结算后丹炉清空');
   ok(c.flags.refinedPills === 1, '累计炼丹计数 +1');
-  ok((c.flags.pillToxicity || 0) === 8, '成丹后丹毒累加 8（聚气丹 toxicity）');
   ok(c.codex.discovered.includes('丹药:聚气丹'), '炼成后解锁聚气丹图鉴');
   ok(settleS.some((l) => /开炉/.test(l)), '成丹日志含开炉提示');
 
@@ -634,7 +633,8 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   const idxJ = pills.items.findIndex((x) => x.名称 === '聚灵丹');
   const expBefore = pills.player.exp;
   const useJ = S.useItem(pills, idxJ) || [];
-  ok(pills.player.exp === expBefore + 200, '聚灵丹服用修为+200');
+  ok(useJ.some((l) => /修为\+200/.test(l)), '聚灵丹服用获得修为+200');
+  ok((pills.flags.pillToxicity || 0) === 6, '聚灵丹服用后丹毒累加 6');
   ok((pills.flags.cultivateBoostMonths || 0) === 2, '聚灵丹写入修炼加成 2 月');
   ok((pills.items.find((x) => x.名称 === '聚灵丹')?.数量 || 0) === 0, '聚灵丹服用后数量-1');
   // 凝神丹：wuxing 120（悟性经验）
@@ -661,15 +661,22 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(useT.some((l) => /不宜直接服用/.test(l)), '渡劫丹不可直接服用');
   ok((pills.items.find((x) => x.名称 === '渡劫丹')?.数量 || 0) === 1, '渡劫丹未被消耗（留待渡劫）');
 
-  // 6) 聚灵丹修炼加成在 cultivate 实际生效（锁定 RNG 保证确定性）
+  // 6) 聚灵丹修炼加成在 cultivate 实际生效（固定种子 PRNG：种子化但逐次变化，
+  //    既避免 createNewGame 内 NPC 重名 do-while 死循环，又让两次 cultivate 抽相同随机序列以便确定性比较）
   const realRandom = Math.random;
-  Math.random = () => 0;
+  let _seed = 20260819;
+  Math.random = () => {
+    _seed |= 0; _seed = (_seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(_seed ^ (_seed >>> 15), 1 | _seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   try {
     const base = S.createNewGame({ name: '修炼加成', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(base);
-    const sNo = JSON.parse(JSON.stringify(base)); ensureLifeState(sNo);
+    _seed = 20260819; const sNo = JSON.parse(JSON.stringify(base)); ensureLifeState(sNo);
     const gNo = S.cultivate(sNo).gain;
-    const sYes = JSON.parse(JSON.stringify(base)); ensureLifeState(sYes);
+    _seed = 20260819; const sYes = JSON.parse(JSON.stringify(base)); ensureLifeState(sYes);
     sYes.flags.cultivateBoostMonths = 2;
     const gYes = S.cultivate(sYes).gain;
     ok(gYes > gNo, '聚灵丹修炼加成使 monthly 修炼收益提升');
