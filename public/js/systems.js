@@ -2620,11 +2620,11 @@ export function resolveSpecialEvent(state, evt, optionIdx) {
 export function extraCompassOptions(state) {
   ensureLifeState(state);
   const opts = [];
-  // 秘境探索（达到等级后出现）
+  // 秘境探索（达到等级后出现；列出全部已解锁秘境，玩家可逐一选择并定深度）
   const mystics = availableMysticRealms(state);
-  if (mystics.length) {
-    const m = mystics[0];
-    opts.push({ icon: '🏔️', tag: '秘境', title: `探索「${m.name}」`, desc: m.desc, action: { type: 'mystic', realmId: m.id }, risk: true, preview: '高风险高回报：材料、灵石、法宝；可能遭遇护宝妖兽' });
+  for (const m of mystics) {
+    const needMap = m.requiresMap ? '（需集齐 3 张「海上遗府残图」开启）' : '';
+    opts.push({ icon: '🏔️', tag: '秘境', title: `探索「${m.name}」`, desc: m.desc + needMap, action: { type: 'mystic', realmId: m.id }, risk: true, preview: '高风险高回报：材料、灵石、法宝；可能遭遇护宝妖兽' });
   }
   // 拍卖会（偶发）
   if (state.world.month === 9 || state.flags.auctionAvailable) {

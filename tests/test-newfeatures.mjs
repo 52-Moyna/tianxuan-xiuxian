@@ -1,7 +1,7 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -902,6 +902,26 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(totalAfter - totalBefore >= 5 && totalAfter - totalBefore <= 10, '玉华丹随机提升一项道基 5~10 级');
   ok((pills.flags.pillToxicity || 0) - toxBefore === 18, '玉华丹丹毒累加 18（增量）');
 }
+/* ---------- 罗盘列出全部已解锁秘境 ---------- */
+{
+  const c = S.createNewGame({ name: '罗盘', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(c);
+  c.world.month = 1; // 避开 9 月拍卖会干扰断言
+  c.flags.auctionAvailable = false;
+  c.player.level = 30; // 解锁 青虚(15) + 火焰谷(25)
+  const m30 = S.extraCompassOptions(c).filter((o) => o.action.type === 'mystic');
+  ok(m30.length === availableMysticRealms(c).length, '罗盘秘境数=已解锁数(30级)');
+  ok(m30.length === 2, '30级恰好两处秘境可入');
+  ok(new Set(m30.map((o) => o.action.realmId)).size === m30.length, '各秘境 realmId 不重复');
+  ok(m30.some((o) => o.action.realmId === 'qingxu') && m30.some((o) => o.action.realmId === 'huoyan'), '30级含青虚与火焰谷');
+  // 升至 55，应解锁 冰海遗迹(40) 与 海上遗府(50)，共 4 处
+  c.player.level = 55;
+  const m55 = S.extraCompassOptions(c).filter((o) => o.action.type === 'mystic');
+  ok(m55.length === availableMysticRealms(c).length && m55.length === 4, '55级四秘境全部可选');
+  const yifu = m55.find((o) => o.action.realmId === 'yifu');
+  ok(yifu && /残图/.test(yifu.desc), '海上遗府选项提示需残图开启');
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
