@@ -356,6 +356,11 @@ export const CODEX_ITEMS = [
   { id: 'mat_herb_huojing', category: '材料', name: '火精枣', rarity: '材料', source: '灵草园收获（火精枣树）', effect: '火属性灵植，炼器与炼丹皆宜。' },
   { id: 'mat_herb_yushu', category: '材料', name: '玉髓芝', rarity: '材料', source: '灵草园收获（玉髓芝）', effect: '上品灵植，炼制高阶丹药的关键辅药。' },
   { id: 'mat_herb_yuehua', category: '材料', name: '天材地宝·月华露', rarity: '传说材料', source: '灵草园收获（月华露藤）', effect: '月华凝露，炼丹圣物，价值连城。' },
+  // —— 灵草杂交奇珍灵材（杂交产出即录入图鉴） ——
+  { id: 'mat_hybrid_ninhuo', category: '材料', name: '凝火奇实', rarity: '奇珍灵材', source: '灵草园杂交（凝露草+火精枣）', effect: '凝露与火精交融所结奇实，灵气内蕴，炼器炼丹皆宜。' },
+  { id: 'mat_hybrid_yuhua', category: '材料', name: '玉华灵髓', rarity: '奇珍灵材', source: '灵草园杂交（玉髓芝+月华露）', effect: '玉髓与月华同炼的灵髓，温润如玉，高阶丹药圣料。' },
+  { id: 'mat_hybrid_luhua', category: '材料', name: '露华玉液', rarity: '奇珍灵材', source: '灵草园杂交（凝露草+月华露）', effect: '凝露承月华而成的玉液，可解百毒、助悟道。' },
+  { id: 'mat_hybrid_yanlu', category: '材料', name: '炎玉灵枣', rarity: '奇珍灵材', source: '灵草园杂交（火精枣+玉髓芝）', effect: '火精与玉髓相济的灵枣，温补根基、淬炼筋骨。' },
 ];
 
 /* ============================================================
@@ -436,6 +441,7 @@ export const ACHIEVEMENTS = [
   { id: 'heal',    name: '妙手回春', icon: '💉', desc: '服下疗伤丹，清除一身伤势。', reward: { stones: 200 }, check: (s) => !!s.flags?.curedWounds },
   { id: 'dujie',   name: '九九归真', icon: '⚡', desc: '成功渡过一次大境界天劫。', reward: { stones: 2000 }, check: (s) => !!s.flags?.tribulationSuccess },
   { id: 'herbCodex', name: '百草通鉴', icon: '🍃', desc: '集齐灵草园全部 4 种灵草图鉴。', reward: { stones: 800 }, check: (s) => ['灵草:凝露灵草', '灵草:火精枣树', '灵草:玉髓芝', '灵草:月华露藤'].every((k) => (s.codex?.discovered || []).includes(k)) },
+  { id: 'herbHybrid', name: '灵植奇才', icon: '🌿', desc: '杂交出全部 4 种奇珍灵材。', reward: { stones: 1200 }, check: (s) => ['材料:凝火奇实', '材料:玉华灵髓', '材料:露华玉液', '材料:炎玉灵枣'].every((k) => (s.codex?.discovered || []).includes(k)) },
 ];
 
 /** 返回每个成就的「视图」：是否已解锁 + 进度（cur/max/ratio），供 UI 渲染进度条 */

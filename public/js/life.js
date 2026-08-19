@@ -1,5 +1,7 @@
 import { ensureCodexState, discoverItem, ensureBeastState, ensureSectState, ensureAuctionState, setBonusFlags, rollPillQuality } from './codex.js';
-import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES, REALMS } from './data.js';
+import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES, REALMS, HERB_HYBRIDS, HERB_HYBRID_COST } from './data.js';
+export { HERB_HYBRID_COST, HERB_HYBRIDS };
+
 
 /**
  * life.js - 修仙生活系统
@@ -565,6 +567,40 @@ export function irrigateHerb(state, idx) {
   h.irrigated = (h.irrigated || 0) + 1;
   const mature = h.progress >= h.grow;
   return { ok: true, logs: [`你引灵泉浇灌「${h.name}」，灵草生长 +1 月（${h.progress}/${h.grow} 月）${mature ? '，现已可收获！' : ''}。`, `耗灵石 ${HERB_IRRIGATE_COST}（本月已浇灌 ${h.irrigatedThisMonth}/${HERB_IRRIGATE_CAP_PER_MONTH} 次）。`] };
+}
+
+/* ============================================================
+ * 灵草杂交（洞府灵草园进阶玩法）
+ * ----------------------------------------------------------
+ * 将两种不同基础灵草产物杂交，凝成一种奇珍灵材。确定性、无 RNG。
+ * 与 storeItem/discoverItem 协作：产物自动入袋并解锁图鉴。
+ * ========================================================== */
+/** 按（排序后的）两种灵草产物名查找杂交配方，顺序无关 */
+export function findHerbHybrid(a, b) {
+  const key = [a, b].sort().join('+');
+  return HERB_HYBRIDS.find((h) => [h.a, h.b].sort().join('+') === key) || null;
+}
+
+/**
+ * 灵草杂交：消耗两种不同灵草产物各 1 份 + 灵石，凝成奇珍灵材。
+ * 产物经 storeItem 入袋（内含 discoverItem 解锁图鉴）。确定性、无 RNG。
+ */
+export function crossbreedHerbs(state, aName, bName) {
+  ensureLifeState(state);
+  if (!aName || !bName || aName === bName) return { ok: false, logs: ['需选择两种不同的灵草产物进行杂交。'] };
+  const def = findHerbHybrid(aName, bName);
+  if (!def) return { ok: false, logs: [`「${aName}」与「${bName}」无法杂交出灵材。`] };
+  const itemA = state.items.find((x) => x.名称 === aName);
+  const itemB = state.items.find((x) => x.名称 === bName);
+  if (!itemA || (itemA.数量 || 0) < 1 || !itemB || (itemB.数量 || 0) < 1) {
+    return { ok: false, logs: [`灵草产物不足：需要「${aName}」与「${bName}」各 1 份。`] };
+  }
+  if (!spendStoneLike(state, HERB_HYBRID_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_HYBRID_COST}）。`] };
+  itemA.数量 -= 1; if (itemA.数量 <= 0) state.items.splice(state.items.indexOf(itemA), 1);
+  itemB.数量 -= 1; if (itemB.数量 <= 0) state.items.splice(state.items.indexOf(itemB), 1);
+  storeItem(state, { ...def.out });
+  state.inventory.used = inventoryUsed(state);
+  return { ok: true, logs: [`你将「${aName}」与「${bName}」杂交，凝成奇珍灵材「${def.out.名称}」×1。`, `耗灵石 ${HERB_HYBRID_COST}。`] };
 }
 
 /* ============================================================

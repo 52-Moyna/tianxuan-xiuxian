@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2514,6 +2514,19 @@ function renderCenter() {
             </div>`).join('')}
         </div>
         <div class="opt-desc" style="margin-top:8px">灵草成熟需若干月（随游戏月度推进），<b>播种即解锁「灵草」图鉴</b>，收获产物自动入袋，可在行囊「材料」分类与图鉴中查看。集齐全部 4 种灵草可触发「百草通鉴」成就。<b>灵泉浇灌除加速生长外，每次还会累积提升最终收获产量（累计封顶 +${HERB_IRRIGATE_YIELD_CAP}）。</b></div>
+        <div class="side-subtitle">🌿 灵草杂交</div>
+        <div class="opt-desc">将两种不同的灵草产物杂交，凝成奇珍灵材（图鉴收集 + 高价可售）。每次消耗灵石 ${D.HERB_HYBRID_COST}。</div>
+        <div class="herb-seed-list">
+          ${D.HERB_HYBRIDS.map((hy) => {
+            const ca = (st.items.find((x) => x.名称 === hy.a)?.数量) || 0;
+            const cb = (st.items.find((x) => x.名称 === hy.b)?.数量) || 0;
+            const can = ca >= 1 && cb >= 1 && (st.currencies['下品灵石'] || 0) >= D.HERB_HYBRID_COST;
+            return `<div class="herb-seed">
+              <div class="herb-seed-info"><b>${hy.out.名称}</b><span>${hy.a} + ${hy.b} → ${hy.out.名称}（价值 ${hy.out.价值}）</span><span class="herb-q">持有：${ca}/${cb}</span></div>
+              <button class="btn btn-sm btn-gold" data-cross="${hy.a}|${hy.b}" ${can ? '' : 'disabled'}>杂交</button>
+            </div>`;
+          }).join('')}
+        </div>
         ${alchemySection}
       </div>`;
     box.querySelectorAll('[data-plant]').forEach((b) => b.addEventListener('click', () => {
@@ -2532,6 +2545,13 @@ function renderCenter() {
       const r = irrigateHerb(st, Number(b.dataset.irrigate));
       (r.logs || []).forEach((l) => pushLog(l));
       toast(r.ok ? r.logs[0] : (r.logs[0] || '无法浇灌'), r.ok ? 'jade' : 'warn');
+      renderAll();
+    }));
+    box.querySelectorAll('[data-cross]').forEach((b) => b.addEventListener('click', () => {
+      const [a, bname] = b.dataset.cross.split('|');
+      const r = crossbreedHerbs(st, a, bname);
+      (r.logs || []).forEach((l) => pushLog(l));
+      toast(r.ok ? r.logs[0] : (r.logs[0] || '无法杂交'), r.ok ? 'gold' : 'warn');
       renderAll();
     }));
     box.querySelectorAll('[data-refine]').forEach((b) => b.addEventListener('click', () => {

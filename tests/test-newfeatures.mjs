@@ -1,6 +1,6 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
-import { DIVINATION, PILL_RECIPES } from '../public/js/data.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
+import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
@@ -811,6 +811,39 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
     const gYes = S.cultivate(sYes).gain;
     ok(gYes > gNo, '聚灵丹修炼加成使 monthly 修炼收益提升');
   } finally { Math.random = realRandom; }
+}
+
+/* ---------- 灵草杂交：两种灵草产物→奇珍灵材（确定性、无 RNG） ---------- */
+{
+  const g = S.createNewGame({ name: '灵草杂交', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.currencies = g.currencies || {};
+  g.currencies['下品灵石'] = 99999;
+  // 配方查找：顺序无关 + 无效组合
+  ok(findHerbHybrid('凝露草', '火精枣') !== null && findHerbHybrid('火精枣', '凝露草') !== null, 'findHerbHybrid 顺序无关');
+  ok(findHerbHybrid('凝露草', '凝露草') === null, '相同灵草无配方');
+  ok(!crossbreedHerbs(g, '凝露草', '凝露草').ok, '相同灵草不可杂交');
+  ok(!crossbreedHerbs(g, '凝露草', '不存在的材料').ok, '无效组合拒绝杂交');
+  // 缺少材料拒绝
+  ok(!crossbreedHerbs(g, '凝露草', '火精枣').ok, '灵草产物不足时拒绝杂交');
+  // 准备材料（各 1）与配方（顺序颠倒也应成功）
+  g.items.push({ 名称: '凝露草', 类型: '材料', 数量: 1, 描述: '', 价值: 40 });
+  g.items.push({ 名称: '火精枣', 类型: '材料', 数量: 1, 描述: '', 价值: 50 });
+  const before = g.currencies['下品灵石'];
+  const rr = crossbreedHerbs(g, '火精枣', '凝露草');
+  ok(rr.ok && g.items.some((it) => it.名称 === '凝火奇实'), '杂交成功并产出奇珍灵材（不分先后）');
+  ok(g.currencies['下品灵石'] === before - HERB_HYBRID_COST, '杂交扣除对应灵石');
+  ok(!g.items.some((it) => it.名称 === '凝露草') && !g.items.some((it) => it.名称 === '火精枣'), '杂交消耗两种灵草产物各 1 份');
+  ok(g.codex.discovered.includes('材料:凝火奇实'), '杂交奇珍灵材解锁图鉴');
+  // 全部 4 种杂交 → 解锁「灵植奇才」成就
+  for (const hy of HERB_HYBRIDS) {
+    if (g.codex.discovered.includes('材料:' + hy.out.名称)) continue;
+    g.items.push({ 名称: hy.a, 类型: '材料', 数量: 1, 描述: '', 价值: 10 });
+    g.items.push({ 名称: hy.b, 类型: '材料', 数量: 1, 描述: '', 价值: 10 });
+    crossbreedHerbs(g, hy.a, hy.b);
+  }
+  checkAchievements(g);
+  ok(g.achievements.some((a) => a.id === 'herbHybrid'), '集齐 4 种奇珍灵材解锁「灵植奇才」成就');
 }
 
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
