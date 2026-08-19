@@ -666,6 +666,10 @@ export function isRecipeUnlocked(state, recipeId) {
     case '筑基丹': return lvl >= 20 || sectRank >= 1;
     case '洗髓丹': return lvl >= 40 || sectRank >= 2 || (state.flags?.refinedPills || 0) >= 15;
     case '渡劫丹': return lvl >= 60 || sectRank >= 3;
+    case '凝火丹': return lvl >= 21 || artLv >= 2;
+    case '炎玉丹': return lvl >= 40 || sectRank >= 2 || (state.flags?.refinedPills || 0) >= 15;
+    case '玉华丹': return lvl >= 40 || sectRank >= 3;
+    case '露华丹': return lvl >= 60 || sectRank >= 3;
     default: return false;
   }
 }

@@ -846,6 +846,62 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(g.achievements.some((a) => a.id === 'herbHybrid'), '集齐 4 种奇珍灵材解锁「灵植奇才」成就');
 }
 
+
+/* ---------- 灵草杂交产物 → 高阶丹方闭环（确定性、无 RNG） ---------- */
+{
+  // 1) 解锁门槛：奇珍灵材丹方与境界 / 百艺 / 宗门贡献挂钩
+  const u = S.createNewGame({ name: '高阶丹方解锁', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(u); u.player.level = 1; u.arts = {}; u.sect = { rank: 0 };
+  ok(!isRecipeUnlocked(u, '凝火丹'), '低境界未解锁凝火丹');
+  u.player.level = 21;
+  ok(isRecipeUnlocked(u, '凝火丹'), '达 21 级解锁凝火丹');
+  ok(!isRecipeUnlocked(u, '玉华丹'), '低境界未解锁玉华丹');
+  u.player.level = 40;
+  ok(isRecipeUnlocked(u, '玉华丹'), '达 40 级解锁玉华丹');
+  u.player.level = 60;
+  ok(isRecipeUnlocked(u, '露华丹'), '达 60 级解锁露华丹');
+
+  // 2) 闭环：杂交产出奇珍灵材 → 作为高阶丹方材料开炉
+  const g = S.createNewGame({ name: '闭环炼丹', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.currencies = g.currencies || {}; g.currencies['下品灵石'] = 999999;
+  storeItem(g, { 名称: '凝露草', 类型: '材料', 数量: 5, 描述: '测试', 价值: 5 });
+  storeItem(g, { 名称: '火精枣', 类型: '材料', 数量: 5, 描述: '测试', 价值: 5 });
+  const cross = crossbreedHerbs(g, '凝露草', '火精枣');
+  ok(cross.ok && g.items.some((it) => it.名称 === '凝火奇实'), '杂交得到凝火奇实（闭环起点）');
+  g.player.level = 21; ensureLifeState(g);
+  ok(isRecipeUnlocked(g, '凝火丹'), '已满足凝火丹解锁条件');
+  const stonesBefore = S.totalStones(g);
+  const refineR = refinePill(g, '凝火丹');
+  ok(refineR.ok, '以凝火奇实开炉炼制凝火丹成功');
+  ok(S.totalStones(g) === stonesBefore - PILL_RECIPES.凝火丹.stoneCost, '开炉按总灵石扣费');
+  ok(!g.items.some((it) => it.名称 === '凝火奇实'), '开炉消耗奇珍灵材凝火奇实');
+  ok(g.cave.alchemy.length === 1, '丹炉写入 1 炉');
+  settleRefine(g, [], 'success');
+  ok((g.items.find((x) => x.名称 === '凝火丹')?.数量 || 0) >= 1, '凝火丹炼成');
+  ok(g.codex.discovered.includes('丹药:凝火丹'), '炼成后解锁凝火丹图鉴');
+
+  // 3) 高阶丹药效果（露华丹：heal + wuxing；玉华丹：随机道基 5~10）
+  const pills = S.createNewGame({ name: '高阶丹效', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(pills);
+  pills.flags.wounded = 2;
+  storeItem(pills, { 名称: '露华丹', 类型: '丹药', 数量: 1, 描述: '测试', toxicity: 8, effect: { heal: true, wuxing: 200 }, breakthrough: false });
+  const idxL = pills.items.findIndex((x) => x.名称 === '露华丹');
+  const wuxBefore = pills.player.daoBase['悟性'].exp;
+  const useL = S.useItem(pills, idxL) || [];
+  ok((pills.flags.wounded || 0) === 0, '露华丹服用清除伤势');
+  ok(useL.some((l) => /悟性经验\+200/.test(l)) || (pills.player.daoBase['悟性'].exp - wuxBefore >= 200), '露华丹服用悟性经验 +200');
+  ok(useL.some((l) => /伤势尽去/.test(l)), '露华丹服用日志含伤势尽去');
+
+  const totalBefore = Object.values(pills.player.daoBase).reduce((s, v) => s + v.level, 0);
+  storeItem(pills, { 名称: '玉华丹', 类型: '丹药', 数量: 1, 描述: '测试', toxicity: 18, effect: { daoBase: { keys: ['悟性', '气运'], min: 5, max: 10 } }, breakthrough: false });
+  const idxY = pills.items.findIndex((x) => x.名称 === '玉华丹');
+  const toxBefore = pills.flags.pillToxicity || 0;
+  S.useItem(pills, idxY);
+  const totalAfter = Object.values(pills.player.daoBase).reduce((s, v) => s + v.level, 0);
+  ok(totalAfter - totalBefore >= 5 && totalAfter - totalBefore <= 10, '玉华丹随机提升一项道基 5~10 级');
+  ok((pills.flags.pillToxicity || 0) - toxBefore === 18, '玉华丹丹毒累加 18（增量）');
+}
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
