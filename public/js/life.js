@@ -464,7 +464,7 @@ export function plantHerb(state, herbId) {
   if (!def) return { ok: false, logs: ['未知灵草。'] };
   if (state.cave.garden.length >= gardenCapacity(state)) return { ok: false, logs: [`灵草园已满（最多 ${gardenCapacity(state)} 株），请先收获。`] };
   if (!spendStoneLike(state, def.seedCost)) return { ok: false, logs: [`灵石不足（需 ${def.seedCost}）。`] };
-  state.cave.garden.push({ id: def.id, name: def.name, progress: 0, grow: def.grow, planted: `${state.world.year}年${state.world.month}月`, irrigatedThisMonth: 0 });
+  state.cave.garden.push({ id: def.id, name: def.name, progress: 0, grow: def.grow, planted: `${state.world.year}年${state.world.month}月`, irrigatedThisMonth: 0, irrigated: 0 });
   // 播种即解锁对应灵草图鉴条目（玩家可感知的收集反馈）
   discoverItem(state, { 名称: def.name, 类型: '灵草' });
   return { ok: true, logs: [`你在洞府灵田播下「${def.name}」，约 ${def.grow} 个月后可收获。`, `耗灵石 ${def.seedCost}。`] };
@@ -482,11 +482,20 @@ export function harvestHerb(state, idx) {
   if (def.yield) {
     const q = herbQuality(state);
     const baseQty = def.yield.数量 || 1;
-    const qty = Math.max(1, Math.round(baseQty * q.mul));
+    const qualityQty = Math.max(1, Math.round(baseQty * q.mul));
+    const irriBonus = Math.min(h.irrigated || 0, HERB_IRRIGATE_YIELD_CAP);
+    const qty = qualityQty + irriBonus;
     storeItem(state, { ...def.yield, 数量: qty });
-    const extra = qty - baseQty;
-    const tag = q.tier === '下品' ? '' : `（${q.tier}灵田·+${extra}）`;
-    return { ok: true, logs: [`你采得「${def.yield.名称}」×${qty}${tag}，已收入储物袋。`, q.tier === '下品' ? '灵田灵气平淡，产出寻常。' : `洞府灵气滋养，灵草品质达「${q.tier}」，产量提升。`] };
+    const qualityExtra = qualityQty - baseQty;
+    const tagParts = [];
+    if (q.tier !== '下品') tagParts.push(`${q.tier}灵田·+${qualityExtra}`);
+    if (irriBonus > 0) tagParts.push(`灵泉浸润·+${irriBonus}`);
+    const tag = tagParts.length ? `（${tagParts.join('，')}）` : '';
+    const notes = [];
+    if (q.tier !== '下品') notes.push(`洞府灵气滋养，灵草品质达「${q.tier}」，产量提升。`);
+    if (irriBonus > 0) notes.push(`灵泉反复浸润，灵草肥硕，额外多收 ${irriBonus} 份。`);
+    if (!notes.length) notes.push('灵田灵气平淡，产出寻常。');
+    return { ok: true, logs: [`你采得「${def.yield.名称}」×${qty}${tag}，已收入储物袋。`, ...notes] };
   }
   return { ok: true, logs: [`「${h.name}」已收获，但灵种异变，未见产出。`] };
 }
@@ -507,6 +516,8 @@ export const HERB_IRRIGATE_COST = 15;
 export const HERB_IRRIGATE_CAP_PER_MONTH = 2;
 /** 灵泉涌动阈值：洞府达到此等级（Lv.5+），灵泉自然涌动，灵草每月额外 +1 自然生长 */
 export const HERB_SPRING_LEVEL = 5;
+/** 单株累计浸润可转化为收获产量加成的上限：防止付费无限堆产，保留平衡 */
+export const HERB_IRRIGATE_YIELD_CAP = 3;
 /**
  * 灵泉自然加成：洞府灵泉涌动后，每株灵草月度自然生长额外 +1（确定性，无 RNG）。
  * 与浇灌（付费单次 +1）互补：高等级洞府的灵草园收获更快，是洞府长线投资的回报之一。
@@ -551,6 +562,7 @@ export function irrigateHerb(state, idx) {
   if (!spendStoneLike(state, HERB_IRRIGATE_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_IRRIGATE_COST}）。`] };
   h.progress = Math.min(h.grow, h.progress + 1);
   h.irrigatedThisMonth = (h.irrigatedThisMonth || 0) + 1;
+  h.irrigated = (h.irrigated || 0) + 1;
   const mature = h.progress >= h.grow;
   return { ok: true, logs: [`你引灵泉浇灌「${h.name}」，灵草生长 +1 月（${h.progress}/${h.grow} 月）${mature ? '，现已可收获！' : ''}。`, `耗灵石 ${HERB_IRRIGATE_COST}（本月已浇灌 ${h.irrigatedThisMonth}/${HERB_IRRIGATE_CAP_PER_MONTH} 次）。`] };
 }

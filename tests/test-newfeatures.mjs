@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -515,6 +515,36 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ensureLifeState(g8); g8.cave.level = 8; g8.cave.garden = []; g8.currencies = g8.currencies || {}; g8.currencies['下品灵石'] = 99999;
   let p8 = 0; for (let i = 0; i < 9; i++) { if (plantHerb(g8, 'lingcao').ok) p8++; }
   ok(p8 === 8 && g8.cave.garden.length === 8, 'Lv.8 最多播种 8 株，第 9 株被拒');
+}
+
+/* ---------- 灵泉浇灌提升收获产量（加速 + 累计浸润增产，封顶） ---------- */
+{
+  ok(typeof HERB_IRRIGATE_YIELD_CAP === 'number' && HERB_IRRIGATE_YIELD_CAP === 3, '浇灌增产上限常量为 3');
+  function yieldOf(level, irrigated) {
+    const g = S.createNewGame({ name: 'irr', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g); g.cave.level = level; g.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 3, grow: 3, planted: 'x', irrigated: irrigated }];
+    g.currencies = g.currencies || {}; g.currencies['下品灵石'] = 1000;
+    const before = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
+    harvestHerb(g, 0);
+    const after = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
+    return after - before;
+  }
+  ok(yieldOf(0, 0) === 2, '无浇灌 Lv.0 收获凝露草×2（与旧逻辑一致）');
+  ok(yieldOf(0, 2) === 4, 'Lv.0 + 浸润2次 → 凝露草×4（2+2）');
+  ok(yieldOf(0, 3) === 5, 'Lv.0 + 浸润3次 → 凝露草×5（2+3，达上限）');
+  ok(yieldOf(0, 99) === 5, 'Lv.0 + 浸润99次 → 仍封顶 ×5（2+3）');
+  ok(yieldOf(8, 2) === 7, 'Lv.8 仙品×5 + 浸润2 → ×7（品质与浸润叠加）');
+  const g2 = S.createNewGame({ name: 'irr2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g2); g2.cave.level = 0; g2.cave.garden = []; g2.currencies = g2.currencies || {}; g2.currencies['下品灵石'] = 99999;
+  const pr = plantHerb(g2, 'lingcao'); ok(pr.ok && g2.cave.garden[0].irrigated === 0, '播种后浸润计数初始化为 0');
+  ok(irrigateHerb(g2, 0).ok && g2.cave.garden[0].irrigated === 1, '首次浇灌浸润计数=1');
+  ok(irrigateHerb(g2, 0).ok && g2.cave.garden[0].irrigated === 2, '二次浇灌浸润计数=2（达月度上限）');
+  ok(!irrigateHerb(g2, 0).ok, '同日第三次浇灌被月度上限拒绝');
+  g2.cave.garden[0].progress = 3;
+  const before2 = g2.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
+  const hr2 = harvestHerb(g2, 0);
+  const after2 = g2.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
+  ok(hr2.ok && (after2 - before2) === 4, '浸润2次实际收获 +4（基础2+浸润2）');
 }
 
 /* ---------- 灵草图鉴解锁：播种解锁灵草条目、收获解锁产物材料、集齐得「百草通鉴」成就 ---------- */

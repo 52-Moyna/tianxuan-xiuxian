@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, omenActive, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2499,7 +2499,7 @@ function renderCenter() {
           const atCap = (h.irrigatedThisMonth || 0) >= HERB_IRRIGATE_CAP_PER_MONTH;
           return `
           <div class="herb-row ${mature ? 'mature' : ''}">
-            <div class="herb-info"><b>${h.name}</b><span>播种于 ${h.planted || '?'}</span><span class="herb-q">${herbQuality(st).label}灵田${herbSpringBonus(st) > 0 ? ' · 💧灵泉' : ''}</span></div>
+            <div class="herb-info"><b>${h.name}</b><span>播种于 ${h.planted || '?'}</span><span class="herb-q">${herbQuality(st).label}灵田${herbSpringBonus(st) > 0 ? ' · 💧灵泉' : ''}${(h.irrigated||0) > 0 ? ` · 💧浸润${h.irrigated}（收获+${Math.min(h.irrigated, HERB_IRRIGATE_YIELD_CAP)}）` : ''}</span></div>
             <div class="herb-grow"><i style="width:${Math.min(100, Math.round(h.progress / h.grow * 100))}%"></i><span>${h.progress}/${h.grow} 月${mature ? ' · 可收获' : (atCap ? ' · 本月浇灌已满' : '')}</span></div>
             <button class="btn btn-sm btn-gold" data-harvest="${i}" ${mature ? '' : 'disabled'}>${mature ? '收获' : '未熟'}</button>
             <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
@@ -2513,7 +2513,7 @@ function renderCenter() {
               <button class="btn btn-sm btn-gold" data-plant="${hb.id}" ${garden.length >= gardenCapacity(st) ? 'disabled' : ''}>播种（${hb.seedCost}灵石）</button>
             </div>`).join('')}
         </div>
-        <div class="opt-desc" style="margin-top:8px">灵草成熟需若干月（随游戏月度推进），<b>播种即解锁「灵草」图鉴</b>，收获产物自动入袋，可在行囊「材料」分类与图鉴中查看。集齐全部 4 种灵草可触发「百草通鉴」成就。</div>
+        <div class="opt-desc" style="margin-top:8px">灵草成熟需若干月（随游戏月度推进），<b>播种即解锁「灵草」图鉴</b>，收获产物自动入袋，可在行囊「材料」分类与图鉴中查看。集齐全部 4 种灵草可触发「百草通鉴」成就。<b>灵泉浇灌除加速生长外，每次还会累积提升最终收获产量（累计封顶 +${HERB_IRRIGATE_YIELD_CAP}）。</b></div>
         ${alchemySection}
       </div>`;
     box.querySelectorAll('[data-plant]').forEach((b) => b.addEventListener('click', () => {
