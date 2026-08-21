@@ -2471,6 +2471,8 @@ function awardAuctionItem(state, item, amount) {
 /* ============================================================
  * 十八、秘境多层探索（与遗府残图、天命联动）
  * ========================================================== */
+// 海上遗府（需残图秘境）进入需缴纳的护阵灵石；海岛通行令可减 20%（持久生效、不消耗）
+const MYSTIC_REALM_ENTRY_FEE = 100;
 export function exploreMysticRealm(state, realmId, depth = 1) {
   ensureLifeState(state);
   const realm = MYSTIC_REALMS.find((r) => r.id === realmId);
@@ -2478,11 +2480,20 @@ export function exploreMysticRealm(state, realmId, depth = 1) {
   if (state.player.level < realm.minLevel) return { logs: [`修为不足，需达到 Lv.${realm.minLevel}。`] };
   depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
   const dcfg = MYSTIC_DEPTH.of(depth);
+  const logs = [`你深入「${realm.name}·${dcfg.name}」：${realm.desc}`];
   // 遗府需要残图
   if (realm.requiresMap) {
     const maps = state.items.filter((i) => i.名称 === '海上遗府残图');
     const total = maps.reduce((s, i) => s + (i.数量 || 1), 0);
     if (total < 3) return { logs: [`需集齐 3 张「海上遗府残图」方可开启，当前 ${total} 张。`] };
+    // 护阵灵石（海岛通行令可减 20%，持久生效、不消耗），先校验费用再consum残图
+    const relicDiscount = state.items
+      .filter((i) => i.effect && i.effect.relic)
+      .reduce((mx, i) => Math.max(mx, i.effect.relic || 0), 0);
+    const fee = Math.max(0, Math.round(MYSTIC_REALM_ENTRY_FEE * (1 - relicDiscount / 100)));
+    if (fee > 0 && !spendStones(state, fee)) {
+      return { logs: [`遗府护阵需缴纳灵石 ${fee}，当前灵石不足，无法进入。`] };
+    }
     // 消耗 3 张残图
     let need = 3;
     for (const m of maps) {
@@ -2492,8 +2503,8 @@ export function exploreMysticRealm(state, realmId, depth = 1) {
       if (m.数量 <= 0) state.items.splice(state.items.indexOf(m), 1);
       if (need <= 0) break;
     }
+    if (fee > 0) logs.push(`缴纳遗府护阵灵石 -${fee}${relicDiscount > 0 ? '（海岛通行令减费）' : ''}。`);
   }
-  const logs = [`你深入「${realm.name}·${dcfg.name}」：${realm.desc}`];
   const setFlags = setBonusFlags(state);
   const findBonus = setFlags.mysticFind || 0;
   // 奖励结算（深度越高越丰厚）—— 先结算，再决定是否遭遇妖兽，保证深处收益严格更高

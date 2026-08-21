@@ -54,6 +54,7 @@ export const REGION_MARKET = {
     { name: '基础功法玉简', type: '功法', price: 180, desc: '凡品功法，适合初学者。', effect: { technique: '基础吐纳术' } },
     { name: '疗伤丹', type: '丹药', price: 40, desc: '清除 1 个月伤势。', effect: { heal: true } },
     { name: '制式护心甲', type: '装备', price: 160, level: 1, desc: '稳定防护，战力 +1。' },
+    { name: '旅行凭证', type: '消耗品', price: 160, desc: '下次跨域旅行费用减半。', effect: { travel: 50 } },
   ],
   donghuang: [
     { name: '青风狼内丹', type: '材料', price: 45, desc: '妖兽内丹，炼丹主药。' },
@@ -415,10 +416,23 @@ export function startTravel(state, regionId) {
   const current = REGION_TRAVEL[state.world.regionId] || REGION_TRAVEL.zhongzhou;
   if (!current.neighbors.includes(regionId)) return { ok: false, text: '此地暂无直达路线，需先到相邻地域。' };
   if (state.world.travel?.destination) return { ok: false, text: '你已在旅途中，不能重复规划路线。' };
-  if (!spendStoneLike(state, target.cost)) return { ok: false, text: `路费不足，需要下品灵石${target.cost}。` };
+  // 跨域旅行凭证：持有时本次路费减半（单张消耗），使「远航凭证/旅行凭证」成为真实可用道具
+  let cost = target.cost;
+  const voucher = state.items.find((i) => i.effect && i.effect.travel);
+  let usedVoucher = null;
+  if (voucher) {
+    cost = Math.max(0, Math.round(target.cost * (1 - (voucher.effect.travel || 0) / 100)));
+    usedVoucher = voucher;
+  }
+  if (!spendStoneLike(state, cost)) return { ok: false, text: `路费不足，需要下品灵石${cost}。` };
+  if (usedVoucher) {
+    usedVoucher.数量 -= 1;
+    if (usedVoucher.数量 <= 0) state.items.splice(state.items.indexOf(usedVoucher), 1);
+  }
   state.world.travel = { destination: regionId, remaining: target.months };
   const name = REGION_NAMES[regionId] || regionId;
-  return { ok: true, text: `你踏上前往${name}的路途，预计${target.months}个月抵达。`, months: target.months };
+  const tail = usedVoucher ? `（使用「${usedVoucher.名称}」，路费减半）` : '';
+  return { ok: true, text: `你踏上前往${name}的路途，预计${target.months}个月抵达。${tail}`, months: target.months };
 }
 
 export function completeTravel(state, regionNames = {}) {

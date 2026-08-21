@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -1042,6 +1042,78 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(!g.items.some((i) => i.名称 === '聚灵阵旗'), '聚灵阵旗使用后消耗');
 }
 
+
+
+/* ---------- 死道具修复：旅行凭证 / 远航凭证（跨域旅行费用减半，单张消耗） ---------- */
+const pickNeighbor = (st) => travelOptions(st)[0];
+{
+  // 无凭证：路费 = 全额
+  const t1 = S.createNewGame({ name: '旅行测试1', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(t1);
+  const nb1 = pickNeighbor(t1);
+  t1.currencies['下品灵石'] = 100000;
+  const b1 = t1.currencies['下品灵石'];
+  const r1 = startTravel(t1, nb1.id);
+  ok(r1.ok, '无凭证旅行可规划');
+  ok(b1 - t1.currencies['下品灵石'] === nb1.cost, '无凭证路费=全额');
+  ok(!r1.text.includes('减半'), '无凭证文案不含减半');
+
+  // 持旅行凭证：路费减半且消耗一张
+  const t2 = S.createNewGame({ name: '旅行测试2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(t2);
+  const nb2 = pickNeighbor(t2);
+  t2.currencies['下品灵石'] = 100000;
+  t2.items.push({ 名称: '旅行凭证', 类型: '消耗品', 数量: 1, effect: { travel: 50 }, 描述: '跨域旅行费用减半。' });
+  const b2 = t2.currencies['下品灵石'];
+  const r2 = startTravel(t2, nb2.id);
+  const exp2 = Math.max(0, Math.round(nb2.cost * 0.5));
+  ok(r2.ok, '持旅行凭证旅行可规划');
+  ok(b2 - t2.currencies['下品灵石'] === exp2, '持旅行凭证路费减半(实扣' + (b2 - t2.currencies['下品灵石']) + ',期望' + exp2 + ')');
+  ok(!t2.items.some((i) => i.名称 === '旅行凭证'), '旅行凭证被消耗');
+  ok(r2.text.includes('减半'), '持凭证文案提示减半');
+
+  // 持远航凭证同样生效
+  const t3 = S.createNewGame({ name: '旅行测试3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(t3);
+  const nb3 = pickNeighbor(t3);
+  t3.currencies['下品灵石'] = 100000;
+  t3.items.push({ 名称: '远航凭证', 类型: '消耗品', 数量: 1, effect: { travel: 50 }, 描述: '跨域旅行费用减半。' });
+  const b3 = t3.currencies['下品灵石'];
+  const r3 = startTravel(t3, nb3.id);
+  ok(r3.ok && b3 - t3.currencies['下品灵石'] === Math.max(0, Math.round(nb3.cost * 0.5)), '远航凭证同样减半并消耗');
+}
+
+/* ---------- 死道具修复：海岛通行令（海上遗府护阵灵石减费，持久生效） ---------- */
+{
+  const mkYifu = () => {
+    const g = S.createNewGame({ name: '遗府测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    g.player.level = 55;
+    g.currencies['下品灵石'] = 1000;
+    for (let k = 0; k < 3; k++) g.items.push({ 名称: '海上遗府残图', 类型: '线索', 数量: 1, 描述: '残图' });
+    return g;
+  };
+  // 灵石不足：提前返回且残图不消耗
+  const a = mkYifu(); a.currencies['下品灵石'] = 0;
+  const ra = S.exploreMysticRealm(a, 'yifu', 1);
+  ok(ra.logs.some((l) => l.includes('灵石不足')), '遗府灵石不足时拒绝进入');
+  ok(a.items.filter((i) => i.名称 === '海上遗府残图').reduce((s, i) => s + (i.数量 || 1), 0) === 3, '灵石不足时残图不被消耗');
+
+  // 无通行令：全额护阵灵石 100
+  const b = mkYifu();
+  const rb = S.exploreMysticRealm(b, 'yifu', 1);
+  ok(rb.logs.some((l) => l.includes('缴纳遗府护阵灵石 -100')), '无通行令缴全额100护阵灵石');
+  ok(!rb.logs.some((l) => l.includes('海岛通行令减费')), '无通行令无减费提示');
+  ok(b.items.filter((i) => i.名称 === '海上遗府残图').reduce((s, i) => s + (i.数量 || 1), 0) === 0, '遗府探索消耗3张残图');
+
+  // 持海岛通行令：减费至 80，且通行令持久不消耗
+  const c = mkYifu();
+  c.items.push({ 名称: '海岛通行令', 类型: '消耗品', 数量: 1, effect: { relic: 20 }, 描述: '降低海外遗府探索费用。' });
+  const rc = S.exploreMysticRealm(c, 'yifu', 1);
+  ok(rc.logs.some((l) => l.includes('缴纳遗府护阵灵石 -80')), '持通行令缴80护阵灵石(减费20%)');
+  ok(rc.logs.some((l) => l.includes('海岛通行令减费')), '持通行令有减费提示');
+  ok(c.items.some((i) => i.名称 === '海岛通行令'), '海岛通行令持久不消耗');
+}
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
