@@ -1114,6 +1114,51 @@ const pickNeighbor = (st) => travelOptions(st)[0];
   ok(rc.logs.some((l) => l.includes('海岛通行令减费')), '持通行令有减费提示');
   ok(c.items.some((i) => i.名称 === '海岛通行令'), '海岛通行令持久不消耗');
 }
+/* ---------- 宗门秘境：核心弟子可入，确定性收益，无妖兽风险 ---------- */
+{
+  const mkSect = (rank, contrib = 0) => {
+    const g = S.createNewGame({ name: '宗门秘境测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    S.joinSect(g, '测试仙宗');
+    g.sect.rank = rank;
+    g.sect.contribution = contrib;
+    return g;
+  };
+  // 门禁：内外门(rank<3) 不能进入
+  const gLow = mkSect(2);
+  const rLow = S.exploreSectRealm(gLow, 1);
+  ok(!rLow.ok && rLow.logs.some((l) => l.includes('需核心弟子')), 'rank<3 拒绝进入宗门秘境');
+  ok(gLow.sect.contribution === 0, 'rank<3 进入失败不改动贡献');
+  // 未入宗：拒绝
+  const gNone = S.createNewGame({ name: '无宗', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gNone); gNone.sect = { name: '', rank: 0, contribution: 0 };
+  const rNone = S.exploreSectRealm(gNone, 1);
+  ok(!rNone.ok && rNone.logs.some((l) => l.includes('尚未加入')), '未入宗拒绝进入宗门秘境');
+  // 核心弟子(rank3) depth1：确定性收益
+  const g3 = mkSect(3, 0);
+  const beforeStones = S.totalStones(g3);
+  const r3 = S.exploreSectRealm(g3, 1);
+  ok(r3.ok, 'rank3 可进入宗门秘境');
+  ok(g3.sect.contribution === 30, `depth1 贡献+30（实际 ${g3.sect.contribution}）`);
+  ok(S.totalStones(g3) === beforeStones + 80, `depth1 灵石+80（实际 ${S.totalStones(g3) - beforeStones}）`);
+  ok(g3.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 1), 'depth1 得材料 宗门灵脉晶×1');
+  ok(!g3.items.some((i) => i.名称 === '聚气丹'), 'depth1 深处丹药未出现');
+  // 深处(depth2)：聚气丹出现，贡献/灵石按 1.6 倍缩放
+  const g2 = mkSect(3, 0);
+  const before2 = S.totalStones(g2);
+  const r2 = S.exploreSectRealm(g2, 2);
+  ok(r2.ok, 'rank3 depth2 可进入');
+  ok(g2.sect.contribution === 48, `depth2 贡献 30×1.6=48（实际 ${g2.sect.contribution}）`);
+  ok(S.totalStones(g2) === before2 + 128, `depth2 灵石 80×1.6=128（实际 ${S.totalStones(g2) - before2}）`);
+  ok(g2.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 2), 'depth2 材料 宗门灵脉晶×2');
+  ok(g2.items.some((i) => i.名称 === '聚气丹' && i.数量 === 1), 'depth2 深处得聚气丹×1');
+  // 罗盘选项：rank>=3 出现，rank<3 不出现
+  const gOpt = mkSect(1);
+  ok(!S.extraCompassOptions(gOpt).some((o) => o.action.type === 'sectRealm'), 'rank1 罗盘无宗门秘境选项');
+  gOpt.sect.rank = 3;
+  ok(S.extraCompassOptions(gOpt).some((o) => o.action.type === 'sectRealm'), 'rank3 罗盘出现宗门秘境选项');
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

@@ -982,6 +982,14 @@ async function onCompassPick(option) {
     if (option.action.type === 'auction') { await flowAuction(); return; }
     if (option.action.type === 'tameBeast') { await flowTameBeast(); return; }
     if (option.action.type === 'sectTask') { await flowSectTask(); return; }
+    if (option.action.type === 'sectRealm') {
+      const depth = await chooseSectDepth();
+      if (!depth) return;
+      const r = S.performAction(GameState.data, option, { depth });
+      await resolveFlows(r, option);
+      return;
+    }
+
     if (option.action.type === 'mystic') {
       const depth = await chooseMysticDepth();
       if (!depth) return;
@@ -1537,6 +1545,29 @@ async function chooseMysticDepth() {
       { title: '秘境探索 · 深度选择', lock: true, cls: 'modal-lg' });
     m.querySelectorAll('[data-depth]').forEach((b) => b.addEventListener('click', () => { pick = Number(b.dataset.depth); closeModal(); resolve(); }));
     m.querySelector('#btn-cancel-depth').addEventListener('click', () => { closeModal(); resolve(); });
+  });
+  return pick;
+}
+
+/* ---------------- 宗门秘境深度选择 ---------------- */
+async function chooseSectDepth() {
+  const depths = D.MYSTIC_DEPTH.levels;
+  let pick = null;
+  await new Promise((resolve) => {
+    const m = openModal(`
+      <div class="choice-intro">选择本次潜修的纵深。越深，宗门贡献、灵石与材料越丰厚；深处更藏有宗门丹房旧藏（聚气丹）。无妖兽风险。</div>
+      <div class="depth-list">
+        ${depths.map((d) => `
+          <div class="depth-opt">
+            <div class="depth-name">${d.name}<span class="depth-idx">第 ${depths.indexOf(d) + 1} 层</span></div>
+            <div class="depth-detail">贡献&灵石×${d.stoneMul} ｜ 材料×${d.matMul}${d.depth >= 2 ? ' ｜ 深处得聚气丹' : ''}</div>
+            <button class="btn btn-sm btn-gold" data-depth="${depths.indexOf(d) + 1}">深入${d.name}</button>
+          </div>`).join('')}
+      </div>
+      <div class="modal-actions"><button class="btn" id="btn-cancel-sectdepth">取消</button></div>`,
+      { title: '宗门秘境 · 深度选择', lock: true, cls: 'modal-lg' });
+    m.querySelectorAll('[data-depth]').forEach((b) => b.addEventListener('click', () => { pick = Number(b.dataset.depth); closeModal(); resolve(); }));
+    m.querySelector('#btn-cancel-sectdepth').addEventListener('click', () => { closeModal(); resolve(); });
   });
   return pick;
 }

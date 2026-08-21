@@ -1502,6 +1502,11 @@ export function performAction(state, option, extra = {}) {
       if (r.hiddenEvent) { /* 深处隐藏奇遇，由 UI 接管 */ extra.hiddenEvent = r.hiddenEvent; }
       break;
     }
+    case 'sectRealm': {
+      const r = exploreSectRealm(state, extra.depth || 1);
+      logs.push(...r.logs);
+      break;
+    }
     case 'specialEvent': {
       const evt = SPECIAL_EVENTS.find((e) => e.id === a.eventId);
       if (evt) {
@@ -2561,6 +2566,47 @@ export function exploreMysticRealm(state, realmId, depth = 1) {
 }
 
 /* ============================================================
+ * 十八·甲、宗门秘境（核心弟子及以上可进入，确定性收益，无妖兽风险）
+ * ========================================================== */
+/**
+ * 潜修宗门秘境：核心弟子(rank>=3)及以上可进入本宗禁地，体悟传承获取
+ * 宗门贡献与灵脉资源。完全确定性、无 RNG、无妖兽风险，作为稳定资源来源。
+ * @param {object} state
+ * @param {number} depth 1..MYSTIC_DEPTH.max
+ * @returns {{ ok:boolean, logs:string[] }}
+ */
+export function exploreSectRealm(state, depth = 1) {
+  ensureLifeState(state);
+  if (!state.sect?.name) return { ok: false, logs: ['你尚未加入任何宗门，无处进入宗门秘境。'] };
+  if ((state.sect.rank || 0) < 3) {
+    return { ok: false, logs: [`需核心弟子及以上方可进入宗门秘境（当前职级：${SECT_RANKS[state.sect.rank]?.name || '散修'}）。`] };
+  }
+  depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
+  const dcfg = MYSTIC_DEPTH.of(depth);
+  const logs = [`你步入「宗门秘境·${dcfg.name}」，灵脉环绕，宗门先辈留下的洞天福地静候你的体悟……`];
+  // 体悟传承：宗门贡献（确定性，按深度缩放）
+  const gain = Math.round(30 * dcfg.stoneMul);
+  state.sect.contribution += gain;
+  logs.push(`体悟宗门传承，宗门贡献 +${gain}。`);
+  // 采得灵脉矿髓：下品灵石（确定性）
+  const stones = Math.round(80 * dcfg.stoneMul);
+  addStones(state, stones);
+  logs.push(`采得灵脉矿髓，下品灵石 +${stones}。`);
+  // 灵脉所凝材料（确定性）
+  const mat = { 名称: '宗门灵脉晶', 类型: '材料', 数量: depth, 描述: '宗门秘境灵脉所凝之晶，可充作炼器灵材。' };
+  if (storeItem(state, mat)) logs.push(`获得材料：宗门灵脉晶 ×${mat.数量}。`);
+  // 深处藏有宗门丹房旧藏（确定性，depth>=2 可得聚气丹）
+  if (depth >= 2) {
+    const pill = { 名称: '聚气丹', 类型: '丹药', 数量: 1, effect: { exp: 90 }, toxicity: 8, 描述: '宗门丹房旧藏，服下修为 +90（连续服用生丹毒）。' };
+    if (storeItem(state, pill)) logs.push(`于深处丹室寻得宗门旧藏：聚气丹 ×1。`);
+  }
+  makeChronicle(state, { type: '宗门', title: `潜修宗门秘境·${dcfg.name}`, text: logs.join('') });
+  addLog(state, '事件', `潜修宗门秘境·${dcfg.name}：${logs.slice(1).join('')}`);
+  refreshDerived(state);
+  return { ok: true, logs };
+}
+
+/* ============================================================
  * 十九、修仙机缘事件链（走火入魔、心魔、天道注视、因果债）
  * ========================================================== */
 export function checkSpecialEvent(state) {
@@ -2703,6 +2749,10 @@ export function extraCompassOptions(state) {
   // 宗门任务（加入宗门后）
   if (state.sect?.name) {
     opts.push({ icon: '🏯', tag: '宗门', title: `执行宗门任务（${state.sect.name}）`, desc: `当前职级：${SECT_RANKS[state.sect.rank]?.name}，贡献 ${state.sect.contribution}。`, action: { type: 'sectTask' }, preview: '换取贡献、晋升职级、获得修炼加成' });
+  }
+  // 宗门秘境（核心弟子及以上可入）：确定性收益，无妖兽风险
+  if ((state.sect?.rank || 0) >= 3) {
+    opts.push({ icon: '🏞️', tag: '宗门', title: '潜修宗门秘境', desc: '宗门禁地，核心弟子及以上方可进入。体悟传承得宗门贡献，采灵脉矿髓与材料（无妖兽风险）。', action: { type: 'sectRealm' }, preview: '确定性收益：宗门贡献 + 下品灵石 + 材料（深处额外得聚气丹）' });
   }
   // 机缘事件（自动检测，有则出现）
   const special = checkSpecialEvent(state);
