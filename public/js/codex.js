@@ -621,6 +621,20 @@ export const SECT_TASKS = [
  * 数值与 SECT_RANKS 贡献阈值同级递增：外门 50 → 宗主 1500。 */
 export const SECT_STIPEND = [0, 50, 120, 300, 700, 1500];
 
+/* 宗门兑换所：以宗门贡献兑换资源（确定性，无 RNG）。
+ * cost 为所需贡献；type 'stones' 直接发放下品灵石，type 'pill' 发放丹药
+ * （effect/toxicity 与丹炉产出一致，可被 useItem 正常服用，且与同名丹药堆叠）。 */
+export const SECT_EXCHANGE = [
+  { id: 'ex_stones', name: '兑换宗门灵石', cost: 100, type: 'stones', amount: 600,
+    desc: '以贡献换取宗门库藏下品灵石，充实行囊。' },
+  { id: 'ex_qi', name: '兑换聚气丹', cost: 150, type: 'pill', item: '聚气丹', qty: 1,
+    effect: { exp: 90 }, toxicity: 8, desc: '宗门丹房所出，服下修为 +90（连续服用生丹毒）。' },
+  { id: 'ex_heal', name: '兑换凝血丹', cost: 180, type: 'pill', item: '凝血丹', qty: 1,
+    effect: { heal: true }, toxicity: 0, desc: '宗门秘药，服下清除全部伤势，无毒副作用。' },
+  { id: 'ex_ningshen', name: '兑换凝神丹', cost: 240, type: 'pill', item: '凝神丹', qty: 1,
+    effect: { wuxing: 120 }, toxicity: 10, desc: '宗门丹房所出，服下悟性经验 +120（慎用丹毒）。' },
+];
+
 export function ensureSectState(state) {
   state.sect = state.sect || { name: '', rank: 0, contribution: 0, tasks: [] };
   // 真实俸禄状态：stipend=待领取灵石；claimedYear/claimedMonth=上次领取时的年月（用于提示）

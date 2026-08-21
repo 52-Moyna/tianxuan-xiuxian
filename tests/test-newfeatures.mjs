@@ -1,7 +1,7 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -188,6 +188,34 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(s2.sect.stipend === 120, `晋升后俸禄单价变为 120（实际 ${s2.sect.stipend}）`);
   const re = deserialize(serialize(s2));
   ok(re.sect.stipend === s2.sect.stipend && re.sect.rank === s2.sect.rank, '宗门俸禄存读档持久化');
+}
+
+/* ---------- 宗门兑换所（贡献主动消耗） ---------- */
+{
+  const s4 = S.createNewGame({ name: '兑换测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(s4);
+  ok(!S.sectExchange(s4, 'ex_stones').ok, '未入宗不可兑换');
+  S.joinSect(s4, '兑换宗门');
+  s4.sect.contribution = 1000;
+  const stonesBefore = S.totalStones(s4);
+  const cBefore = s4.sect.contribution;
+  const r1 = S.sectExchange(s4, 'ex_stones');
+  ok(r1.ok && S.totalStones(s4) === stonesBefore + 600 && s4.sect.contribution === cBefore - 100, '兑换灵石：扣贡献 100、入账 600 灵石');
+  const r2 = S.sectExchange(s4, 'ex_ningshen');
+  ok(r2.ok && s4.sect.contribution === cBefore - 100 - 240, '兑换凝神丹：扣贡献 240');
+  ok(s4.items.some((i) => i.名称 === '凝神丹' && (i.数量 || 0) >= 1), '兑换凝神丹：丹药已入行囊');
+  // 贡献不足时拒绝且不扣减
+  const s5 = S.createNewGame({ name: '穷宗', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(s5);
+  S.joinSect(s5, '穷宗');
+  s5.sect.contribution = 50;
+  ok(!S.sectExchange(s5, 'ex_ningshen').ok && s5.sect.contribution === 50, '贡献不足时拒绝兑换且不扣减');
+  // 服用兑换所得凝神丹：悟性经验 +120（确定性，无 RNG）
+  const idx = s4.items.findIndex((i) => i.名称 === '凝神丹');
+  const wuxBefore = s4.player.daoBase['悟性'].exp;
+  const useLogs = S.useItem(s4, idx);
+  ok(useLogs && (useLogs.some((l) => /悟性经验\+120/.test(l)) || s4.player.daoBase['悟性'].exp > wuxBefore), '服用兑换凝神丹：悟性经验增加');
+  ok(SECT_EXCHANGE.some((e) => e.id === 'ex_ningshen'), 'SECT_EXCHANGE 含凝神丹条目');
 }
 
 /* ---------- 出战灵兽星级加成战斗胜率 ---------- */

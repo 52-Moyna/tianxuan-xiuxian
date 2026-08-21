@@ -29,7 +29,7 @@ import { ensureLifeState, storeItem, canStore, craftRecipe, canCraft, relationIn
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
-  canTameBeast, BEAST_TEMPLATES, ensureSectState, SECT_RANKS, SECT_TASKS, SECT_STIPEND, sectCultivateBonus,
+  canTameBeast, BEAST_TEMPLATES, ensureSectState, SECT_RANKS, SECT_TASKS, SECT_STIPEND, sectCultivateBonus, SECT_EXCHANGE,
   ensureAuctionState, AUCTION_ITEMS_POOL, availableMysticRealms, MYSTIC_REALMS, SPECIAL_EVENTS,
 } from './codex.js';
 
@@ -2186,6 +2186,30 @@ export function claimSectStipend(state) {
 /* ============================================================
  * 十四、转世轮回（文档第十八章）
  * ========================================================== */
+/** 宗门兑换所：以宗门贡献兑换资源（确定性，无 RNG）。 */
+export function sectExchange(state, itemId) {
+  ensureLifeState(state);
+  ensureSectState(state);
+  if (!state.sect.name) return { ok: false, logs: ['你尚未加入任何宗门，无处兑换。'] };
+  const ex = SECT_EXCHANGE.find((e) => e.id === itemId);
+  if (!ex) return { ok: false, logs: ['宗门兑换所无此物资。'] };
+  if (state.sect.contribution < ex.cost) {
+    return { ok: false, logs: [`宗门贡献不足，需 ${ex.cost}（当前 ${state.sect.contribution}）。`] };
+  }
+  state.sect.contribution -= ex.cost;
+  const logs = [`🏯 你于宗门兑换所换取「${ex.name}」，消耗贡献 ${ex.cost}。`];
+  if (ex.type === 'stones') {
+    addStones(state, ex.amount);
+    logs.push(`获得下品灵石 +${ex.amount}。`);
+  } else if (ex.type === 'pill') {
+    const it = { 名称: ex.item, 类型: '丹药', 数量: ex.qty || 1, 描述: ex.desc, effect: ex.effect, toxicity: ex.toxicity };
+    if (storeItem(state, it)) logs.push(`获得丹药：${ex.item} ×${ex.qty || 1}。`);
+  }
+  addLog(state, '操作', `宗门兑换所兑换「${ex.name}」，贡献-${ex.cost}。`);
+  refreshDerived(state);
+  return { ok: true, logs };
+}
+
 export function reincarnate(state, full) {
   if (full) return null; // 完全重开：由 UI 走新建流程
   // 轮回转世：继承部分遗产

@@ -1598,6 +1598,11 @@ async function flowSectTask() {
       <div class="codex-body"><b>${t.name}</b><div class="codex-source">${t.desc} ｜ 贡献 +${t.contribution}</div></div>
       <button class="btn btn-sm btn-gold" data-task="${t.id}">执行</button>
     </div>`).join('')}
+    <div class="choice-intro">宗门兑换所（消耗贡献）：</div>
+    ${CX.SECT_EXCHANGE.map((e) => `<div class="sect-task">
+      <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div></div>
+      <button class="btn btn-sm ${st.sect.contribution >= e.cost ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${st.sect.contribution >= e.cost ? '' : 'disabled'}>兑换</button>
+    </div>`).join('')}
     <div class="modal-actions"><button class="btn" id="btn-back-sect">返回本月选择</button></div>`,
     { title: '宗门任务', lock: true, cls: 'modal-lg' });
   let settled = false;
@@ -1609,6 +1614,11 @@ async function flowSectTask() {
     await resolveFlows({ logs: r.logs, battle: r.battle || null }, { title: '执行宗门任务' });
   }));
   m.querySelector('#btn-back-sect').addEventListener('click', () => { closeModal(); });
+  m.querySelectorAll('[data-exchange]').forEach((b) => b.addEventListener('click', () => {
+    const r = S.sectExchange(st, b.dataset.exchange);
+    if (r.ok) toast(r.logs[0], 'gold'); else toast(r.logs[0], 'warn');
+    closeModal(); renderAll(); settled = true;
+  }));
   const claimBtn = m.querySelector('[data-claimstipend]');
   if (claimBtn) claimBtn.addEventListener('click', () => {
     const r = S.claimSectStipend(st);
