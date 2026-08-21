@@ -1131,9 +1131,9 @@ export const WANDER_EVENTS = [
     id: 'cave', weight: 9, regionBoost: { haiwai: 1.8, xiji: 1.4 },
     run(state) {
       const logs = [];
-      const map = { 名称: '秘境残图', 类型: '线索', 数量: 1, 描述: '上古遗府的残片地图，集齐或可开启一次遗府探索。', 价值: 120 };
-      if (storeItem(state, map)) logs.push('你误入一处风化洞府，在石台夹层寻得「秘境残图」一张。');
-      else logs.push('你寻得「秘境残图」，储物袋已满只能暂存怀中。');
+      const map = { 名称: '海上遗府残图', 类型: '线索', 数量: 1, 描述: '上古遗府的残片地图，集齐 3 张可开启一次遗府探索。', 价值: 120 };
+      if (storeItem(state, map)) logs.push('你误入一处风化洞府，在石台夹层寻得「海上遗府残图」一张。');
+      else logs.push('你寻得「海上遗府残图」，储物袋已满只能暂存怀中。');
       if (Rng.chance(0.5)) {
         const art = generateEquip(state, 'artifact', Rng.int(3, 6), Rng.pick(ARTIFACT_NAMES));
         state.equipment.stash.push(art);
@@ -2623,7 +2623,10 @@ export function extraCompassOptions(state) {
   // 秘境探索（达到等级后出现；列出全部已解锁秘境，玩家可逐一选择并定深度）
   const mystics = availableMysticRealms(state);
   for (const m of mystics) {
-    const needMap = m.requiresMap ? '（需集齐 3 张「海上遗府残图」开启）' : '';
+    const mapCount = state.items.filter((i) => i.名称 === '海上遗府残图').reduce((sum, i) => sum + (i.数量 || 1), 0);
+    const needMap = m.requiresMap
+      ? (mapCount >= 3 ? '（已集齐 3 张残图，可开启！）' : `（需集齐 3 张「海上遗府残图」开启，当前持有 ${mapCount} 张）`)
+      : '';
     opts.push({ icon: '🏔️', tag: '秘境', title: `探索「${m.name}」`, desc: m.desc + needMap, action: { type: 'mystic', realmId: m.id }, risk: true, preview: '高风险高回报：材料、灵石、法宝；可能遭遇护宝妖兽' });
   }
   // 拍卖会（偶发）
