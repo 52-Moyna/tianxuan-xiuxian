@@ -873,6 +873,18 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     const ups = tryLevelUp(state, logs);
     if (ups) logs.push(`战后感悟，修为进一步精进。`);
   } else {
+    // 护符抵挡：非切磋失败且持有护符时，消耗一张护符抵消损失
+    let wardKind = null;
+    if (type !== 'qiecuo') {
+      const wFull = state.items.find((i) => i.名称 === '护身符');
+      const wLow = state.items.find((i) => i.名称 === '低阶护身符');
+      const w = wFull || wLow;
+      if (w) {
+        wardKind = wFull ? 'ward' : 'wardLow';
+        w.数量 -= 1;
+        if (w.数量 <= 0) state.items.splice(state.items.indexOf(w), 1);
+      }
+    }
     // 失败惩罚（按文档「失败惩罚机制」简化实现）
     if (type === 'qiecuo') {
       logs.push('切磋落败，点到为止，并无实质损失。');
@@ -881,10 +893,18 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
       const danger = enemy.danger || (REGION_TRAVEL[state.world.regionId]?.danger) || 2;
       const pen = beastDefeatPenalty(danger, { ally: allyAided, tactic });
       logs.push('你重伤遁走，需休养数月（本月行动收益减半）。');
-      state.flags.wounded = pen.wounded;
+      if (wardKind !== 'ward') {
+        state.flags.wounded = pen.wounded;
+      } else {
+        logs.push('护身符光华流转，替你挡去重伤，安然脱身。');
+      }
       if (pen.loseStones > 0) {
-        const lost = Math.round(totalStones(state) * pen.loseStones);
-        if (lost > 0) { spendStones(state, lost); logs.push(`险地溃败，被劫去灵石约${lost}。`); }
+        if (!wardKind) {
+          const lost = Math.round(totalStones(state) * pen.loseStones);
+          if (lost > 0) { spendStones(state, lost); logs.push(`险地溃败，被劫去灵石约${lost}。`); }
+        } else {
+          logs.push('护符护体，灵石分毫未失。');
+        }
       }
     } else {
       const gap = (enemy.power - p.power) / Math.max(1, p.power);
@@ -895,11 +915,19 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
       back = Math.max(1, Math.round(back * penaltyMul));
       loseRate = Math.min(1, loseRate * penaltyMul);
       if (allyAided) { back = Math.max(1, Math.round(back * 0.5)); loseRate = Math.min(1, loseRate * 0.5); }
-      p.level = Math.max(1, p.level - back);
-      p.exp = 0;
-      const lost = Math.round(totalStones(state) * loseRate * 0.5);
-      spendStones(state, lost);
-      logs.push(`修为倒退至 ${realmLevelName(p.level)}，损失灵石约${lost}。`);
+      if (wardKind !== 'ward') {
+        p.level = Math.max(1, p.level - back);
+        p.exp = 0;
+      } else {
+        logs.push('护身符碎裂，替你稳住道基，修为未损。');
+      }
+      if (!wardKind) {
+        const lost = Math.round(totalStones(state) * loseRate * 0.5);
+        spendStones(state, lost);
+        logs.push(`修为倒退至 ${realmLevelName(p.level)}，损失灵石约${lost}。`);
+      } else {
+        logs.push('护符护体，灵石分毫未失。');
+      }
     }
     addDaoBaseExp(state, '道心', Rng.int(1, 4), logs); // 败中磨砺
   }
@@ -1265,7 +1293,7 @@ export const WANDER_EVENTS = [
     run(state) {
       const logs = [];
       const item = Rng.pick([
-        { 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, effect: { cultivate: 20 }, 描述: '下次修炼额外获得修为。', 价值: 180 },
+        { 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, effect: { cultivateBoostMonths: 1 }, 描述: '下次修炼效率提升（+15%，持续1月）。', 价值: 180 },
         { 名称: '低阶护身符', 类型: '消耗品', 数量: 1, effect: { ward: true }, 描述: '下一次战斗失败时减轻损失。', 价值: 110 },
         { 名称: '远航凭证', 类型: '消耗品', 数量: 1, effect: { travel: 50 }, 描述: '下次跨域旅行费用减半。', 价值: 160 },
       ]);

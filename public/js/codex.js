@@ -252,7 +252,7 @@ export const CODEX_ITEMS = [
   // 三、道具（消耗品 / 功能性物品）
   // ================================================================
   { id: 'item_ward', category: '道具', name: '护身符', rarity: '消耗品', source: '制符、坊市、秘境', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
-  { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '阵法、秘境', effect: '下次修炼额外获得修为 +50%。' },
+  { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '阵法、秘境', effect: '下次修炼效率提升（+15%，持续1月）。' },
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
   { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
   { id: 'item_sea_pass', category: '道具', name: '海岛通行令', rarity: '消耗品', source: '北冥瀚海坊市', effect: '降低海外遗府探索的费用 20%。' },
@@ -654,7 +654,7 @@ export function sectCultivateBonus(state) {
  * ========================================================== */
 export const AUCTION_ITEMS_POOL = [
   { name: '残缺功法玉简', type: '功法', basePrice: 500, rarity: '灵品', desc: '可能蕴含失传功法片段。' },
-  { name: '聚灵阵旗', type: '道具', basePrice: 200, rarity: '消耗品', desc: '下次修炼额外获得修为。' },
+  { name: '聚灵阵旗', type: '道具', basePrice: 200, rarity: '消耗品', effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升（+15%，持续1月）。' },
   { name: '洗髓丹', type: '丹药', basePrice: 1500, rarity: '珍贵丹药', desc: '提升随机道基 5~10 级。' },
   { name: '延寿丹', type: '丹药', basePrice: 2000, rarity: '珍贵丹药', desc: '寿元上限 +20 年。' },
   { name: '青锋剑', type: '法宝', basePrice: 3000, rarity: '法宝', desc: '等级 ×2 计入战力。' },

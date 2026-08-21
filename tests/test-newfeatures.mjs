@@ -974,6 +974,74 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(opt3 && /已集齐 3 张残图，可开启/.test(opt3.desc), '集齐 3 张时提示可开启');
 }
 
+
+
+/* ---------- 护符抵挡：失败损失抵消（确定性，强制败北） ---------- */
+{
+  const mkWard = () => {
+    const g = S.createNewGame({ name: '护符测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    g.player.level = 30; g.player.power = 50;
+    g.currencies = { '下品灵石': 1000, '中品灵石': 0, '上品灵石': 0 };
+    g.items.push({ 名称: '护身符', 类型: '消耗品', 数量: 2, effect: { ward: true }, 描述: '战斗失败时减轻损失。', 价值: 100 });
+    return g;
+  };
+  const wardEnemy = { name: '强敌', realm: '金丹', level: 60, power: 5000, danger: 3 };
+  // 先用真实随机建好对局，再覆盖为常量以强制败北（避免 makeNpc 重名死循环）
+  const g = mkWard();
+  const g0 = mkWard(); g0.items = g0.items.filter((i) => i.名称 !== '护身符');
+  const realRandom = Math.random;
+  Math.random = () => 0.999;
+  try {
+    const bLv = g.player.level, bSt = S.totalStones(g);
+    const rep = S.resolveBattle(g, wardEnemy, 'shengci', false, 'normal', false);
+    ok(!rep.win, '护符测试：强敌当前必败');
+    ok(g.player.level === bLv, '护身符抵消修为倒退');
+    ok(S.totalStones(g) === bSt, '护身符抵消灵石损失');
+    ok((g.items.find((i) => i.名称 === '护身符')?.数量 || 0) === 1, '护身符消耗 1 张');
+    ok(rep.logs.some((l) => l.includes('护符')), '战报含护符抵挡文案');
+    const s0 = S.totalStones(g0);
+    const rep0 = S.resolveBattle(g0, wardEnemy, 'shengci', false, 'normal', false);
+    ok(!rep0.win && S.totalStones(g0) < s0, '对照：无护符时失败损失灵石');
+  } finally { Math.random = realRandom; }
+}
+
+/* ---------- 护符抵挡：低阶护身符（仅抵灵石，修为仍倒退） ---------- */
+{
+  const mkLow = () => {
+    const g = S.createNewGame({ name: '低阶护符', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    g.player.level = 30; g.player.power = 50;
+    g.currencies = { '下品灵石': 1000, '中品灵石': 0, '上品灵石': 0 };
+    g.items.push({ 名称: '低阶护身符', 类型: '消耗品', 数量: 1, effect: { ward: true }, 描述: '战斗失败时减轻损失。', 价值: 110 });
+    return g;
+  };
+  const lowEnemy = { name: '强敌', realm: '金丹', level: 60, power: 5000, danger: 3 };
+  const g = mkLow();
+  const realRandom2 = Math.random;
+  Math.random = () => 0.999;
+  try {
+    const bLv = g.player.level, bSt = S.totalStones(g);
+    const rep = S.resolveBattle(g, lowEnemy, 'shengci', false, 'normal', false);
+    ok(!rep.win, '低阶护符测试：必败');
+    ok(g.player.level < bLv, '低阶护身符不抵修为倒退');
+    ok(S.totalStones(g) === bSt, '低阶护身符抵消灵石损失');
+    ok(!g.items.some((i) => i.名称 === '低阶护身符'), '低阶护身符被消耗');
+  } finally { Math.random = realRandom2; }
+}
+
+/* ---------- 聚灵阵旗：使用后为下月修炼加成（死道具修复） ---------- */
+{
+  const g = S.createNewGame({ name: '阵旗测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.items.push({ 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, effect: { cultivateBoostMonths: 1 }, 描述: '下次修炼效率提升。', 价值: 180 });
+  const idx = g.items.length - 1;
+  const logs = S.useItem(g, idx);
+  ok((g.flags.cultivateBoostMonths || 0) >= 1, '聚灵阵旗使用后写入修炼加成月数');
+  ok(logs.some((l) => l.includes('修炼效率')), '聚灵阵旗使用文案正确');
+  ok(!g.items.some((i) => i.名称 === '聚灵阵旗'), '聚灵阵旗使用后消耗');
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

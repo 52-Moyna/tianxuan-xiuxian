@@ -101,7 +101,7 @@ export const ART_RECIPES = {
     { id: '护身符', name: '护身符', need: { '冰魄符纸': 1, '海灵珠': 1 }, output: { name: '护身符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '战斗失败时减轻损失。' }, value: 100 },
   ],
   阵法: [
-    { id: '聚灵阵旗', name: '聚灵阵旗', need: { '冰魄符纸': 2, '星砂': 1 }, output: { name: '聚灵阵旗', type: '消耗品', quantity: 1, effect: { cultivate: 20 }, desc: '下次修炼额外获得修为。' }, value: 180 },
+    { id: '聚灵阵旗', name: '聚灵阵旗', need: { '冰魄符纸': 2, '星砂': 1 }, output: { name: '聚灵阵旗', type: '消耗品', quantity: 1, effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升（+15%，持续1月）。' }, value: 180 },
   ],
   灵植: [
     { id: '百年灵芝', name: '百年灵芝', need: { '百越灵草': 2 }, output: { name: '百年灵芝', type: '材料', quantity: 1, desc: '炼丹主药，也可在坊市出售。' }, value: 100 },
