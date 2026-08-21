@@ -96,6 +96,8 @@ export const ART_RECIPES = {
   炼器: [
     { id: '护心甲', name: '护心甲', need: { '赤铜精': 2, '铁背苍熊内丹': 1 }, output: { name: '护心甲', type: '装备', quantity: 1, level: 3, desc: '稳定防护装备，战力 +3。' }, value: 260 },
     { id: '星纹剑', name: '星纹剑', need: { '赤铜精': 1, '星砂': 1 }, output: { name: '星纹剑', type: '装备', quantity: 1, level: 4, desc: '精炼武器，战力 +4。' }, value: 420 },
+    // 宗门灵脉晶真实消费点：将「宗门灵脉晶」（宗门秘境产出）作为炼器材料，使其成为可用灵材而非死道具
+    { id: 'lingmai_shi', name: '灵脉石饰', need: { '宗门灵脉晶': 1, '矿石': 2 }, output: { name: '灵脉石饰', type: '装备', quantity: 1, level: 5, 部位: 'accessory', desc: '宗门秘境灵脉凝琢的石饰，温养元神，战力 +5。' }, value: 220 },
     { id: 'free', name: '自由锻造', need: { '赤铜精': 1 }, output: { type: '装备', quantity: 1, level: 3, desc: '自选部位锻造一件装备，战力随品阶浮动。' }, value: 200 },
   ],
   制符: [

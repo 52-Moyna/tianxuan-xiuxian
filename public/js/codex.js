@@ -171,6 +171,7 @@ const EQUIP_GRID = [
   ['accessory', 'fabao', 'gear_poison_pouch', '百毒囊', '稀有', '岭南百越坊市', '探索妖兽巢穴时额外获得材料'],
   ['weapon', 'fabao', 'gear_break_sword', '破阵短剑', '稀有', '西极玄冰域坊市', '探索遗迹时更容易发现线索'],
   ['weapon', 'fabao', 'gear_star_sword', '星纹剑', '稀有', '百艺炼器（赤铜精+星砂）', '精炼武器，星辉共鸣材料'],
+  ['accessory', 'fan', 'eq_ac_lingmai', '灵脉石饰', '凡器', '百艺炼器（宗门灵脉晶+矿石）', '宗门秘境灵脉凝琢，温养元神'],
   // —— 六部位细分（固定品质名） ——
   ['weapon', 'fan', 'eq_weapon_fan', '凡铁剑', '凡品', '坊市、历练战利品', '入门兵器'],
   ['weapon', 'faqi', 'eq_weapon_jing', '精钢剑', '中品', '坊市、炼器', '炼气期常用'],

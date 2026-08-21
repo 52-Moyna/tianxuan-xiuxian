@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -1158,6 +1158,27 @@ const pickNeighbor = (st) => travelOptions(st)[0];
   gOpt.sect.rank = 3;
   ok(S.extraCompassOptions(gOpt).some((o) => o.action.type === 'sectRealm'), 'rank3 罗盘出现宗门秘境选项');
 }
+
+
+/* ---------- 宗门灵脉晶接入炼器（修复死道具） ---------- */
+// 新增「灵脉石饰」配方应将宗门灵脉晶作为真实锻造材料，使其不再是死道具
+const lmRecipe = ART_RECIPES.炼器.find((r) => r.id === 'lingmai_shi');
+ok(!!lmRecipe, '炼器新增灵脉石饰配方');
+ok(lmRecipe && lmRecipe.need['宗门灵脉晶'] === 1, '灵脉石饰配方消耗宗门灵脉晶×1');
+ok(lmRecipe && lmRecipe.need['矿石'] === 2, '灵脉石饰配方消耗矿石×2');
+// 材料不足：无法锻造、不产出
+const lmState = S.createNewGame({ name: '灵脉测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(lmState);
+const lmNoMat = S.practiceArt(lmState, '炼器', 'lingmai_shi');
+ok(!lmNoMat.some((l) => l.includes('百艺制成')), '无材料时灵脉石饰锻造不产出');
+// 给予材料：确定性产出灵脉石饰并消耗材料
+storeItem(lmState, { 名称: '宗门灵脉晶', 类型: '材料', 数量: 1, 描述: 'x' });
+storeItem(lmState, { 名称: '矿石', 类型: '材料', 数量: 2, 描述: 'x' });
+const lmBefore = lmState.items.find((i) => i.名称 === '宗门灵脉晶')?.数量 || 0;
+const lmLogs = S.practiceArt(lmState, '炼器', 'lingmai_shi');
+ok(lmLogs.some((l) => l.includes('灵脉石饰')), '持材料锻造灵脉石饰成功产出');
+ok((lmState.items.find((i) => i.名称 === '宗门灵脉晶')?.数量 || 0) === lmBefore - 1, '锻造消耗宗门灵脉晶×1');
+ok(!!lmState.items.find((i) => i.名称 === '灵脉石饰'), '背包出现灵脉石饰装备');
 
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
