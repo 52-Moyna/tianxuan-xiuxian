@@ -210,12 +210,12 @@ export function rollPillGrade(luckMod = 0) {
 
 /* ---------------- 材料掉落 ---------------- */
 export const MATERIAL_TYPES = [
-  { id: 'yaodan',   name: '妖丹',  type: '材料', desc: '妖兽精华，可炼丹或出售。', value: 80 },
+  { id: 'yaodan',   name: '妖丹',  type: '材料', desc: '妖兽精华内丹（旧称），可出售。', value: 80 },
   { id: 'lingcao',  name: '灵草',  type: '材料', desc: '炼丹常见材料。', value: 25 },
   { id: 'kuangshi', name: '矿石',  type: '材料', desc: '炼器材料。', value: 35 },
   { id: 'shougu',   name: '兽骨',  type: '材料', desc: '炼器或入药。', value: 20 },
   { id: 'pimao',    name: '皮毛',  type: '材料', desc: '可制防具或符箓。', value: 18 },
-  { id: 'xianyuan', name: '仙缘',  type: '材料', desc: '罕见机缘之物，价值不菲。', value: 300 },
+  { id: 'xianyuan', name: '仙缘',  type: '材料', desc: '罕见机缘之物，可于罗盘「仙缘兑换」换得道途助益。', value: 300 },
 ];
 
 /* ---------------- 道基 ---------------- */

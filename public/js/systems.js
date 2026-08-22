@@ -1562,6 +1562,21 @@ export function performAction(state, option, extra = {}) {
       logs.push('✨ 太初仙缘加身，修为+2000、道韵+40、悟性+25、下品灵石+800。一段绝世机缘就此圆满。');
       break;
     }
+    case 'xianyuanExchange': {
+      // 仙缘：于罗盘「仙缘兑换」换得道途助益（确定性收益，无 RNG、无风险）
+      const held = state.items.filter((i) => i.名称 === '仙缘');
+      const cnt = held.reduce((s, i) => s + (i.数量 || 1), 0);
+      if (cnt < 1) { logs.push('你手中尚无「仙缘」，无缘兑换。'); break; }
+      const it = held[0];
+      it.数量 -= 1;
+      if (it.数量 <= 0) state.items.splice(state.items.indexOf(it), 1);
+      gainExp(state, 200, logs);
+      addDaoYunExp(state, 15, logs);
+      addDaoBaseExp(state, '悟性', 20, logs);
+      addStones(state, 300);
+      logs.push('✨ 仙缘加身，修为+200、道韵+15、悟性+20、下品灵石+300。一段寻常机缘就此落定。');
+      break;
+    }
     /* market / art / socialList / auction / tameBeast / sectTask 由 UI 打开子界面处理，不在此处结算 */
     default:
       logs.push('本月你按照自己的心意行动，岁月静好。');
@@ -1999,7 +2014,7 @@ export function generateBeastDrops(state, enemy) {
     if (tpl && Rng.chance(chance)) {
       const qty = Math.max(1, Math.round(Rng.int(1, Math.max(2, Math.floor(lv / 15) + 1)) * dangerMul));
       // 矿石为基础材料，按通用名掉落（与灵脉石饰配方、图鉴对齐）；其余兽材保留「妖兽」前缀
-      const dropName = tpl.id === 'kuangshi' ? '矿石' : `妖兽${tpl.name}`;
+      const dropName = tpl.id === 'kuangshi' ? '矿石' : (tpl.id === 'xianyuan' ? '仙缘' : `妖兽${tpl.name}`);
       drops.push({ 名称: dropName, 类型: tpl.type, 数量: qty, 描述: tpl.desc, 价值: Math.round(tpl.value * (1 + lv / 50) * dangerMul) });
     }
   }
@@ -2809,6 +2824,11 @@ export function extraCompassOptions(state) {
   const taichu = state.items.filter((i) => i.名称 === '仙缘·太初之气').reduce((sum, i) => sum + (i.数量 || 1), 0);
   if (taichu >= 1) {
     opts.push({ icon: '🌟', tag: '天机', title: '太初仙缘·兑换绝世机缘', desc: `持「仙缘·太初之气」×1，寻上古仙缘使者兑换一段绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并获赠天品功法《太虚剑经》（已持有则改赠灵石）。当前持有 ${taichu} 份。`, action: { type: 'taichuXianyuan' }, preview: '收益：修为/道韵/悟性大涨 + 赠天品功法《太虚剑经》' });
+  }
+  // 仙缘兑换（持有「仙缘」时出现）：寻常机缘变现为道途助益（确定性、无 RNG、无风险）
+  const xy = state.items.filter((i) => i.名称 === '仙缘').reduce((sum, i) => sum + (i.数量 || 1), 0);
+  if (xy >= 1) {
+    opts.push({ icon: '🍀', tag: '天机', title: '仙缘兑换·道途助益', desc: `持「仙缘」×1，于坊间奇人处兑换一段道途助益：修为+200、道韵+15、悟性+20、下品灵石+300。当前持有 ${xy} 份。`, action: { type: 'xianyuanExchange' }, preview: '收益：修为/道韵/悟性 + 下品灵石 300（确定性）' });
   }
   return opts;
 }
