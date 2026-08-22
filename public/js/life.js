@@ -92,6 +92,9 @@ export const ART_RECIPES = {
   炼丹: [
     { id: '聚气丹', name: '聚气丹', need: { '百越灵草': 1, '海灵珠': 1 }, output: { name: '聚气丹', type: '丹药', quantity: 2, effect: { exp: 90 }, desc: '服用后修为 +90。' }, value: 80 },
     { id: '凝血丹', name: '凝血丹', need: { '百年灵芝': 1, '青风狼内丹': 1 }, output: { name: '凝血丹', type: '丹药', quantity: 1, effect: { heal: true }, desc: '服用后清除伤势。' }, value: 90 },
+    // 兽材闭环：妖兽灵草 → 凝元丹（exp）；妖兽兽骨 → 兽骨续命丹（heal）
+    { id: 'ningyuan', name: '凝元丹', need: { '妖兽灵草': 2 }, output: { name: '凝元丹', type: '丹药', quantity: 1, effect: { exp: 100 }, desc: '服用后修为 +100。' }, value: 110 },
+    { id: 'shougu_dan', name: '兽骨续命丹', need: { '妖兽兽骨': 2 }, output: { name: '兽骨续命丹', type: '丹药', quantity: 1, effect: { heal: true }, desc: '服用后清除全部伤势。' }, value: 90 },
   ],
   炼器: [
     { id: '护心甲', name: '护心甲', need: { '赤铜精': 2, '铁背苍熊内丹': 1 }, output: { name: '护心甲', type: '装备', quantity: 1, level: 3, desc: '稳定防护装备，战力 +3。' }, value: 260 },
@@ -102,6 +105,8 @@ export const ART_RECIPES = {
   ],
   制符: [
     { id: '护身符', name: '护身符', need: { '冰魄符纸': 1, '海灵珠': 1 }, output: { name: '护身符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '战斗失败时减轻损失。' }, value: 100 },
+    // 兽材闭环：妖兽皮毛 → 兽皮护符（ward），落实图鉴"可制防具或符箓"
+    { id: 'pelt_talisman', name: '兽皮护符', need: { '妖兽皮毛': 3 }, output: { name: '兽皮护符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '以妖兽皮毛揉制的护符，战斗失败时减轻损失。' }, value: 120 },
   ],
   阵法: [
     { id: '聚灵阵旗', name: '聚灵阵旗', need: { '冰魄符纸': 2, '星砂': 1 }, output: { name: '聚灵阵旗', type: '消耗品', quantity: 1, effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升（+15%，持续1月）。' }, value: 180 },

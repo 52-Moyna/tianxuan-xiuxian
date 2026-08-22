@@ -1971,7 +1971,9 @@ export function generateBeastDrops(state, enemy) {
   for (const { tpl, chance } of pool) {
     if (tpl && Rng.chance(chance)) {
       const qty = Math.max(1, Math.round(Rng.int(1, Math.max(2, Math.floor(lv / 15) + 1)) * dangerMul));
-      drops.push({ 名称: `妖兽${tpl.name}`, 类型: tpl.type, 数量: qty, 描述: tpl.desc, 价值: Math.round(tpl.value * (1 + lv / 50) * dangerMul) });
+      // 矿石为基础材料，按通用名掉落（与灵脉石饰配方、图鉴对齐）；其余兽材保留「妖兽」前缀
+      const dropName = tpl.id === 'kuangshi' ? '矿石' : `妖兽${tpl.name}`;
+      drops.push({ 名称: dropName, 类型: tpl.type, 数量: qty, 描述: tpl.desc, 价值: Math.round(tpl.value * (1 + lv / 50) * dangerMul) });
     }
   }
   // 低概率掉装备/法宝胚

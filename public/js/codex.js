@@ -228,6 +228,8 @@ export const CODEX_ITEMS = [
   // ================================================================
   { id: 'pill_qi', category: '丹药', name: '聚气丹', rarity: '消耗品', source: '坊市、炼丹', effect: '服用后修为 +80；连续服用会产生丹毒。', toxicity: 8 },
   { id: 'pill_heal', category: '丹药', name: '凝血丹', rarity: '消耗品', source: '坊市、炼丹、道友回礼', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
+  { id: 'pill_ningyuan', category: '丹药', name: '凝元丹', rarity: '消耗品', source: '百艺炼丹（妖兽灵草）', effect: '服用后修为 +100；连续服用会产生丹毒。', toxicity: 8 },
+  { id: 'pill_shougu', category: '丹药', name: '兽骨续命丹', rarity: '消耗品', source: '百艺炼丹（妖兽兽骨）', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
   { id: 'pill_foundation', category: '丹药', name: '筑基丹', rarity: '关键丹药', source: '坊市、炼丹、天命', effect: '筑基渡劫成功率 +20%；仅在对应瓶颈消耗。', toxicity: 3 },
   { id: 'pill_lifespan', category: '丹药', name: '延寿丹', rarity: '珍贵丹药', source: '炼丹（金丹期以上）、秘境、拍卖会', effect: '服用后寿元上限 +20 年；一生最多服用 3 颗。', toxicity: 15 },
   { id: 'pill_marrow', category: '丹药', name: '洗髓丹', rarity: '珍贵丹药', source: '炼丹（筑基期以上）、天命', effect: '服用后随机提升一项道基 5~10 级；一生最多服用 2 颗。', toxicity: 20 },
@@ -253,6 +255,7 @@ export const CODEX_ITEMS = [
   // 三、道具（消耗品 / 功能性物品）
   // ================================================================
   { id: 'item_ward', category: '道具', name: '护身符', rarity: '消耗品', source: '制符、坊市、秘境', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
+  { id: 'item_pelt_talisman', category: '道具', name: '兽皮护符', rarity: '消耗品', source: '百艺制符（妖兽皮毛）', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
   { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '阵法、秘境', effect: '下次修炼效率提升（+15%，持续1月）。' },
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
   { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
@@ -285,11 +288,11 @@ export const CODEX_ITEMS = [
   { id: 'mat_fire_guide', category: '材料', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺炼器时提高品质；地火套装组件。' },
   { id: 'mat_voyage_pass', category: '材料', name: '远航凭证', rarity: '消耗品', source: '北冥瀚海坊市', effect: '下次跨域旅行费用减半；海行套装组件。' },
   // 材料大类（妖兽掉落通用名）
-  { id: 'mat_yaodan', category: '材料', name: '妖丹', rarity: '材料', source: '妖兽战利品（必掉）', effect: '妖兽精华内丹，可炼丹、炼器或出售。' },
+  { id: 'mat_yaodan', category: '材料', name: '妖丹', rarity: '材料', source: '妖兽战利品（各妖兽掉落专属内丹，如青风狼内丹；通用妖丹为旧称）', effect: '妖兽精华内丹，可炼丹、炼器或出售。' },
   { id: 'mat_lingcao', category: '材料', name: '灵草', rarity: '材料', source: '妖兽战利品（概率）、采集', effect: '炼丹常见辅材，各地域有不同品种。' },
-  { id: 'mat_kuangshi', category: '材料', name: '矿石', rarity: '材料', source: '妖兽战利品（概率）、 mining', effect: '炼器基础材料，各地域矿脉产出不同。' },
-  { id: 'mat_shougu', category: '材料', name: '兽骨', rarity: '材料', source: '妖兽战利品（概率）', effect: '炼器或入药的材料，硬骨质。' },
-  { id: 'mat_pimao', category: '材料', name: '皮毛', rarity: '材料', source: '妖兽战利品（概率）', effect: '可制防具或符箓的皮料。' },
+  { id: 'mat_kuangshi', category: '材料', name: '矿石', rarity: '材料', source: '妖兽战利品（概率）、百艺炼器消耗', effect: '炼器基础材料，可用于灵脉石饰等配方。' },
+  { id: 'mat_shougu', category: '材料', name: '兽骨', rarity: '材料', source: '妖兽战利品（概率）', effect: '百艺炼丹（兽骨续命丹）或炼器材料，硬骨质。' },
+  { id: 'mat_pimao', category: '材料', name: '皮毛', rarity: '材料', source: '妖兽战利品（概率）', effect: '百艺制符（兽皮护符）的皮料。' },
   { id: 'mat_xianyuan', category: '材料', name: '仙缘', rarity: '稀有材料', source: '高阶妖兽战利品（极低概率）', effect: '罕见机缘之物，价值不菲，可用于特殊交易。' },
   { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '海外仙岛机缘（极稀有），气运/悟性双满时概率大幅提升', effect: '传说中的仙界之气，可遇不可求。持此物者可触发特殊天命事件，或于特定NPC处兑换绝世机缘。价值连城。' },
   // 妖兽材料子类（generateBeastDrops 动态名）

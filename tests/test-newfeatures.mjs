@@ -1180,6 +1180,39 @@ ok(lmLogs.some((l) => l.includes('灵脉石饰')), '持材料锻造灵脉石饰�
 ok((lmState.items.find((i) => i.名称 === '宗门灵脉晶')?.数量 || 0) === lmBefore - 1, '锻造消耗宗门灵脉晶×1');
 ok(!!lmState.items.find((i) => i.名称 === '灵脉石饰'), '背包出现灵脉石饰装备');
 
+/* ---------- 兽材百艺闭环：妖兽材料接入制符/炼丹（修复装饰性死材料） ---------- */
+// 1) 野兽掉落应产出通用「矿石」（此前误产「妖兽矿石」，导致灵脉石饰配方无法在真实游戏完成）
+state.arts['制符'] = state.arts['制符'] || { level: 1, exp: 0 };
+state.arts['炼丹'] = state.arts['炼丹'] || { level: 1, exp: 0 };
+let dropOre = false;
+for (let i = 0; i < 600 && !dropOre; i++) {
+  const enemy = { name: '试炼妖兽', level: 5, danger: 2 };
+  const arr = S.generateBeastDrops(state, enemy);
+  if (arr.some((d) => d.名称 === '矿石')) dropOre = true;
+}
+ok(dropOre, '野兽掉落可产出通用「矿石」（灵脉石饰配方在真实游戏可达）');
+
+// 2) 制符：妖兽皮毛 → 兽皮护符（ward 效果，战斗失败减轻损失）
+storeItem(state, { 名称: '妖兽皮毛', 类型: '材料', 数量: 3, 描述: '测试', 价值: 20 });
+const beforePelt = state.items.find((i) => i.名称 === '兽皮护符')?.数量 || 0;
+S.practiceArt(state, '制符', 'pelt_talisman', undefined, 1);
+const afterPelt = state.items.find((i) => i.名称 === '兽皮护符');
+ok(afterPelt && afterPelt.数量 > beforePelt && afterPelt.effect && afterPelt.effect.ward === true, '妖兽皮毛可制符为兽皮护符（ward 效果生效）');
+
+// 3) 炼丹：妖兽灵草 → 凝元丹（exp+100）
+storeItem(state, { 名称: '妖兽灵草', 类型: '材料', 数量: 2, 描述: '测试', 价值: 20 });
+const beforeNing = state.items.find((i) => i.名称 === '凝元丹')?.数量 || 0;
+S.practiceArt(state, '炼丹', 'ningyuan', undefined, 1);
+const afterNing = state.items.find((i) => i.名称 === '凝元丹');
+ok(afterNing && afterNing.数量 > beforeNing && afterNing.effect && afterNing.effect.exp === 100, '妖兽灵草可炼丹为凝元丹（exp+100）');
+
+// 4) 炼丹：妖兽兽骨 → 兽骨续命丹（heal）
+storeItem(state, { 名称: '妖兽兽骨', 类型: '材料', 数量: 2, 描述: '测试', 价值: 20 });
+const beforeShou = state.items.find((i) => i.名称 === '兽骨续命丹')?.数量 || 0;
+S.practiceArt(state, '炼丹', 'shougu_dan', undefined, 1);
+const afterShou = state.items.find((i) => i.名称 === '兽骨续命丹');
+ok(afterShou && afterShou.数量 > beforeShou && afterShou.effect && afterShou.effect.heal === true, '妖兽兽骨可炼丹为兽骨续命丹（heal 效果生效）');
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
