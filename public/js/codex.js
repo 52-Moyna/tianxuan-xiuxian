@@ -265,7 +265,7 @@ export const CODEX_ITEMS = [
   { id: 'item_ward_low', category: '道具', name: '低阶护身符', rarity: '消耗品', source: '西极玄冰域坊市', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
   { id: 'item_bug_powder', category: '道具', name: '驱虫粉', rarity: '消耗品', source: '岭南百越坊市', effect: '降低雨林探索风险，防止毒虫侵扰。' },
   { id: 'item_tame_food', category: '道具', name: '驯兽口粮', rarity: '消耗品', source: '百艺御兽', effect: '提高下一次收服灵兽成功率 +15%；可用妖兽内丹+灵草炼制。' },
-  { id: 'item_fire_guide', category: '道具', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺炼器时提高品质；地火套装组件。' },
+  { id: 'item_fire_guide', category: '道具', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
 
   // ================================================================
   // 四、容器（储物袋系列）
@@ -285,7 +285,7 @@ export const CODEX_ITEMS = [
   { id: 'mat_herb', category: '材料', name: '百越灵草', rarity: '材料', source: '岭南百越坊市、采集', effect: '炼丹主药，灵植师最喜欢的材料。' },
   { id: 'mat_lingzhi', category: '材料', name: '百年灵芝', rarity: '材料', source: '百艺灵植、采集', effect: '炼丹主药，也可在坊市出售。' },
   { id: 'mat_star_sand', category: '材料', name: '星砂', rarity: '稀有材料', source: '海外仙岛坊市', effect: '高阶炼器与法宝修复材料；星辉套装组件。' },
-  { id: 'mat_fire_guide', category: '材料', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺炼器时提高品质；地火套装组件。' },
+  { id: 'mat_fire_guide', category: '材料', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
   { id: 'mat_voyage_pass', category: '材料', name: '远航凭证', rarity: '消耗品', source: '北冥瀚海坊市', effect: '下次跨域旅行费用减半；海行套装组件。' },
   // 材料大类（妖兽掉落通用名）
   { id: 'mat_yaodan', category: '材料', name: '妖丹', rarity: '材料', source: '妖兽战利品（各妖兽掉落专属内丹，如青风狼内丹；通用妖丹为旧称）', effect: '妖兽精华内丹，可炼丹、炼器或出售。' },

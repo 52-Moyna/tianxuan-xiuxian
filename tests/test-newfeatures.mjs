@@ -1213,6 +1213,58 @@ S.practiceArt(state, '炼丹', 'shougu_dan', undefined, 1);
 const afterShou = state.items.find((i) => i.名称 === '兽骨续命丹');
 ok(afterShou && afterShou.数量 > beforeShou && afterShou.effect && afterShou.effect.heal === true, '妖兽兽骨可炼丹为兽骨续命丹（heal 效果生效）');
 
+/* ---------- 地火引：百艺助燃剂（修复装饰性死道具） ---------- */
+// 地火引此前 effect.craft 从未被任何逻辑读取，坊市可买、游历可掉、图鉴声称
+// "百艺炼器时提高品质"却从不生效，属装饰性死道具；亦不可直接服用（会被白扣）。
+// 现接入百艺配方制作：持有则自动消耗 1 张、本次产量 +1，且拦截直接服用。
+
+// 1) 无地火引对照：灵脉石饰基础产量 = 1
+const fgBase = S.createNewGame({ name: '地火对照', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(fgBase);
+storeItem(fgBase, { 名称: '宗门灵脉晶', 类型: '材料', 数量: 1, 描述: 'x' });
+storeItem(fgBase, { 名称: '矿石', 类型: '材料', 数量: 2, 描述: 'x' });
+S.practiceArt(fgBase, '炼器', 'lingmai_shi');
+const fgBaseQty = fgBase.items.filter((i) => i.名称 === '灵脉石饰').reduce((s, i) => s + (i.数量 || 1), 0);
+ok(fgBaseQty === 1, '无地火引时灵脉石饰基础产量 = 1');
+
+// 2) 持地火引：产量 +1，且地火引被消耗
+const fgState = S.createNewGame({ name: '地火加成', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(fgState);
+storeItem(fgState, { 名称: '宗门灵脉晶', 类型: '材料', 数量: 1, 描述: 'x' });
+storeItem(fgState, { 名称: '矿石', 类型: '材料', 数量: 2, 描述: 'x' });
+storeItem(fgState, { 名称: '地火引', 类型: '消耗品', 数量: 1, 描述: 'x', effect: { craft: 15 } });
+S.practiceArt(fgState, '炼器', 'lingmai_shi');
+const fgQty = fgState.items.filter((i) => i.名称 === '灵脉石饰').reduce((s, i) => s + (i.数量 || 1), 0);
+ok(fgQty === 2, '持地火引时灵脉石饰产量 +1（=2）');
+ok(!fgState.items.some((i) => i.名称 === '地火引'), '百艺制作自动消耗地火引');
+
+// 3) 丹药同样 +1：聚气丹（基础 2）→ 3
+const fgPill = S.createNewGame({ name: '地火丹药', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(fgPill);
+storeItem(fgPill, { 名称: '百越灵草', 类型: '材料', 数量: 1, 描述: 'x' });
+storeItem(fgPill, { 名称: '海灵珠', 类型: '材料', 数量: 1, 描述: 'x' });
+storeItem(fgPill, { 名称: '地火引', 类型: '消耗品', 数量: 1, 描述: 'x', effect: { craft: 15 } });
+S.practiceArt(fgPill, '炼丹', '聚气丹');
+const fgPillQty = fgPill.items.filter((i) => i.名称 === '聚气丹').reduce((s, i) => s + (i.数量 || 1), 0);
+ok(fgPillQty === 3, '持地火引时聚气丹产量 +1（=3）');
+
+// 4) 材料不足时地火引不被消耗（避免白扣）
+const fgNoMat = S.createNewGame({ name: '地火缺料', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(fgNoMat);
+storeItem(fgNoMat, { 名称: '地火引', 类型: '消耗品', 数量: 1, 描述: 'x', effect: { craft: 15 } });
+const fgNoMatLogs = S.practiceArt(fgNoMat, '炼器', 'lingmai_shi');
+ok(fgNoMatLogs.some((l) => l.includes('材料不足')), '材料不足时配方不产出');
+ok(fgNoMat.items.some((i) => i.名称 === '地火引' && i.数量 === 1), '材料不足时地火引不被消耗');
+
+// 5) 直接服用地火引被拦截，不消耗（防白扣）
+const fgUse = S.createNewGame({ name: '地火服用', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(fgUse);
+storeItem(fgUse, { 名称: '地火引', 类型: '消耗品', 数量: 1, 描述: 'x', effect: { craft: 15 } });
+const fgUseIdx = fgUse.items.findIndex((i) => i.名称 === '地火引');
+const fgUseRes = S.useItem(fgUse, fgUseIdx);
+ok(fgUseRes && fgUseRes.some((l) => l.includes('不宜直接服用')), '直接服用地火引被拦截提示');
+ok(fgUse.items.some((i) => i.名称 === '地火引' && i.数量 === 1), '直接服用地火引不被消耗');
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

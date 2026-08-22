@@ -1258,7 +1258,7 @@ export const WANDER_EVENTS = [
       const logs = [];
       const goods = Rng.pick([
         { 名称: '聚气丹', 类型: '丹药', 数量: 2, effect: { exp: 90 }, 描述: '服用后修为 +90。', 价值: 80 },
-        { 名称: '地火引', 类型: '消耗品', 数量: 1, effect: { craft: 15 }, 描述: '百艺炼器时提高品质。', 价值: 90 },
+        { 名称: '地火引', 类型: '消耗品', 数量: 1, effect: { craft: 15 }, 描述: '百艺配方制作时额外产出 1 件（自动消耗）。', 价值: 90 },
         { 名称: '驭兽香', 类型: '消耗品', 数量: 1, effect: { tame: 20 }, 描述: '提高下一次收服灵兽成功率。', 价值: 70 },
       ]);
       if (storeItem(state, goods)) logs.push(`路遇一支商队，你以公道价淘得「${goods.名称}」。`);
@@ -1835,6 +1835,10 @@ export function useItem(state, idx) {
     const kind = it.breakthrough ? '瓶颈专属丹' : '渡劫丹';
     return [`「${it.名称}」为${kind}，需在冲击瓶颈 / 渡劫时自动消耗，不宜直接服用（留于储物袋即可）。`];
   }
+  // 地火引：百艺助燃剂，制作时自动消耗，不可直接服用（避免白扣）
+  if (it.名称 === '地火引') {
+    return ['「地火引」为百艺助燃剂，需在百艺制作时自动消耗，不宜直接服用（留于储物袋即可）。'];
+  }
   if (it.effect.exp) {
     let expGain = it.effect.exp;
     // 丹药品质影响（物品带 quality 字段时按品质乘算）
@@ -2042,7 +2046,7 @@ export function practiceArt(state, artName, recipeId = '', slotOverride, batch =
     } else {
       // 套装加成：炼器/炼丹时品质和经验提升
       const expMul = setFlags.craftExp ? (1 + setFlags.craftExp) : 1;
-      const craft = craftRecipeWithQuality(state, recipe, art.level, setFlags, batch);
+      const craft = craftRecipeWithQuality(state, recipe, art.level, setFlags, batch, true);
       logs.push(...craft.logs);
       if (!craft.ok) {
         const expGain = Math.round(Rng.int(5, 10) * expMul);
@@ -2067,7 +2071,7 @@ export function practiceArt(state, artName, recipeId = '', slotOverride, batch =
 }
 
 /** 带品质判定的炼制函数（丹药带 quality，地火套装减丹毒）。mul>=1 时按批量结算材料与产出。 */
-function craftRecipeWithQuality(state, recipe, artLevel, setFlags, mul = 1) {
+function craftRecipeWithQuality(state, recipe, artLevel, setFlags, mul = 1, fireGuide = false) {
   mul = Math.max(1, Math.floor(mul || 1));
   const baseQty = recipe.output.数量 || recipe.output.quantity || 1;
   const output = {
@@ -2092,6 +2096,18 @@ function craftRecipeWithQuality(state, recipe, artLevel, setFlags, mul = 1) {
     const item = state.items.find((x) => x.名称 === name);
     if (!item || item.数量 < needTotal) return { ok: false, logs: ['材料不足，无法开工。'] };
   }
+  // 地火引：百艺配方制作时若持有则自动消耗 1 张，本次产量 +1（落实"提高品质"承诺，消除死道具）
+  let usedFireGuide = false;
+  if (fireGuide) {
+    const fgIdx = state.items.findIndex((x) => x.名称 === '地火引');
+    if (fgIdx >= 0) {
+      const fg = state.items[fgIdx];
+      fg.数量 -= 1;
+      if (fg.数量 <= 0) state.items.splice(fgIdx, 1);
+      usedFireGuide = true;
+      output.数量 += 1;
+    }
+  }
   if (!canStore(state, output)) return { ok: false, logs: ['储物袋空间不足，请先出售或扩容。'] };
   for (const [name, count] of Object.entries(recipe.need)) {
     const needTotal = count * mul;
@@ -2101,7 +2117,8 @@ function craftRecipeWithQuality(state, recipe, artLevel, setFlags, mul = 1) {
   }
   storeItem(state, output);
   state.inventory.used = inventoryUsed(state);
-  return { ok: true, logs: [`百艺制成「${output.名称}」×${output.数量}${output.quality ? `（${output.quality.grade}）` : ''}。`, `获得实际产物：${output.描述}`] };
+  const fireGuideLog = usedFireGuide ? '🔥 借助地火引，火候更足，额外制得 1 件。' : '';
+  return { ok: true, logs: [`百艺制成「${output.名称}」×${output.数量}${output.quality ? `（${output.quality.grade}）` : ''}。`, `获得实际产物：${output.描述}`, fireGuideLog].filter(Boolean) };
 }
 
 /* ============================================================

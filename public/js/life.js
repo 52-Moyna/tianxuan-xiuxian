@@ -64,7 +64,7 @@ export const REGION_MARKET = {
   nanming: [
     { name: '赤铜精', type: '材料', price: 70, desc: '炼器辅材，火属性法器偏爱。' },
     { name: '火纹战衣', type: '装备', price: 260, level: 3, desc: '耐火护具，战力 +3。' },
-    { name: '地火引', type: '消耗品', price: 90, desc: '百艺炼器时提高品质。', effect: { craft: 15 } },
+    { name: '地火引', type: '消耗品', price: 90, desc: '百艺配方制作时额外产出 1 件（自动消耗）。', effect: { craft: 15 } },
   ],
   xiji: [
     { name: '冰魄符纸', type: '材料', price: 55, desc: '制符与阵法通用材料。' },
