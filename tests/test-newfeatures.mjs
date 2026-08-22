@@ -1351,6 +1351,35 @@ ok(fgUse.items.some((i) => i.名称 === '地火引' && i.数量 === 1), '直接�
   ok(r3 && Array.isArray(r3.logs), '无仙缘时兑换不崩溃');
   ok(!g3.items.some((i) => i.名称 === '仙缘'), '无仙缘时不凭空产生');
 }
+/* ---------- 驯兽口粮（百艺御兽产出）收服时自动消耗 ---------- */
+{
+  // 1) 持有 1 份：收服尝试后必被消耗（无论成败，与「驭兽香」一致），落实图鉴/UI「可大幅提升收服概率」的承诺
+  const tb = S.createNewGame({ name: '驯兽口粮', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(tb);
+  tb.beasts.slots = []; tb.beasts.activeIdx = -1; // 清空灵兽栏，保证可收服
+  storeItem(tb, { 名称: '驯兽口粮', 类型: '消耗品', 数量: 1, effect: { tame: 15 }, 描述: 'x', 价值: 120 });
+  ok(!!tb.items.find((i) => i.名称 === '驯兽口粮'), '注入前持有驯兽口粮');
+  const rb = S.tameBeast(tb, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
+  ok(rb && Array.isArray(rb.logs), '驯兽口粮收服返回结构化日志');
+  ok(!tb.items.some((i) => i.名称 === '驯兽口粮'), '收服尝试后「驯兽口粮」被消耗（消除死道具）');
+
+  // 2) 持有多份：仅消耗 1 份
+  const tb2 = S.createNewGame({ name: '驯兽口粮2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(tb2);
+  tb2.beasts.slots = []; tb2.beasts.activeIdx = -1;
+  storeItem(tb2, { 名称: '驯兽口粮', 类型: '消耗品', 数量: 2, effect: { tame: 15 }, 描述: 'x', 价值: 120 });
+  S.tameBeast(tb2, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
+  const left = tb2.items.find((i) => i.名称 === '驯兽口粮');
+  ok(left && left.数量 === 1, '多份驯兽口粮收服后仅耗 1 份（剩 1）');
+
+  // 3) 无驯兽口粮时不凭空产生、不报错
+  const tb3 = S.createNewGame({ name: '驯兽口粮3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(tb3);
+  tb3.beasts.slots = []; tb3.beasts.activeIdx = -1;
+  S.tameBeast(tb3, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
+  ok(!tb3.items.some((i) => i.名称 === '驯兽口粮'), '无驯兽口粮时收服不凭空产生');
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
