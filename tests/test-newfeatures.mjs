@@ -1264,6 +1264,47 @@ const fgUseIdx = fgUse.items.findIndex((i) => i.名称 === '地火引');
 const fgUseRes = S.useItem(fgUse, fgUseIdx);
 ok(fgUseRes && fgUseRes.some((l) => l.includes('不宜直接服用')), '直接服用地火引被拦截提示');
 ok(fgUse.items.some((i) => i.名称 === '地火引' && i.数量 === 1), '直接服用地火引不被消耗');
+/* ---------- 仙缘·太初之气：兑换绝世机缘（死道具修复，确定性收益） ---------- */
+{
+  const g = S.createNewGame({ name: '太初仙缘', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.currencies = g.currencies || {};
+  g.player.level = 96; g.player.exp = 0; // 96级 expNeed=3000>2000，2000 修为稳定不连升
+  storeItem(g, { 名称: '仙缘·太初之气', 类型: '材料', 数量: 1, 描述: 'x', 价值: 300 });
+  const expBefore = g.player.exp;
+  const yunBefore = (g.player.daoYun?.exp || 0);
+  const wuxingBefore = (g.player.daoBase?.悟性?.exp || 0);
+  const stonesBefore = S.totalStones(g);
+  const r = S.performAction(g, { title: '太初仙缘·兑换绝世机缘', action: { type: 'taichuXianyuan' } });
+  ok(r && Array.isArray(r.logs) && r.logs.length > 0, '太初仙缘兑换返回结构化日志');
+  ok(!g.items.some((i) => i.名称 === '仙缘·太初之气'), '兑换后仙缘·太初之气被消耗');
+  ok(g.player.exp === expBefore + 2000, '兑换后修为+2000（高位不连升）');
+  ok((g.player.daoYun?.exp || 0) === yunBefore + 40, '兑换后道韵经验+40');
+  ok((g.player.daoBase?.悟性?.exp || 0) === wuxingBefore + 25, '兑换后悟性经验+25');
+  ok(S.totalStones(g) === stonesBefore + 800, '兑换后下品灵石+800');
+  ok(g.techniques.some((t) => t.名称 === '太虚剑经'), '兑换赠天品功法《太虚剑经》');
+  // 罗盘选项：持有才出现
+  const gOpt = S.createNewGame({ name: '太初选项', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gOpt);
+  ok(!S.extraCompassOptions(gOpt).some((o) => o.action.type === 'taichuXianyuan'), '无仙缘时不出现太初仙缘选项');
+  storeItem(gOpt, { 名称: '仙缘·太初之气', 类型: '材料', 数量: 1, 描述: 'x', 价值: 300 });
+  ok(S.extraCompassOptions(gOpt).some((o) => o.action.type === 'taichuXianyuan'), '持有仙缘时出现太初仙缘选项');
+  // 持有 2 份：仅消耗 1 份
+  const g2 = S.createNewGame({ name: '太初仙缘2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g2);
+  storeItem(g2, { 名称: '仙缘·太初之气', 类型: '材料', 数量: 2, 描述: 'x', 价值: 300 });
+  S.performAction(g2, { title: '太初仙缘·兑换绝世机缘', action: { type: 'taichuXianyuan' } });
+  const remain = g2.items.filter((i) => i.名称 === '仙缘·太初之气').reduce((s, i) => s + (i.数量 || 1), 0);
+  ok(remain === 1, '持有 2 份兑换后仅消耗 1 份（剩 1）');
+  // 无仙缘时不崩溃、不凭空产生
+  const g3 = S.createNewGame({ name: '太初仙缘3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g3);
+  const r3 = S.performAction(g3, { title: '太初仙缘·兑换绝世机缘', action: { type: 'taichuXianyuan' } });
+  ok(r3 && Array.isArray(r3.logs), '无仙缘·太初之气时兑换不崩溃');
+  ok(!g3.items.some((i) => i.名称 === '仙缘·太初之气'), '无仙缘时不凭空产生');
+}
+
+
 
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

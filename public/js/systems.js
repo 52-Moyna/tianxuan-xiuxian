@@ -1539,6 +1539,29 @@ export function performAction(state, option, extra = {}) {
       (r.logs || []).forEach((l) => logs.push(l));
       break;
     }
+    case 'taichuXianyuan': {
+      // 仙缘·太初之气：兑换绝世机缘（确定性收益，无 RNG、无战斗风险）
+      const held = state.items.filter((i) => i.名称 === '仙缘·太初之气');
+      const cnt = held.reduce((s, i) => s + (i.数量 || 1), 0);
+      if (cnt < 1) { logs.push('你手中尚无「仙缘·太初之气」，无缘兑换。'); break; }
+      const it = held[0];
+      it.数量 -= 1;
+      if (it.数量 <= 0) state.items.splice(state.items.indexOf(it), 1);
+      gainExp(state, 2000, logs);
+      addDaoYunExp(state, 40, logs);
+      addDaoBaseExp(state, '悟性', 25, logs);
+      addStones(state, 800);
+      // 赠天品功法《太虚剑经》；已持有则改赠灵石
+      if (!state.techniques.some((t) => t.名称 === '太虚剑经')) {
+        state.techniques.push({ 名称: '太虚剑经', 品级: '天品', 等级: 1, 经验: 0 });
+        logs.push('🌟 仙缘使者颔首，赠你天品功法《太虚剑经》一部，剑意可震慑低阶妖兽。');
+      } else {
+        addStones(state, 1200);
+        logs.push('🌟 仙缘使者见你已通《太虚剑经》，改赠下品灵石 1200 以助道途。');
+      }
+      logs.push('✨ 太初仙缘加身，修为+2000、道韵+40、悟性+25、下品灵石+800。一段绝世机缘就此圆满。');
+      break;
+    }
     /* market / art / socialList / auction / tameBeast / sectTask 由 UI 打开子界面处理，不在此处结算 */
     default:
       logs.push('本月你按照自己的心意行动，岁月静好。');
@@ -2781,6 +2804,11 @@ export function extraCompassOptions(state) {
   // 观星卜算（灵石充裕时出现）：请动星盘，得确定性道韵/悟性经验与一则天机提示
   if (canAfford(state, DIVINATION.cost)) {
     opts.push({ icon: '🔮', tag: '天机', title: '观星卜算', desc: `夜观天象，请动星盘（耗灵石 ${DIVINATION.cost}）。道韵经验+${DIVINATION.daoYun}，悟性经验+${DIVINATION.wuxing}，并得下月一则天机运势加成。`, action: { type: 'divination' }, preview: '收益：道韵/悟性经验 + 下月天机运势（修炼/灵草/商道/悟性四类之一）' });
+  }
+  // 太初仙缘（持有「仙缘·太初之气」时出现）：上古仙缘使者处兑换绝世机缘（确定性、无 RNG、无风险）
+  const taichu = state.items.filter((i) => i.名称 === '仙缘·太初之气').reduce((sum, i) => sum + (i.数量 || 1), 0);
+  if (taichu >= 1) {
+    opts.push({ icon: '🌟', tag: '天机', title: '太初仙缘·兑换绝世机缘', desc: `持「仙缘·太初之气」×1，寻上古仙缘使者兑换一段绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并获赠天品功法《太虚剑经》（已持有则改赠灵石）。当前持有 ${taichu} 份。`, action: { type: 'taichuXianyuan' }, preview: '收益：修为/道韵/悟性大涨 + 赠天品功法《太虚剑经》' });
   }
   return opts;
 }

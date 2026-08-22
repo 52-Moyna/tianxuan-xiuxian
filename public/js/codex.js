@@ -294,7 +294,7 @@ export const CODEX_ITEMS = [
   { id: 'mat_shougu', category: '材料', name: '兽骨', rarity: '材料', source: '妖兽战利品（概率）', effect: '百艺炼丹（兽骨续命丹）或炼器材料，硬骨质。' },
   { id: 'mat_pimao', category: '材料', name: '皮毛', rarity: '材料', source: '妖兽战利品（概率）', effect: '百艺制符（兽皮护符）的皮料。' },
   { id: 'mat_xianyuan', category: '材料', name: '仙缘', rarity: '稀有材料', source: '高阶妖兽战利品（极低概率）', effect: '罕见机缘之物，价值不菲，可用于特殊交易。' },
-  { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '海外仙岛机缘（极稀有），气运/悟性双满时概率大幅提升', effect: '传说中的仙界之气，可遇不可求。持此物者可触发特殊天命事件，或于特定NPC处兑换绝世机缘。价值连城。' },
+  { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '上古遗府/秘境深处隐藏奇遇（极稀有）', effect: '传说中的仙界之气，可遇不可求。持此物者可于罗盘「太初仙缘」处寻上古仙缘使者兑换绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并赠天品功法《太虚剑经》。价值连城。' },
   // 妖兽材料子类（generateBeastDrops 动态名）
   { id: 'mat_beast_lingcao', category: '材料', name: '妖兽灵草', rarity: '材料', source: '妖兽战利品', effect: '妖兽携带的灵草，品质参差不齐。' },
   { id: 'mat_beast_shougu', category: '材料', name: '妖兽兽骨', rarity: '材料', source: '妖兽战利品', effect: '妖兽骨骼，坚硬程度因妖兽等级而异。' },
