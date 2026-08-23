@@ -2727,13 +2727,15 @@ export function exploreSectRealm(state, depth = 1) {
   const stones = Math.round(80 * dcfg.stoneMul);
   addStones(state, stones);
   logs.push(`采得灵脉矿髓，下品灵石 +${stones}。`);
-  // 灵脉所凝材料（确定性）
-  const mat = { 名称: '宗门灵脉晶', 类型: '材料', 数量: depth, 描述: '宗门秘境灵脉所凝之晶，可充作炼器灵材。' };
+  // 灵脉所凝材料（确定性，用量随深度 ×matMul 缩放，与罗盘面板承诺一致）
+  const matCount = Math.max(1, Math.round(depth * dcfg.matMul));
+  const mat = { 名称: '宗门灵脉晶', 类型: '材料', 数量: matCount, 描述: '宗门秘境灵脉所凝之晶，可充作炼器灵材。' };
   if (storeItem(state, mat)) logs.push(`获得材料：宗门灵脉晶 ×${mat.数量}。`);
-  // 深处藏有宗门丹房旧藏（确定性，depth>=2 可得聚气丹）
+  // 深处藏有宗门丹房旧藏（确定性，depth>=2 可得聚气丹，数量随深度 ×artMul 缩放）
   if (depth >= 2) {
-    const pill = { 名称: '聚气丹', 类型: '丹药', 数量: 1, effect: { exp: 90 }, toxicity: 8, 描述: '宗门丹房旧藏，服下修为 +90（连续服用生丹毒）。' };
-    if (storeItem(state, pill)) logs.push(`于深处丹室寻得宗门旧藏：聚气丹 ×1。`);
+    const pillCount = Math.max(1, Math.round(dcfg.artMul));
+    const pill = { 名称: '聚气丹', 类型: '丹药', 数量: pillCount, effect: { exp: 90 }, toxicity: 8, 描述: '宗门丹房旧藏，服下修为 +90（连续服用生丹毒）。' };
+    if (storeItem(state, pill)) logs.push(`于深处丹室寻得宗门旧藏：聚气丹 ×${pillCount}。`);
   }
   makeChronicle(state, { type: '宗门', title: `潜修宗门秘境·${dcfg.name}`, text: logs.join('') });
   addLog(state, '事件', `潜修宗门秘境·${dcfg.name}：${logs.slice(1).join('')}`);

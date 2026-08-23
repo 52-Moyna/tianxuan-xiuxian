@@ -1150,8 +1150,17 @@ const pickNeighbor = (st) => travelOptions(st)[0];
   ok(r2.ok, 'rank3 depth2 可进入');
   ok(g2.sect.contribution === 48, `depth2 贡献 30×1.6=48（实际 ${g2.sect.contribution}）`);
   ok(S.totalStones(g2) === before2 + 128, `depth2 灵石 80×1.6=128（实际 ${S.totalStones(g2) - before2}）`);
-  ok(g2.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 2), 'depth2 材料 宗门灵脉晶×2');
+  ok(g2.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 3), 'depth2 材料 宗门灵脉晶×3（按 matMul 1.4 缩放）');
   ok(g2.items.some((i) => i.名称 === '聚气丹' && i.数量 === 1), 'depth2 深处得聚气丹×1');
+  // 深处(depth3)：材料 ×matMul(1.8)、聚气丹 ×artMul(1.6→2)，与罗盘面板承诺一致
+  const g3d = mkSect(3, 0);
+  const before3 = S.totalStones(g3d);
+  const r3d = S.exploreSectRealm(g3d, 3);
+  ok(r3d.ok, 'rank3 depth3 可进入');
+  ok(g3d.sect.contribution === 72, `depth3 贡献 30×2.4=72（实际 ${g3d.sect.contribution}）`);
+  ok(S.totalStones(g3d) === before3 + 192, `depth3 灵石 80×2.4=192（实际 ${S.totalStones(g3d) - before3}）`);
+  ok(g3d.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 5), 'depth3 材料 宗门灵脉晶×5（按 matMul 1.8 缩放）');
+  ok(g3d.items.some((i) => i.名称 === '聚气丹' && i.数量 === 2), 'depth3 深处得聚气丹×2（按 artMul 1.6 缩放）');
   // 罗盘选项：rank>=3 出现，rank<3 不出现
   const gOpt = mkSect(1);
   ok(!S.extraCompassOptions(gOpt).some((o) => o.action.type === 'sectRealm'), 'rank1 罗盘无宗门秘境选项');
