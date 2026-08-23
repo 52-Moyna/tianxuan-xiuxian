@@ -263,6 +263,8 @@ export const CODEX_ITEMS = [
   { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后获赠；东荒机缘、秘境亦有传闻', effect: '收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊；灵兽会在战斗与采集中助你一臂之力。' },
   { id: 'item_travel_pass', category: '道具', name: '旅行凭证', rarity: '消耗品', source: '坊市、宗门任务奖励', effect: '下次跨域旅行费用减半。' },
   { id: 'item_ward_low', category: '道具', name: '低阶护身符', rarity: '消耗品', source: '西极玄冰域坊市', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
+  { id: 'item_ward_talisman', category: '道具', name: '低阶符箓', rarity: '消耗品', source: '符师道友敬赠、百艺制符', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
+  { id: 'item_simple_flag', category: '道具', name: '简易阵旗', rarity: '消耗品', source: '阵师道友敬赠、阵法百艺', effect: '战场布成临时护阵，下一次战斗失败时替你挡去重伤与失财。' },
   { id: 'item_bug_powder', category: '道具', name: '驱虫粉', rarity: '消耗品', source: '岭南百越坊市', effect: '降低雨林探索风险，防止毒虫侵扰。' },
   { id: 'item_tame_food', category: '道具', name: '驯兽口粮', rarity: '消耗品', source: '百艺御兽', effect: '提高下一次收服灵兽成功率 +15%；可用妖兽内丹+灵草炼制。' },
   { id: 'item_fire_guide', category: '道具', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },

@@ -147,7 +147,9 @@ export function enhanceEquip(state, target) {
   if (!item || !item.名称 || item.名称 === '无') return { ok: false, logs: ['目标装备不存在。'] };
   const level = Number(item.等级) || 1;
   if (level >= 30) return { ok: false, logs: ['该装备已臻化境，无法继续淬炼。'] };
-  const cost = 40 * (level + 1);
+  let cost = 40 * (level + 1);
+  // 道友之能·炼器师：法器保养与小修八折（relation>=3 的炼器师道友在旁，省下两成灵石）
+  if (daoFriendJob(state, '炼器师')) cost = Math.round(cost * 0.8);
   if (!spendStones(state, cost)) return { ok: false, logs: [`灵石不足（需 ${cost}）。`] };
   const rate = Math.max(35, 88 - level * 2);
   const success = Rng.chance(rate / 100);
@@ -350,6 +352,12 @@ export function knownNpcs(state) {
 /** 道缘是否已结识（缺省视为已结识，兼容旧档） */
 export function isMet(npc) {
   return npc.met !== false;
+}
+
+/** 是否拥有某职业的「道友」（relation>=3）级道缘；返回该 NPC 或 null。
+ *  供「道友之能」按职业触发专属效果（炼器师八折 / 剑修体修助拳 / 散修引荐）。 */
+export function daoFriendJob(state, job) {
+  return knownNpcs(state).find((n) => (n.relation || 0) >= 3 && n.job === job) || null;
 }
 
 /** 创建新游戏 */
@@ -747,6 +755,8 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
     cur = next;
   };
   if (state.flags.companionMonths > 0) apply(10, 'ally');
+  // 道友之能·剑修/体修：仗义护持，道友级（relation>=3）即在战斗中助拳（确定性 +6，不掷运）
+  if (daoFriendJob(state, '剑修') || daoFriendJob(state, '体修')) apply(6, 'ally');
   // 全体灵兽助阵
   if (state.beasts?.slots?.length) {
     const beastBonus = state.beasts.slots.reduce((s, b) => s + (BEAST_WINRATE[b.name] ?? BEAST_WINRATE.default), 0);
@@ -791,6 +801,12 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
   if (state.flags.companionMonths > 0 && !fled) {
     finalRate = Math.min(95, finalRate + 10);
     logs.push(`同行道友「${state.flags.companion}」从旁策应，胜率提高。`);
+  }
+  // 道友之能·剑修/体修：仗义护持，道友级（relation>=3）即在战斗中助拳（确定性 +6）
+  const warFriend = !fled && (daoFriendJob(state, '剑修') || daoFriendJob(state, '体修'));
+  if (warFriend) {
+    finalRate = Math.min(95, finalRate + 6);
+    logs.push(`道友「${warFriend.name}」仗义助拳，胜率提高。`);
   }
   // 灵兽战斗加成
   if (state.beasts?.slots?.length && !fled) {
@@ -877,7 +893,7 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     let wardKind = null;
     if (type !== 'qiecuo') {
       const wFull = state.items.find((i) => i.名称 === '护身符');
-      const wLow = state.items.find((i) => i.名称 === '低阶护身符');
+      const wLow = state.items.find((i) => i.名称 === '低阶护身符' || i.名称 === '低阶符箓' || i.名称 === '简易阵旗');
       const w = wFull || wLow;
       if (w) {
         wardKind = wFull ? 'ward' : 'wardLow';
@@ -2267,6 +2283,28 @@ export function nextMonth(state) {
         addStones(state, 30); logs.push(`道友「${npc.name}」打理产业，分红+30灵石。`);
       } else if (npc.skill.includes('风声')) {
         logs.push(`道友「${npc.name}」捎来一条秘闻：${Rng.pick(WORLD_EVENTS)}。`);
+      } else if (npc.skill.includes('手作')) {
+        if (npc.job === '符师') {
+          const gift = { 名称: '低阶符箓', 类型: '消耗品', 数量: 1, 描述: `${npc.name}所赠符箓，败北时替你挡灾。`, 价值: 50, effect: { ward: true } };
+          if (storeItem(state, gift)) logs.push(`道友「${npc.name}」敬赠一张低阶符箓，已收入储物袋。`);
+          else logs.push(`道友「${npc.name}」赠来符箓，但储物袋已满，暂未收下。`);
+        } else { // 阵师
+          const gift = { 名称: '简易阵旗', 类型: '消耗品', 数量: 1, 描述: `${npc.name}所赠阵旗，战场布成临时护阵，败北时挡灾。`, 价值: 70, effect: { ward: true } };
+          if (storeItem(state, gift)) logs.push(`道友「${npc.name}」赠你一面简易阵旗，已收入储物袋。`);
+          else logs.push(`道友「${npc.name}」赠来阵旗，但储物袋已满，暂未收下。`);
+        }
+      }
+    }
+  }
+  // 道友之能·散修：引荐延誉，每半年（turns 为 6 的倍数）引荐一位尚未结识的高人
+  if (state.world.turns % 6 === 0) {
+    const matchmaker = daoFriendJob(state, '散修');
+    if (matchmaker) {
+      const pend = state.npcs.find((n) => n.met === false);
+      if (pend) {
+        pend.met = true; pend.relation = 0; pend.relationName = '陌路';
+        logs.push(`道友「${matchmaker.name}」（散修）引荐，你结识了${pend.race || ''}${pend.job || ''}「${pend.name}」，多了一段道缘。`);
+        addLog(state, '事件', `经「${matchmaker.name}」引荐，结识「${pend.name}」。`);
       }
     }
   }

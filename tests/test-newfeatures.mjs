@@ -1471,6 +1471,89 @@ beastHabitatReachableGroup();
   }
 }
 
+/* ---------- 道友之能全生效（修复 6 种装饰性假承诺 + 简易阵旗死道具） ---------- */
+{
+  // T1: daoFriendJob helper
+  const g = S.createNewGame({ name: '道友之能测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.npcs = [
+    { name: '炉伯', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '炼器师', trait: '木讷', level: 10 },
+    { name: '剑客', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '剑修', trait: '豪爽', level: 10 },
+    { name: '游方', relation: 1, relationName: '熟识', favor: 30, met: true, gender: '男', race: '人', realm: '练气', job: '散修', trait: '圆滑', level: 10 },
+  ];
+  ok(S.daoFriendJob(g, '炼器师') && S.daoFriendJob(g, '炼器师').name === '炉伯', 'daoFriendJob 命中炼器师道友');
+  ok(S.daoFriendJob(g, '剑修') && S.daoFriendJob(g, '剑修').name === '剑客', 'daoFriendJob 命中剑修道友');
+  ok(S.daoFriendJob(g, '符师') === null, 'daoFriendJob 无对应职业时返回 null');
+  ok(S.daoFriendJob(g, '散修') === null, 'relation<3 的散修不计入道友之能');
+
+  // T2: 炼器师八折（enhanceEquip 淬炼造价）
+  const mkEquip = () => {
+    const s = S.createNewGame({ name: '淬炼测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(s);
+    s.player.power = 100;
+    s.equipment.weapon = { 名称: '试炼剑', 部位: 'weapon', 等级: 5, 战力: 10, 品阶: 'fan' };
+    s.currencies = { '下品灵石': 99999, '中品灵石': 0, '上品灵石': 0 };
+    return s;
+  };
+  const r0 = S.enhanceEquip(mkEquip(), { where: 'equip', slot: 'weapon' });
+  ok(r0.cost === 40 * (5 + 1), `无炼器师道友时淬炼造价=240（实际 ${r0.cost}）`);
+  const dis = mkEquip();
+  dis.npcs = [{ name: '炉伯', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '炼器师', trait: '木讷', level: 10 }];
+  const r1 = S.enhanceEquip(dis, { where: 'equip', slot: 'weapon' });
+  ok(r1.cost === Math.round(40 * (5 + 1) * 0.8), `炼器师道友八折后造价=192（实际 ${r1.cost}）`);
+
+  // T3: 剑修/体修 临阵助拳（战前预估确定性 +6）
+  const mkBattle = (withFriend) => {
+    const s = S.createNewGame({ name: '助拳测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(s);
+    s.player.power = 200;
+    if (withFriend) s.npcs = [{ name: '剑客', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '剑修', trait: '豪爽', level: 10 }];
+    return s;
+  };
+  const enemy = { name: '试炼傀儡', realm: '练气', level: 10, power: 200 };
+  const pvNo = S.previewBattle(mkBattle(false), enemy, 'shengci', 'normal', false).finalRate;
+  const pvYes = S.previewBattle(mkBattle(true), enemy, 'shengci', 'normal', false).finalRate;
+  ok(pvYes === Math.min(95, pvNo + 6), `剑修道友助拳胜率 +6（${pvNo}→${pvYes}）`);
+
+  // T4: 简易阵旗 / 低阶符箓 现为战斗 ward（修复死道具）—— 败北时消耗且灵石不失
+  const wardLossTest = (itemName) => {
+    for (let i = 0; i < 200; i++) {
+      const s = S.createNewGame({ name: '护阵测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+      ensureLifeState(s);
+      s.player.power = 10;
+      s.items.push({ 名称: itemName, 类型: '消耗品', 数量: 1, 描述: '测试', 价值: 50, effect: { ward: true } });
+      s.currencies = { '下品灵石': 500, '中品灵石': 0, '上品灵石': 0 };
+      const before = S.totalStones(s);
+      const e = { name: '太古凶兽', realm: '化神', level: 99, power: 999999 };
+      const rep = S.resolveBattle(s, e, 'shengci', false, 'normal', false);
+      if (!rep.win) {
+        ok(!s.items.some((it) => it.名称 === itemName), `${itemName} 败北时被消耗（非死道具）`);
+        ok(S.totalStones(s) === before, `${itemName} 替你挡去灵石损失`);
+        return;
+      }
+    }
+    ok(false, `${itemName} 未触发败北场景`);
+  };
+  wardLossTest('简易阵旗');
+  wardLossTest('低阶符箓');
+
+  // T5: 散修道友每半年引荐一位未结识高人（确定性，无 RNG）
+  {
+    const s = S.createNewGame({ name: '引荐测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(s);
+    s.world.turns = 5; // nextMonth 会 +1 → 6，恰为 6 的倍数
+    s.npcs = [
+      { name: '游方', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '散修', trait: '圆滑', level: 10 },
+      { name: '隐士', relation: 0, relationName: '陌路', favor: 0, met: false, gender: '男', race: '人', realm: '练气', job: '阵师', trait: '清冷', level: 10 },
+    ];
+    const pendingBefore = s.npcs.filter((n) => n.met === false).length;
+    S.nextMonth(s);
+    const pend = s.npcs.find((n) => n.name === '隐士');
+    ok(pend.met === true, '散修道友引荐使未结识高人变为已结识');
+    ok(s.world.turns % 6 === 0 && pendingBefore === 1, '引荐在每半年（turns 为 6 倍数）触发');
+  }
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
