@@ -1380,6 +1380,55 @@ ok(fgUse.items.some((i) => i.名称 === '地火引' && i.数量 === 1), '直接�
   ok(!tb3.items.some((i) => i.名称 === '驯兽口粮'), '无驯兽口粮时收服不凭空产生');
 }
 
+/* ---------- 灵兽契约首获修复（消除收服死循环） ---------- */
+function contractGroup() {
+  const c1 = S.createNewGame({ name: '契约1', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(c1);
+  c1.beasts.slots = []; c1.beasts.activeIdx = -1;
+  let rr = null;
+  for (let k = 0; k < 300 && !(rr && rr.ok); k++) rr = S.tameBeast(c1, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
+  ok(rr && rr.ok === true, '收服成功返回 ok');
+  const contract = c1.items.find((i) => i.名称 === '灵兽契约');
+  ok(!!contract && contract.数量 === 1, '成功收服后「灵兽契约」真进入背包（消除死循环）');
+  ok(S.extraCompassOptions(c1).some((o) => o.action && o.action.type === 'tameBeast'), '持有契约后「前往灵兽栖息地」收服入口可见');
+}
+
+/* ---------- 驱虫粉接入真实消费点（消除死道具） ---------- */
+function bugPowderGroup() {
+  const b1 = S.createNewGame({ name: '驱虫1', gender: '男', raceId: 'human', ageId: 'young', regionId: 'lingnan', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(b1);
+  storeItem(b1, { 名称: '驱虫粉', 类型: '消耗品', 数量: 2, effect: { explore: 15 }, 描述: '降低雨林风险', 价值: 35 });
+  const before = b1.items.find((i) => i.名称 === '驱虫粉').数量;
+  const res = S.resolveWanderEvent(b1);
+  const after = b1.items.find((i) => i.名称 === '驱虫粉');
+  ok(after && after.数量 === before - 1, '岭南游历后「驱虫粉」被消耗 1 份（消除死道具）');
+  ok(Array.isArray(res.logs) && res.logs.length > 0 && res.logs[0].includes('驱虫粉'), '驱虫粉生效提示写入日志');
+  const b2 = S.createNewGame({ name: '驱虫2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'lingnan', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(b2);
+  const res2 = S.resolveWanderEvent(b2);
+  ok(Array.isArray(res2.logs), '无驱虫粉时岭南游历不崩溃');
+  ok(!b2.items.some((i) => i.名称 === '驱虫粉'), '无驱虫粉时不凭空产生');
+  const b3 = S.createNewGame({ name: '驱虫3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(b3);
+  storeItem(b3, { 名称: '驱虫粉', 类型: '消耗品', 数量: 1, effect: { explore: 15 }, 描述: 'x', 价值: 35 });
+  S.resolveWanderEvent(b3);
+  ok(b3.items.find((i) => i.名称 === '驱虫粉').数量 === 1, '非岭南地区游历不消耗驱虫粉');
+}
+
+/* ---------- 图鉴幽灵条目治理 ---------- */
+function codexGhostGroup() {
+  const entries = codexEntries(S.createNewGame({ name: '图鉴幽灵', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() }));
+  ok(!entries.some((e) => ['灵草', '兽骨', '皮毛'].includes(e.name)), '图鉴已移除从不生成的「灵草/兽骨/皮毛」幽灵条目');
+  for (const nm of ['妖兽灵草', '妖兽兽骨', '妖兽皮毛', '矿石']) {
+    const e = entries.find((x) => x.name === nm);
+    ok(!!e && typeof e.effect === 'string' && e.effect.length > 0, `图鉴含真实掉落条目「${nm}」且描述完整`);
+  }
+}
+
+contractGroup();
+bugPowderGroup();
+codexGhostGroup();
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

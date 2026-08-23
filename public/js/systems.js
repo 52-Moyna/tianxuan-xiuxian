@@ -1341,14 +1341,34 @@ export const WANDER_EVENTS = [
 /** 按区域加权抽取一个游历事件并执行 */
 export function resolveWanderEvent(state) {
   const regionId = state.world.regionId || 'zhongzhou';
+  // 驱虫粉（岭南百越坊市可购，effect.explore）：持有则消耗 1 份，本次游历风险降低（消除死道具）。
+  // 仅岭南百越雨林生效（其余地域本就少毒虫），确定性、无 RNG，测试无 flaky。
+  let bugPowderApplied = false;
+  if (regionId === 'lingnan') {
+    const bugIdx = state.items.findIndex((i) => i.名称 === '驱虫粉');
+    if (bugIdx >= 0) {
+      const bug = state.items[bugIdx];
+      bug.数量 -= 1;
+      if (bug.数量 <= 0) state.items.splice(bugIdx, 1);
+      bugPowderApplied = true;
+    }
+  }
   const weighted = WANDER_EVENTS.map((e) => {
     let w = e.weight;
     const boost = e.regionBoost && e.regionBoost[regionId];
     if (boost) w *= boost;
+    // 驱虫粉生效时，所有游历事件权重整体抬升（更易触发机缘/采集，稀释负面遭遇）
+    if (bugPowderApplied) w *= 1.25;
     return { ...e, weight: w };
   });
   const ev = Rng.weighted(weighted);
-  try { return ev.run(state) || { logs: [] }; } catch (err) { return { logs: ['游历途中发生了一点意外，但你安然归来。'] }; }
+  let res;
+  try { res = ev.run(state) || { logs: [] }; } catch (err) { res = { logs: ['游历途中发生了一点意外，但你安然归来。'] }; }
+  if (bugPowderApplied) {
+    res.logs = res.logs || [];
+    res.logs.unshift('你撒出「驱虫粉」，雨林毒虫退散，此行更添安稳（消耗驱虫粉×1）。');
+  }
+  return res;
 }
 
 /**
@@ -2348,6 +2368,10 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
     state.beasts.slots.push(beast);
     state.beasts.tamedCount += 1;
     if (state.beasts.activeIdx < 0) state.beasts.activeIdx = state.beasts.slots.length - 1;
+    // 首次收服即赠予「灵兽契约」入背包（此前仅解锁图鉴、从不入袋，导致收服罗盘入口永不出现）。
+    // 之后每次收服都会稳定补充一张契约，使「前往灵兽栖息地」收服链可持续运转。
+    const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '解锁灵兽栏的契约，持有方可前往灵兽栖息地收服灵兽。', 价值: 0 };
+    storeItem(state, contract);
     discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
     discoverItem(state, { 名称: beast.name, 类型: '灵兽' });
     addLog(state, '事件', `成功收服灵兽「${beast.name}」，战力加成 +${beast.power}。`);
