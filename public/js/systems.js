@@ -1794,8 +1794,12 @@ export function buyItem(state, goods) {
     const item = generateEquip(state, 'artifact', goods.等级 || 1, goods.名称);
     state.equipment.stash.push(item);
   } else if (goods.类型 === '功法') {
-    state.techniques.push({ 名称: goods.名称, 品级: goods.品级, 等级: 1, 经验: 0 });
-    discoverItem(state, { 名称: goods.名称, 类型: '功法' });
+    // 2026-08-23：功法玉简若声明了 effect.technique，则按声明授予具体功法（如「基础功法玉简」→「基础吐纳术」），
+    // 避免把玉简名本身当功法写入、且品级缺失导致战力兜底。无声明则沿用玉简名与货架品级。
+    const tname = goods.effect?.technique || goods.名称;
+    const tgrade = goods.品级 || '凡品';
+    state.techniques.push({ 名称: tname, 品级: tgrade, 等级: 1, 经验: 0 });
+    discoverItem(state, { 名称: tname, 类型: '功法' });
   } else {
     storeItem(state, { 名称: goods.名称, 类型: goods.类型, 数量: 1, 描述: goods.描述, effect: goods.effect });
   }

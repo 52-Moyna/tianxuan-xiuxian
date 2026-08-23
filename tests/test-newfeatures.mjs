@@ -1453,6 +1453,24 @@ function beastHabitatReachableGroup() {
 }
 beastHabitatReachableGroup();
 
+
+/* ---------- 基础功法玉简：购买按 effect.technique 授予具体功法（确定性） ---------- */
+{
+  const g = S.createNewGame({ name: '功法玉简测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.inventory.capacity = 999; g.inventory.used = 0;
+  S.addStones(g, 100000);
+  const jade = S.shopStock(g).find((x) => x.名称 === '基础功法玉简');
+  ok(!!jade, '坊市含基础功法玉简');
+  if (jade) {
+    S.buyItem(g, jade);
+    const t = g.techniques.find((x) => x.名称 === '基础吐纳术');
+    ok(!!t, '基础功法玉简授予「基础吐纳术」', t ? '品级=' + t.品级 : '缺失');
+    ok(t && t.品级 === '凡品', '「基础吐纳术」品级为凡品', t ? t.品级 : '缺失');
+    ok(!g.techniques.some((x) => x.名称 === '基础功法玉简'), '不会把玉简名当功法写入');
+  }
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
