@@ -2368,11 +2368,12 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
     state.beasts.slots.push(beast);
     state.beasts.tamedCount += 1;
     if (state.beasts.activeIdx < 0) state.beasts.activeIdx = state.beasts.slots.length - 1;
-    // 首次收服即赠予「灵兽契约」入背包（此前仅解锁图鉴、从不入袋，导致收服罗盘入口永不出现）。
-    // 之后每次收服都会稳定补充一张契约，使「前往灵兽栖息地」收服链可持续运转。
-    const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '解锁灵兽栏的契约，持有方可前往灵兽栖息地收服灵兽。', 价值: 0 };
-    storeItem(state, contract);
-    discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
+    // 收服成功赠予「灵兽契约」作为驯兽凭证（见证羁绊）；仅在缺失时补发，避免重复累积。
+    if (!state.items.some((i) => i.名称 === '灵兽契约')) {
+      const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。', 价值: 0 };
+      storeItem(state, contract);
+      discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
+    }
     discoverItem(state, { 名称: beast.name, 类型: '灵兽' });
     addLog(state, '事件', `成功收服灵兽「${beast.name}」，战力加成 +${beast.power}。`);
     makeChronicle(state, { type: '灵兽', title: `收服${beast.name}`, text: `你收服了${beast.name}，它将协助你战斗与采集。` });
@@ -2834,9 +2835,9 @@ export function extraCompassOptions(state) {
   if (state.world.month === 9 || state.flags.auctionAvailable) {
     opts.push({ icon: '🔨', tag: '因缘', title: '参加修真拍卖会', desc: '各路修士齐聚竞价，可能淘到稀有之物。', action: { type: 'auction' }, preview: '需准备灵石，与 NPC 竞价拍品' });
   }
-  // 灵兽收服（持有灵兽契约时）
-  if (state.items.some((i) => i.名称 === '灵兽契约')) {
-    opts.push({ icon: '🐺', tag: '灵兽', title: '前往灵兽栖息地', desc: '尝试收服一头灵兽，协助战斗与采集。', action: { type: 'tameBeast' }, preview: '消耗灵兽契约；御兽等级越高成功率越高' });
+  // 灵兽收服（灵兽栏有空位即可前往；「灵兽契约」改为收服成功后的驯兽凭证，不再作为入口门槛，避免新玩家死锁）
+  if (canTameBeast(state)) {
+    opts.push({ icon: '🐺', tag: '灵兽', title: '前往灵兽栖息地', desc: '尝试收服一头灵兽，协助战斗与采集。', action: { type: 'tameBeast' }, preview: '御兽等级越高成功率越高；成功收服将获赠「灵兽契约」作为驯兽凭证' });
   }
   // 宗门任务（加入宗门后）
   if (state.sect?.name) {

@@ -260,7 +260,7 @@ export const CODEX_ITEMS = [
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
   { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
   { id: 'item_sea_pass', category: '道具', name: '海岛通行令', rarity: '消耗品', source: '北冥瀚海坊市', effect: '降低海外遗府探索的费用 20%。' },
-  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '御兽、东荒机缘、秘境', effect: '解锁灵兽栏，灵兽可在战斗和采集中提供协助。' },
+  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后获赠；东荒机缘、秘境亦有传闻', effect: '收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊；灵兽会在战斗与采集中助你一臂之力。' },
   { id: 'item_travel_pass', category: '道具', name: '旅行凭证', rarity: '消耗品', source: '坊市、宗门任务奖励', effect: '下次跨域旅行费用减半。' },
   { id: 'item_ward_low', category: '道具', name: '低阶护身符', rarity: '消耗品', source: '西极玄冰域坊市', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
   { id: 'item_bug_powder', category: '道具', name: '驱虫粉', rarity: '消耗品', source: '岭南百越坊市', effect: '降低雨林探索风险，防止毒虫侵扰。' },

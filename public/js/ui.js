@@ -2848,9 +2848,9 @@ function renderBeastsPanel(box) {
         <div class="opt-desc" style="margin-top:8px">灵兽总战力加成：<b style="color:var(--jade)">+${totalPower}</b>（计入战斗胜率与采集收益）。指定一只「出战」灵兽可在战斗中额外护主，胜率再 +${S.activeBeastBonus(st)}%（星级越高加成越大，1★+2% → 5★+10%）。</div>
       ` : `
         <div class="opt-desc">你尚未收服任何灵兽。</div>
-        <div class="opt-desc" style="margin-top:6px"><b>如何收服灵兽：</b>在决策罗盘选择「游历」行动，有概率前往<strong>灵兽栖息地</strong>（需 Lv.5+ 解锁），遭遇野生灵兽后可尝试收服。</div>
-        <div class="opt-desc" style="margin-top:4px"><b>提高成功率：</b>使用「驭兽香」（坊市·消耗品）或「驯兽口粮」可大幅提升收服概率；道缘中「驯兽师」NPC 可传授驭兽技巧。</div>
-        <div class="opt-desc" style="margin-top:4px"><b>灵兽加成：</b>已收服的灵兽会在战斗中助阵（提高胜率）并提供固定战力加成。使用「灵兽契约」（图鉴解锁后可获得）可解锁更多栏位。</div>
+        <div class="opt-desc" style="margin-top:6px"><b>如何收服灵兽：</b>当灵兽栏有空位时，决策罗盘会出现「前往灵兽栖息地」选项，遭遇野生灵兽后即可尝试收服（御兽等级越高成功率越高）。</div>
+        <div class="opt-desc" style="margin-top:4px"><b>提高成功率：</b>使用「驭兽香」（坊市·消耗品）或「驯兽口粮」（百艺·御兽产出）可提升收服概率；提升百艺「御兽」等级也能增加成功率。</div>
+        <div class="opt-desc" style="margin-top:4px"><b>灵兽加成：</b>已收服的灵兽会在战斗中助阵（提高胜率）并提供固定战力加成。成功收服灵兽可获得「灵兽契约」作为驯兽凭证；灵兽栏默认 1 格。</div>
       `}
     </div>`;
   box.querySelectorAll('[data-setbeast]').forEach((b) => b.addEventListener('click', () => {

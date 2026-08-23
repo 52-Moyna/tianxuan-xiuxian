@@ -1389,8 +1389,10 @@ function contractGroup() {
   for (let k = 0; k < 300 && !(rr && rr.ok); k++) rr = S.tameBeast(c1, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
   ok(rr && rr.ok === true, '收服成功返回 ok');
   const contract = c1.items.find((i) => i.名称 === '灵兽契约');
-  ok(!!contract && contract.数量 === 1, '成功收服后「灵兽契约」真进入背包（消除死循环）');
-  ok(S.extraCompassOptions(c1).some((o) => o.action && o.action.type === 'tameBeast'), '持有契约后「前往灵兽栖息地」收服入口可见');
+  ok(!!contract && contract.数量 === 1, '成功收服后「灵兽契约」真进入背包（作为驯兽凭证）');
+  // 灵兽栏有空位时入口可见（修复后不再以持有契约为门槛，消除死锁）
+  c1.beasts.slots = []; c1.beasts.activeIdx = -1;
+  ok(S.extraCompassOptions(c1).some((o) => o.action && o.action.type === 'tameBeast'), '灵兽栏有空位时「前往灵兽栖息地」入口可见');
 }
 
 /* ---------- 驱虫粉接入真实消费点（消除死道具） ---------- */
@@ -1428,6 +1430,28 @@ function codexGhostGroup() {
 contractGroup();
 bugPowderGroup();
 codexGhostGroup();
+
+
+/* ---------- 灵兽栖息地可达性修复（不再以持有契约为门槛） ---------- */
+function beastHabitatReachableGroup() {
+  // 新玩家（无契约、栏位空）也应能见到「前往灵兽栖息地」入口（此前契约门槛导致死锁）
+  const sb = S.createNewGame({ name: '栖息地可达', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(sb);
+  ensureBeastState(sb); // 初始化 beasts
+  sb.beasts.slots = []; sb.beasts.activeIdx = -1;
+  ok(!sb.items.some((i) => i.名称 === '灵兽契约'), '新玩家初始无灵兽契约');
+  ok(S.extraCompassOptions(sb).some((o) => o.action && o.action.type === 'tameBeast'), '无契约、栏位空时「前往灵兽栖息地」入口可见（死锁已修复）');
+  // 收服成功赠予契约作为驯兽凭证（仅补发一次，不累积）
+  let rr = null;
+  for (let k = 0; k < 300 && !(rr && rr.ok); k++) rr = S.tameBeast(sb, { name: '试驯灵兽', power: 5, minLevel: 1, desc: '测试' }, false);
+  ok(rr && rr.ok, '可成功收服灵兽');
+  const c2 = sb.items.find((i) => i.名称 === '灵兽契约');
+  ok(c2 && c2.数量 === 1, '收服后获赠「灵兽契约」且数量仅 1（不累积）');
+  // 栏位满时入口隐藏（无法再收服）
+  sb.beasts.slots = [{ name: '满灵兽', element: '火', power: 5, skill: 'x', desc: 'x', tamed: true }];
+  ok(!S.extraCompassOptions(sb).some((o) => o.action && o.action.type === 'tameBeast'), '灵兽栏满时入口隐藏');
+}
+beastHabitatReachableGroup();
 
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
