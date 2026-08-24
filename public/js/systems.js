@@ -2028,6 +2028,20 @@ export function useItem(state, idx) {
     state.flags.cultivateBoostMonths = Math.max(state.flags.cultivateBoostMonths || 0, m);
     logs.push(`灵力充盈，未来 ${m} 月修炼效率提升。`);
   }
+  // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖
+  if (it.effect.lifespan) {
+    const yrs = it.effect.lifespan;
+    state.player.lifeBonus = (state.player.lifeBonus || 0) + yrs;
+    refreshDerived(state);
+    logs.push(`服之延寿，寿元上限 +${yrs} 年（现 ${state.player.lifespan} 岁）。`);
+  }
+  // 灵兽契约：服用拓宽灵兽栏（上限 +1，至多 6 栏）
+  if (it.effect.beastSlot) {
+    state.beasts = state.beasts || { slots: [], maxSlots: 1, tamedCount: 0 };
+    const cap = 6;
+    if (state.beasts.maxSlots >= cap) logs.push(`灵兽栏已至上限（${cap} 栏），契约暂存。`);
+    else { state.beasts.maxSlots += 1; logs.push(`契约生效，灵兽栏上限提升至 ${state.beasts.maxSlots} 栏。`); }
+  }
   // 丹毒累加
   const codexItem = it._codexToxicity !== undefined ? it : null;
   const toxicity = (typeof it.toxicity === 'number') ? it.toxicity : (codexItem?.toxicity || 0);
@@ -2489,7 +2503,7 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
     if (state.beasts.activeIdx < 0) state.beasts.activeIdx = state.beasts.slots.length - 1;
     // 收服成功赠予「灵兽契约」作为驯兽凭证（见证羁绊）；仅在缺失时补发，避免重复累积。
     if (!state.items.some((i) => i.名称 === '灵兽契约')) {
-      const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。', 价值: 0 };
+      const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '驯兽凭证；服用可拓宽灵兽栏（上限 +1，至多 6 栏）。', 价值: 0, effect: { beastSlot: 1 } };
       storeItem(state, contract);
       discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
     }
@@ -2680,7 +2694,11 @@ function awardAuctionItem(state, item, amount) {
     state.techniques.push({ 名称: item.name, 品级: item.rarity, 等级: 1, 经验: 0 });
     discoverItem(state, { 名称: item.name, 类型: '功法' });
   } else {
-    storeItem(state, { 名称: item.name, 类型: item.type, 数量: 1, 描述: item.desc });
+    const it = { 名称: item.name, 类型: item.type, 数量: 1, 描述: item.desc };
+    if (item.effect) it.effect = item.effect;
+    if (typeof item.toxicity === 'number') it.toxicity = item.toxicity;
+    storeItem(state, it);
+    discoverItem(state, item);
   }
   addLog(state, '操作', `拍卖会购得「${item.name}」，花费${amount}灵石。`);
 }

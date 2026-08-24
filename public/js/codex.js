@@ -260,7 +260,7 @@ export const CODEX_ITEMS = [
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
   { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
   { id: 'item_sea_pass', category: '道具', name: '海岛通行令', rarity: '消耗品', source: '北冥瀚海坊市', effect: '降低海外遗府探索的费用 20%。' },
-  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后获赠；东荒机缘、秘境亦有传闻', effect: '收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊；灵兽会在战斗与采集中助你一臂之力。' },
+  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后获赠；东荒机缘、秘境、拍卖会亦有流传', effect: '服用可拓宽灵兽栏（上限 +1，至多 6 栏）；亦是收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。' },
   { id: 'item_travel_pass', category: '道具', name: '旅行凭证', rarity: '消耗品', source: '坊市、宗门任务奖励', effect: '下次跨域旅行费用减半。' },
   { id: 'item_ward_low', category: '道具', name: '低阶护身符', rarity: '消耗品', source: '西极玄冰域坊市', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
   { id: 'item_ward_talisman', category: '道具', name: '低阶符箓', rarity: '消耗品', source: '符师道友敬赠、百艺制符', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
@@ -660,11 +660,11 @@ export function sectCultivateBonus(state) {
 export const AUCTION_ITEMS_POOL = [
   { name: '残缺功法玉简', type: '功法', basePrice: 500, rarity: '灵品', desc: '可能蕴含失传功法片段。' },
   { name: '聚灵阵旗', type: '道具', basePrice: 200, rarity: '消耗品', effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升（+15%，持续1月）。' },
-  { name: '洗髓丹', type: '丹药', basePrice: 1500, rarity: '珍贵丹药', desc: '提升随机道基 5~10 级。' },
-  { name: '延寿丹', type: '丹药', basePrice: 2000, rarity: '珍贵丹药', desc: '寿元上限 +20 年。' },
+  { name: '洗髓丹', type: '丹药', basePrice: 1500, rarity: '珍贵丹药', effect: { daoBase: { keys: ['根骨', '道心'], min: 5, max: 10 } }, toxicity: 20, desc: '洗髓伐毛，服用后随机提升一项道基 5~10 级。' },
+  { name: '延寿丹', type: '丹药', basePrice: 2000, rarity: '珍贵丹药', effect: { lifespan: 20 }, desc: '服之延寿，寿元上限 +20 年。' },
   { name: '青锋剑', type: '法宝', basePrice: 3000, rarity: '法宝', desc: '等级 ×2 计入战力。' },
   { name: '海上遗府残图', type: '线索', basePrice: 300, rarity: '线索', desc: '集齐 3 张开启遗府。' },
-  { name: '灵兽契约', type: '道具', basePrice: 800, rarity: '特殊道具', desc: '解锁灵兽栏。' },
+  { name: '灵兽契约', type: '道具', basePrice: 800, rarity: '特殊道具', effect: { beastSlot: 1 }, desc: '驯兽凭证；服用可拓宽灵兽栏（上限 +1，至多 6 栏）。' },
   { name: '星砂', type: '材料', basePrice: 150, rarity: '稀有材料', desc: '高阶炼器材料。' },
 ];
 

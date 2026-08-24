@@ -1,7 +1,7 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -1631,6 +1631,54 @@ beastHabitatReachableGroup();
   ok(ds.some((l) => l.includes('灵石+120')), '散修委托确定性回赠灵石+120');
   ok(S.totalStones(gs) === stonesBefore + 120, '灵石实际到账+120');
 }
+
+/* ---------- 拍卖拍品不再是死道具（effect 真实落地） ---------- */
+const poolXM = AUCTION_ITEMS_POOL.find((x) => x.name === '洗髓丹');
+const poolYS = AUCTION_ITEMS_POOL.find((x) => x.name === '延寿丹');
+const poolHT = AUCTION_ITEMS_POOL.find((x) => x.name === '灵兽契约');
+ok(poolXM && poolXM.effect && poolXM.effect.daoBase, '拍卖洗髓丹带 daoBase effect（非死道具）');
+ok(poolYS && poolYS.effect && poolYS.effect.lifespan === 20, '拍卖延寿丹带 lifespan:20 effect');
+ok(poolHT && poolHT.effect && poolHT.effect.beastSlot === 1, '拍卖灵兽契约带 beastSlot:1 effect');
+// 按 awardAuctionItem 的真实发放映射（name→名称 + 复制 effect/toxicity）构造物品，隔离拍卖 RNG
+const grantAuctionItem = (st, tpl) => {
+  const it = { 名称: tpl.name, 类型: tpl.type, 数量: 1, 描述: tpl.desc };
+  if (tpl.effect) it.effect = tpl.effect;
+  if (typeof tpl.toxicity === 'number') it.toxicity = tpl.toxicity;
+  return storeItem(st, it);
+};
+const pickLastIdx = (arr, pred) => { for (let k = arr.length - 1; k >= 0; k--) if (pred(arr[k])) return k; return -1; };
+
+// 洗髓丹服用真实提升道基
+const stXM = S.createNewGame({ name: '拍卖洗髓', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(stXM);
+stXM.inventory.capacity = 1000;
+const dbBefore = Object.values(stXM.player.daoBase).reduce((a, b) => a + b.level, 0);
+ok(grantAuctionItem(stXM, poolXM), '拍卖洗髓丹成功入库（带名称映射）');
+const idxXM = pickLastIdx(stXM.items, (i) => i.名称 === '洗髓丹' && i.effect && i.effect.daoBase);
+S.useItem(stXM, idxXM);
+ok(Object.values(stXM.player.daoBase).reduce((a, b) => a + b.level, 0) - dbBefore >= 5, '服用拍卖洗髓丹真实提升道基 5~10 级');
+
+// 延寿丹服用真实提升寿元上限
+const stYS = S.createNewGame({ name: '拍卖延寿', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(stYS);
+stYS.inventory.capacity = 1000;
+const lifeBefore = stYS.player.lifespan;
+ok(grantAuctionItem(stYS, poolYS), '拍卖延寿丹成功入库（带名称映射）');
+const idxYS = pickLastIdx(stYS.items, (i) => i.名称 === '延寿丹' && i.effect && i.effect.lifespan);
+S.useItem(stYS, idxYS);
+ok(stYS.player.lifespan === lifeBefore + 20, '服用拍卖延寿丹寿元上限 +20');
+
+// 灵兽契约服用拓宽灵兽栏
+const stHT = S.createNewGame({ name: '拍卖契约', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(stHT);
+stHT.inventory.capacity = 1000;
+ensureBeastState(stHT);
+const ms0 = stHT.beasts.maxSlots;
+ok(grantAuctionItem(stHT, poolHT), '拍卖灵兽契约成功入库（带名称映射）');
+const idxHT = pickLastIdx(stHT.items, (i) => i.名称 === '灵兽契约' && i.effect && i.effect.beastSlot);
+S.useItem(stHT, idxHT);
+ok(stHT.beasts.maxSlots === ms0 + 1, '服用灵兽契约灵兽栏上限 +1');
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
