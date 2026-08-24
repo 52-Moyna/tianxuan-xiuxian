@@ -783,6 +783,38 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   decayPillToxicity(e);
   ok(e.flags.pillToxicity === 22, '丹毒月度衰减 8');
 
+  // 6) 炼丹催化：「年份灵草」「私藏丹方·残卷」自动消耗提升成丹率（消除死道具，确定性）
+  const cat = S.createNewGame({ name: '炼丹催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(cat);
+  cat.currencies['下品灵石'] = 1000;
+  storeItem(cat, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  storeItem(cat, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  storeItem(cat, { 名称: '年份灵草', 类型: '材料', 数量: 2, 描述: '催化材料', 价值: 60 });
+  const yearBefore = cat.items.find((x) => x.名称 === '年份灵草').数量;
+  const rrYear = refinePill(cat, '聚气丹');
+  ok(rrYear.ok && /催化/.test(rrYear.logs[0]), '持年份灵草开炉触发催化提示');
+  ok((cat.items.find((x) => x.名称 === '年份灵草')?.数量 || 0) === yearBefore - 1, '开炉自动消耗 1 份年份灵草');
+  ok(cat.cave.alchemy[0].catalystBonus === 8, '年份灵草催化加成 +8%');
+
+  const cat2 = S.createNewGame({ name: '丹方催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(cat2);
+  cat2.currencies['下品灵石'] = 1000;
+  storeItem(cat2, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  storeItem(cat2, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  storeItem(cat2, { 名称: '私藏丹方·残卷', 类型: '材料', 数量: 1, 描述: '催化材料', 价值: 120 });
+  const rrDf = refinePill(cat2, '聚气丹');
+  ok(rrDf.ok && cat2.cave.alchemy[0].catalystBonus === 15, '私藏丹方·残卷催化加成 +15%');
+  ok(!cat2.items.some((x) => x.名称 === '私藏丹方·残卷'), '开炉自动消耗私藏丹方·残卷');
+
+  // 无催化材料时不消耗、无加成（无回归）
+  const cat3 = S.createNewGame({ name: '无催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(cat3);
+  cat3.currencies['下品灵石'] = 1000;
+  storeItem(cat3, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  storeItem(cat3, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
+  const rrNo = refinePill(cat3, '聚气丹');
+  ok(rrNo.ok && (!cat3.cave.alchemy[0].catalystBonus || cat3.cave.alchemy[0].catalystBonus === 0), '无催化材料时加成 0（不误消耗）');
+
   // 5) useItem 新丹药效果 + 保留丹不可直接服用
   const pills = S.createNewGame({ name: '丹药效果', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(pills);

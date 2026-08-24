@@ -541,6 +541,14 @@ export const HERB_IRRIGATE_CAP_PER_MONTH = 2;
 export const HERB_SPRING_LEVEL = 5;
 /** 单株累计浸润可转化为收获产量加成的上限：防止付费无限堆产，保留平衡 */
 export const HERB_IRRIGATE_YIELD_CAP = 3;
+/** 炼丹催化材料：开炉时若持有，自动消耗 1 份以提升成丹率（确定性、无 RNG）。
+ *  来源：道友深谈（灵植师赠「年份灵草」、炼丹师赠「私藏丹方·残卷」）与道友委托酬谢。
+ *  此前这两样材料无真实消费点=死道具；现接入炼丹成为可感知的催化助力，
+ *  落实其图鉴描述中的「炼丹上品 / 研习可助炼丹」承诺。 */
+export const ALCHEMY_CATALYSTS = {
+  '年份灵草': { bonus: 8, label: '年份灵草催化' },
+  '私藏丹方·残卷': { bonus: 15, label: '丹方心得催化' },
+};
 /**
  * 灵泉自然加成：洞府灵泉涌动后，每株灵草月度自然生长额外 +1（确定性，无 RNG）。
  * 与浇灌（付费单次 +1）互补：高等级洞府的灵草园收获更快，是洞府长线投资的回报之一。
@@ -719,13 +727,26 @@ export function refinePill(state, recipeId, opts = {}) {
   }
   // 扣灵石（分层）
   if (r.stoneCost) alchemySpendStones(state, r.stoneCost);
+  // 炼丹催化：自动消耗持有的催化材料，提升本次成丹率（确定性、无 RNG）
+  let catalystBonus = 0;
+  const usedCatalysts = [];
+  for (const [cname, cfg] of Object.entries(ALCHEMY_CATALYSTS)) {
+    const it = state.items.find((x) => x.名称 === cname);
+    if (it && it.数量 >= 1) {
+      it.数量 -= 1;
+      if (it.数量 <= 0) state.items.splice(state.items.indexOf(it), 1);
+      catalystBonus += cfg.bonus;
+      usedCatalysts.push(cname);
+    }
+  }
   // 写入炼制中（到期年月）
   const w = state.world;
   let dy = w.year, dm = w.month + (r.months || 1);
   while (dm > 12) { dm -= 12; dy += 1; }
-  state.cave.alchemy.push({ recipeId, name: r.name, dueYear: dy, dueMonth: dm, startedYear: w.year, startedMonth: w.month });
+  state.cave.alchemy.push({ recipeId, name: r.name, dueYear: dy, dueMonth: dm, startedYear: w.year, startedMonth: w.month, catalystBonus, usedCatalysts });
   state.inventory.used = inventoryUsed(state);
-  return { ok: true, logs: [`你点燃丹炉，开始炼制「${r.name}」（${r.months} 月后出炉，基础成丹率 ${r.baseRate}%）。`, `耗灵石 ${r.stoneCost || 0}。`] };
+  const catNote = catalystBonus ? `，催化加成 +${catalystBonus}%（${usedCatalysts.join('、')}）` : '';
+  return { ok: true, logs: [`你点燃丹炉，开始炼制「${r.name}」（${r.months} 月后出炉，基础成丹率 ${r.baseRate}%${catNote}）。`, `耗灵石 ${r.stoneCost || 0}。`] };
 }
 
 /** 丹药品阶名 → PILL_GRADES id（供渡劫丹在瓶颈按品阶加成） */
@@ -756,7 +777,7 @@ export function settleRefine(state, logs = [], force) {
     if (!due && !force) continue; // 未到出炉月且非强制
     state.flags.refinedPills = (state.flags.refinedPills || 0) + 1;
     const caveBonus = Math.round((state.cave?.bonus || 0) * 30); // 洞府丹炉加成（最高约 +24）
-    const rate = Math.min(98, r.baseRate + caveBonus);
+    const rate = Math.min(98, r.baseRate + caveBonus + (p.catalystBonus || 0));
     let success;
     if (force === 'success') success = true;
     else if (force === 'fail') success = false;

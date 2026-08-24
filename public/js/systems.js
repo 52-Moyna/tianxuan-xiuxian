@@ -1661,8 +1661,10 @@ function applyCommissionReward(state, task, npc, logs) {
     logs.push(`「${npc.name}」如约相酬，灵石+${r.amount}。`);
   } else if (r.type === 'item') {
     const it = { ...r }; delete it.type;
-    if (storeItem(state, it)) logs.push(`「${npc.name}」收下${task.item}，回赠${r.名称}x${r.数量 || 1}，已收入储物袋。`);
-    else logs.push(`储物袋已满，「${npc.name}」所赠${r.名称}未能带走。`);
+    if (storeItem(state, it)) {
+      logs.push(`「${npc.name}」收下${task.item}，回赠${r.名称}x${r.数量 || 1}，已收入储物袋。`);
+      discoverItem(state, { 名称: r.名称, 类型: r.类型 });
+    } else logs.push(`储物袋已满，「${npc.name}」所赠${r.名称}未能带走。`);
   } else if (r.type === 'equip') {
     const eq = generateEquip(state, r.slot, r.level);
     state.equipment.stash.push(eq);
@@ -1746,8 +1748,10 @@ export function interactNpc(state, npc, kind) {
           logs.push(`「${npc.name}」以私藏相济，灵石+${s}。`);
         } else if (r.type === 'item') {
           const it = { ...r }; delete it.type;
-          if (storeItem(state, it)) logs.push(`「${npc.name}」赠你${r.名称}×${r.数量 || 1}，已收入储物袋。`);
-          else logs.push(`储物袋已满，「${npc.name}」所赠${r.名称}未能带走。`);
+          if (storeItem(state, it)) {
+            logs.push(`「${npc.name}」赠你${r.名称}×${r.数量 || 1}，已收入储物袋。`);
+            discoverItem(state, { 名称: r.名称, 类型: r.类型 });
+          } else logs.push(`储物袋已满，「${npc.name}」所赠${r.名称}未能带走。`);
         } else if (r.type === 'equip') {
           const eq = generateEquip(state, r.slot, r.level);
           state.equipment.stash.push(eq);

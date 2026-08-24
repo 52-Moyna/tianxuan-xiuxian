@@ -294,6 +294,8 @@ export const CODEX_ITEMS = [
   { id: 'mat_kuangshi', category: '材料', name: '矿石', rarity: '材料', source: '妖兽战利品（概率）、百艺炼器消耗', effect: '炼器基础材料，可用于灵脉石饰等配方。' },
   { id: 'mat_xianyuan', category: '材料', name: '仙缘', rarity: '稀有材料', source: '高阶妖兽战利品（极低概率）', effect: '罕见机缘之物，可于罗盘「仙缘兑换」换得道途助益：修为+200、道韵+15、悟性+20、下品灵石+300。' },
   { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '上古遗府/秘境深处隐藏奇遇（极稀有）', effect: '传说中的仙界之气，可遇不可求。持此物者可于罗盘「太初仙缘」处寻上古仙缘使者兑换绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并赠天品功法《太虚剑经》。价值连城。' },
+  { id: 'mat_year_herb', category: '材料', name: '年份灵草', rarity: '稀有材料', source: '道友深谈（灵植师）、道友委托酬谢', effect: '灵植师精心培育的年份灵草，灵气醇厚，炼丹上品。开炉炼丹时若持有可自动催化，成丹率 +8%。' },
+  { id: 'mat_danfang_scroll', category: '材料', name: '私藏丹方·残卷', rarity: '稀有材料', source: '道友深谈（炼丹师）', effect: '炼丹师相赠的丹方心得残卷，研习可助炼丹。开炉炼丹时若持有可自动催化，成丹率 +15%。' },
   // 妖兽材料子类（generateBeastDrops 动态名）
   { id: 'mat_beast_lingcao', category: '材料', name: '妖兽灵草', rarity: '材料', source: '妖兽战利品', effect: '妖兽携带的灵草，品质参差不齐。' },
   { id: 'mat_beast_shougu', category: '材料', name: '妖兽兽骨', rarity: '材料', source: '妖兽战利品', effect: '妖兽骨骼，坚硬程度因妖兽等级而异。' },
