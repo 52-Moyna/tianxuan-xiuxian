@@ -572,6 +572,23 @@ export const DEEP_NPC_EVENTS = {
   '灵植师': { text: '对方引你入灵田，赠你几株年份不浅的灵草，言「灵植最讲缘分」。', reward: { type: 'item', 名称: '年份灵草', 类型: '材料', 数量: 2, 描述: '灵植师相赠的灵草，炼丹上品。', 价值: 60 } },
 };
 
+/* ---------------- 道友委托（支线闭环） ----------------
+ * 道友级（relation>=3）NPC 可托付委托：交付指定材料即获确定性格奖励。
+ * 奖励 shape 与 DEEP_NPC_EVENTS 一致（stones/item/equip/exp），但金额固定（无 RNG，便于断言与无 flaky）。
+ * 所需材料均为可 farmed 的常用物（矿石/凝露草/妖兽皮毛·兽骨），奖励物品均已有图鉴条目，不产生死道具。 */
+export const COMMISSION_TASKS = {
+  '散修': { item: '矿石', need: 2, reward: { type: 'stones', amount: 120 } },
+  '坊市商贩': { item: '凝露草', need: 2, reward: { type: 'stones', amount: 100 } },
+  '炼丹师': { item: '凝露草', need: 3, reward: { type: 'exp', base: '悟性', amount: 30 } },
+  '炼器师': { item: '矿石', need: 3, reward: { type: 'equip', slot: 'weapon', level: 8 } },
+  '符师': { item: '妖兽皮毛', need: 2, reward: { type: 'item', 名称: '低阶符箓', 类型: '消耗品', 数量: 2, 描述: '符师委托酬谢的护身符，危难时或可挡灾。', 价值: 50 } },
+  '阵师': { item: '妖兽兽骨', need: 2, reward: { type: 'item', 名称: '简易阵旗', 类型: '消耗品', 数量: 1, 描述: '阵师委托酬谢的阵旗，战场布成临时护阵。', 价值: 70, effect: { ward: true } } },
+  '剑修': { item: '妖兽兽骨', need: 3, reward: { type: 'exp', base: '悟性', amount: 30 } },
+  '体修': { item: '妖兽兽骨', need: 3, reward: { type: 'exp', base: '根骨', amount: 30 } },
+  '包打听': { item: '凝露草', need: 2, reward: { type: 'exp', base: '气运', amount: 30 } },
+  '灵植师': { item: '矿石', need: 2, reward: { type: 'item', 名称: '年份灵草', 类型: '材料', 数量: 2, 描述: '灵植师委托酬谢的灵草，炼丹上品。', 价值: 60 } },
+};
+
 /* ---------------- 势力素材（天机简报用） ---------------- */
 export const FACTIONS = ['太虚宗', '玄阴殿', '血煞门', '丹盟', '天剑宗', '大商皇朝', '妖皇殿', '散修联盟', '器盟', '万兽谷'];
 export const WORLD_EVENTS = [

@@ -1772,6 +1772,7 @@ function npcInteractModal(npc) {
         <button class="btn" data-k="gift">备礼登门 · 消耗 50 灵石，好感 +10~20</button>
         <button class="btn" data-k="invite">邀请同行 · 需达到「道友」</button>
         <button class="btn btn-gold ${npc.relation >= 3 ? '' : 'btn-dim'}" data-k="deep" ${(npc.relation >= 3) ? '' : 'disabled'}>💞 秉烛深谈 · 道友专属支线（好感+18~30${(npc.relation >= 3) ? '' : ' · 需达道友'}）</button>
+        ${(npc.relation >= 3) ? (() => { const ci = S.commissionInfo(st, npc); return ci.cdRemaining > 0 ? `<button class="btn btn-dim" disabled>委托筹措中（剩 ${ci.cdRemaining} 月）</button>` : `<button class="btn btn-gold" data-k="commission">交付委托 · 需 ${ci.need} ${ci.task.item}（持 ${ci.have}）</button>`; })() : ''}
         <button class="btn btn-red" data-k="qiecuo">切磋较技 · 会进入斗法</button>
         <button class="btn" data-k="back">返回对象列表</button>
       </div>`, { title: '道缘往来', lock: true });
