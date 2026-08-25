@@ -420,6 +420,13 @@ export function itemSetOf(name) {
 /* ============================================================
  * 三·补、成就系统（里程碑式长期目标）
  * ========================================================== */
+/* 成就收集里程碑集合（不计入基础成就统计，避免自计数导致解锁抖动） */
+export const ACH_MILESTONE_IDS = new Set(['achCount10', 'achCount20', 'achCountAll']);
+/** 统计已解锁的「基础成就」数量（排除收集里程碑自身） */
+function achBaseUnlocked(state) {
+  return (state.achievements || []).filter((a) => !ACH_MILESTONE_IDS.has(a.id)).length;
+}
+
 export const ACHIEVEMENTS = [
   { id: 'start',   name: '初入仙途', icon: '🌱', desc: '开启你的修真之旅。', reward: { stones: 100 }, check: () => true },
   { id: 'qiyin',   name: '引气入体', icon: '🌬️', desc: '踏入炼气期。', reward: { stones: 200 }, check: (s) => s.player.level >= 11 },
@@ -451,7 +458,14 @@ export const ACHIEVEMENTS = [
   { id: 'dujie',   name: '九九归真', icon: '⚡', desc: '成功渡过一次大境界天劫。', reward: { stones: 2000 }, check: (s) => !!s.flags?.tribulationSuccess },
   { id: 'herbCodex', name: '百草通鉴', icon: '🍃', desc: '集齐灵草园全部 4 种灵草图鉴。', reward: { stones: 800 }, check: (s) => ['灵草:凝露灵草', '灵草:火精枣树', '灵草:玉髓芝', '灵草:月华露藤'].every((k) => (s.codex?.discovered || []).includes(k)) },
   { id: 'herbHybrid', name: '灵植奇才', icon: '🌿', desc: '杂交出全部 4 种奇珍灵材。', reward: { stones: 1200 }, check: (s) => ['材料:凝火奇实', '材料:玉华灵髓', '材料:露华玉液', '材料:炎玉灵枣'].every((k) => (s.codex?.discovered || []).includes(k)) },
+  // —— 成就收集里程碑：统计已解锁的「基础成就」数（不含里程碑自身），解锁阶段性收集奖励 ——
+  { id: 'achCount10', name: '小有所成', icon: '🥉', desc: '累计解锁 10 个基础成就。', reward: { stones: 800 }, check: (s) => achBaseUnlocked(s) >= 10, progress: (s) => ({ cur: achBaseUnlocked(s), max: 10 }) },
+  { id: 'achCount20', name: '登堂入室', icon: '🥈', desc: '累计解锁 20 个基础成就。', reward: { stones: 1800 }, check: (s) => achBaseUnlocked(s) >= 20, progress: (s) => ({ cur: achBaseUnlocked(s), max: 20 }) },
+  { id: 'achCountAll', name: '仙途大成', icon: '🏆', desc: '解锁全部基础成就。', reward: { stones: 5000 }, check: (s) => achBaseUnlocked(s) >= ACH_BASE_TOTAL, progress: (s) => ({ cur: Math.min(achBaseUnlocked(s), ACH_BASE_TOTAL), max: ACH_BASE_TOTAL }) },
 ];
+/** 基础成就总数（不含收集里程碑自身），用于「仙途大成」进度上限与测试断言 */
+export const ACH_BASE_TOTAL = ACHIEVEMENTS.filter((a) => !ACH_MILESTONE_IDS.has(a.id)).length;
+
 
 /** 返回每个成就的「视图」：是否已解锁 + 进度（cur/max/ratio），供 UI 渲染进度条 */
 export function achievementView(state) {

@@ -1,7 +1,7 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -1838,6 +1838,42 @@ ok(stHT.beasts.maxSlots === ms0 + 1, '服用灵兽契约灵兽栏上限 +1');
   } finally { Math.random = realRandom; }
 }
 
-console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
+/* ---------- 成就收集里程碑奖励（统计已解锁基础成就数，解锁阶段性收集奖励） ---------- */
+const baseIds = ACHIEVEMENTS.filter((a) => !ACH_MILESTONE_IDS.has(a.id)).map((a) => a.id);
+ok(baseIds.length >= 30, '基础成就数量充足（≥30）');
+const mkAchState = (n) => {
+  const s = S.createNewGame({ name: '里程碑测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(s);
+  s.achievements = baseIds.slice(0, n).map((id) => ({ id, name: 'x', icon: 'x', time: '1年1月' }));
+  return s;
+};
+// 10 个基础成就 → 解锁「小有所成」，但「登堂入室/仙途大成」不解锁
+let s10 = mkAchState(10);
+const new10 = checkAchievements(s10);
+ok(new10.some((a) => a.id === 'achCount10'), '解锁10个基础成就→小有所成');
+ok(!new10.some((a) => a.id === 'achCount20'), '仅10个→登堂入室未解锁');
+ok(!new10.some((a) => a.id === 'achCountAll'), '仅10个→仙途大成未解锁');
+ok(s10.achievements.filter((a) => !ACH_MILESTONE_IDS.has(a.id)).length === 10, '里程碑自身不计入基础计数');
+// 20 个 → 解锁「登堂入室」
+let s20 = mkAchState(20);
+const new20 = checkAchievements(s20);
+ok(new20.some((a) => a.id === 'achCount20'), '解锁20个基础成就→登堂入室');
+ok(!new20.some((a) => a.id === 'achCountAll'), '仅20个→仙途大成未解锁');
+// 全部基础成就 → 解锁「仙途大成」
+let sAll = mkAchState(baseIds.length);
+const newAll = checkAchievements(sAll);
+ok(newAll.some((a) => a.id === 'achCountAll'), '解锁全部基础成就→仙途大成');
+// 进度条上限正确
+const vAll = achievementView(sAll);
+const vCountAll = vAll.find((a) => a.id === 'achCountAll');
+ok(vCountAll && vCountAll.progress && vCountAll.progress.max === baseIds.length && vCountAll.progress.ratio >= 1, '仙途大成进度上限=基础成就总数');
+// 一键领取含三档收集奖励
+const rc = claimAllAchievements(sAll);
+ok(rc.ok && rc.total >= 800 + 1800 + 5000, '一键领取含三档收集奖励（≥7600灵石）');
+const vAfter = achievementView(sAll);
+ok(vAfter.filter((a) => ACH_MILESTONE_IDS.has(a.id)).every((a) => a.claimed), '三档收集奖励均已领取');
+
+console.log(`
+===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);
