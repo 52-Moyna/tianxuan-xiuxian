@@ -14,6 +14,17 @@ export const BAG_UPGRADE_BASE = 300;    // 储物袋首次扩容费（灵石）
 export const BAG_UPGRADE_STEP = 250;    // 每级递增费
 export const CAVE_UPGRADE_BASE = 300;   // 洞府每级升级费基数：(level+1)*BASE
 export const BEAST_WINRATE = { '雷翅隼': 8, '九尾灵狐': 5, 'default': 3 }; // 灵兽助战胜率加成(%)
+// 灵兽「伴生天赋」：出战灵兽技能的真实效果（确定性，无 RNG）。
+// 与 BEAST_WINRATE 的全体常驻助战加成互补——BEAST_WINRATE 是所有灵兽小幅加胜率，
+// 这里只由「当前出战灵兽」触发其专属天赋，让不同灵兽产生差异化陪伴价值。
+export const BEAST_SKILL_EFFECTS = {
+  '风刃突袭': { winRate: 5 },            // 先手突袭：出战额外 +5% 胜率
+  '幻境迷心': { vsStronger: 8 },         // 惑乱强敌：出战且敌方等级高于己方时额外 +8% 胜率（越级专用）
+  '铁背护主': { defeatRelief: true },     // 铁背护体：出战战败时大幅减免惩罚（免重伤、免失灵石）
+  '玄水护盾': { gather: 1 },              // 玄水护持：出战秘境探索时灵材获取 +1
+  '雷击俯冲': {},                         // 已由 BEAST_WINRATE['雷翅隼']=8 覆盖，保持
+  '涅槃残焰': {},                         // 极稀有（幼凰，Lv.50+），渡劫保命另行实装
+};
 
 /* ---------------- 种族 ---------------- */
 export const RACES = [

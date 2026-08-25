@@ -2814,6 +2814,14 @@ function renderCenterButtons() {
   });
 }
 
+const BEAST_TALENT_TEXT = {
+  '风刃突袭': '先手突袭：出战时额外 +5% 胜率',
+  '幻境迷心': '惑乱强敌：出战且对战更强对手时额外 +8% 胜率',
+  '铁背护主': '铁背护体：出战战败时大幅减免惩罚（免重伤、免失灵石）',
+  '玄水护盾': '玄水护持：出战秘境探索时灵材获取 +1',
+  '雷击俯冲': '雷霆俯冲：常驻战斗胜率 +8%（见灵兽助阵）',
+  '涅槃残焰': '涅槃残焰：极稀有，渡劫保命（另行实装）',
+};
 /** 灵兽面板：展示已收服灵兽、栏位信息、战力加成 */
 function renderBeastsPanel(box) {
   const st = GameState.data;
@@ -2838,6 +2846,7 @@ function renderBeastsPanel(box) {
             <div class="beast-info">
               <div class="beast-meta"><span class="beast-element">${b.element}系</span><span class="beast-power">战力+${b.power}</span><span class="beast-star">★${star}</span></div>
               <div class="beast-skill">技能：${b.skill}</div>
+              <div class="beast-talent ${isActive ? 'talent-active' : ''}">${isActive ? '出战天赋' : '天赋'}：${BEAST_TALENT_TEXT[b.skill] || '（暂无特殊天赋）'}</div>
               <div class="beast-desc">${b.desc}</div>
             </div>
             <div class="beast-acts">

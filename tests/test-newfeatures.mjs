@@ -1679,6 +1679,99 @@ const idxHT = pickLastIdx(stHT.items, (i) => i.名称 === '灵兽契约' && i.ef
 S.useItem(stHT, idxHT);
 ok(stHT.beasts.maxSlots === ms0 + 1, '服用灵兽契约灵兽栏上限 +1');
 
+/* ---------- 灵兽「伴生天赋」：出战技能真实效果（确定性，无 RNG） ---------- */
+{
+  // mk 直接返回游戏 state（含 state.beasts），下游以 state 入参调用战斗/秘境接口，避免把包装对象当 state 传入。
+  const mk = () => {
+    const g = S.createNewGame({ name: '伴生天赋', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    ensureBeastState(g);
+    g.player.level = 10; g.player.power = 500;
+    return g;
+  };
+  const enemy = { name: '试炼傀儡', realm: '练气', level: 10, power: 500 };
+  // 1) 风刃突袭：出战额外 +5% 胜率（与同配置无天赋灵兽对照，隔离天赋增量）
+  {
+    const g = mk();
+    g.beasts.slots = [{ name: '青风狼', element: '风', star: 1, power: 8, skill: '风刃突袭', desc: 'x' }];
+    g.beasts.activeIdx = 0;
+    const ctrl = mk(); ctrl.beasts.slots = [{ name: '青风狼', element: '风', star: 1, power: 8, skill: 'x', desc: 'x' }]; ctrl.beasts.activeIdx = 0;
+    const ctrlRate = S.previewBattle(ctrl, enemy, 'shengci').finalRate;
+    const wolfRate = S.previewBattle(g, enemy, 'shengci').finalRate;
+    ok(wolfRate === Math.min(95, ctrlRate + 5), `风刃突袭出战额外 +5%（对照${ctrlRate}/狼${wolfRate}）`);
+    ok(S.activeBeastSkill(g) === '风刃突袭', 'activeBeastSkill 返回出战技能名');
+    ok(S.activeBeastSkillEffect(g, 'winRate') === 5, 'activeBeastSkillEffect 读取天赋数值');
+    ok(S.activeBeastSkillEffect(g, 'defeatRelief') === undefined, '无该天赋时返回 undefined');
+  }
+  // 2) 幻境迷心：出战且敌方等级高于己方时额外 +8%（越级专用）。
+  //    用「高己方等级的敌人」触发天赋，并以同配置无天赋灵兽作对照，隔离 +8 增量（避免因基础率触底或默认灵兽加成干扰）。
+  {
+    const strongEnemy = { name: '强敌', realm: '金丹', level: 20, power: 500 };
+    const g = mk();
+    g.beasts.slots = [{ name: '九尾灵狐', element: '幻', star: 1, power: 18, skill: '幻境迷心', desc: 'x' }];
+    g.beasts.activeIdx = 0;
+    const ctrl = mk(); ctrl.beasts.slots = [{ name: '九尾灵狐', element: '幻', star: 1, power: 18, skill: 'x', desc: 'x' }]; ctrl.beasts.activeIdx = 0;
+    const ctrlRate = S.previewBattle(ctrl, strongEnemy, 'shengci').finalRate;
+    const skillRate = S.previewBattle(g, strongEnemy, 'shengci').finalRate;
+    ok(skillRate === Math.min(95, ctrlRate + 8), `幻境迷心越级额外 +8%（对照${ctrlRate}/天赋${skillRate}）`);
+    // 同阶（敌等级不高于己方）不触发：与无天赋对照一致
+    const sameEnemy = { name: '平手', realm: '练气', level: 10, power: 500 };
+    const sameCtrl = S.previewBattle(ctrl, sameEnemy, 'shengci').finalRate;
+    const sameSkill = S.previewBattle(g, sameEnemy, 'shengci').finalRate;
+    ok(sameSkill === sameCtrl, `幻境迷心同阶不触发（对照${sameCtrl}/天赋${sameSkill}）`);
+  }
+  // 3) 雷击俯冲：已由 BEAST_WINRATE 覆盖，天赋名可识别
+  {
+    const g = mk();
+    g.beasts.slots = [{ name: '雷翅隼', element: '雷', star: 1, power: 25, skill: '雷击俯冲', desc: 'x' }];
+    g.beasts.activeIdx = 0;
+    ok(S.activeBeastSkill(g) === '雷击俯冲', '雷击俯冲技能名可识别');
+  }
+  // 4) 铁背护主：出战战败减免惩罚（循环至落败，确定性验证免重伤/免失灵石）
+  {
+    const mkB = () => { const g = mk(); g.beasts.slots = [{ name: '铁背苍熊', element: '土', star: 1, power: 12, skill: '铁背护主', desc: 'x' }]; g.beasts.activeIdx = 0; g.currencies = { '下品灵石': 1000, '中品灵石': 0, '上品灵石': 0 }; return g; };
+    let wounded = -1, lostStones = -1, found = false;
+    for (let i = 0; i < 200 && !found; i++) {
+      const g = mkB();
+      const e = { name: '太古凶兽', realm: '化神', level: 60, power: 999999, beast: true };
+      const before = S.totalStones(g);
+      const rep = S.resolveBattle(g, e, 'yaoshou', false, 'normal', false);
+      if (!rep.win) {
+        found = true;
+        wounded = g.flags.wounded || 0;
+        lostStones = before - S.totalStones(g);
+        ok(rep.logs.some((l) => l.includes('铁背护体')), '铁背护主战败文案出现');
+        ok(wounded === 0, `铁背护主免重伤（wounded=${wounded}）`);
+        ok(lostStones === 0, `铁背护主免失灵石（lost=${lostStones}）`);
+      }
+    }
+    ok(found, '循环至落败以验证铁背护主（非 flaky）');
+  }
+  // 5) 玄水护盾：出战秘境探索灵材 +1（确定性，循环验证每次掉落均带加成文案）
+  {
+    const g = mk();
+    g.beasts.slots = [{ name: '玄水龟', element: '水', star: 1, power: 10, skill: '玄水护盾', desc: 'x' }];
+    g.beasts.activeIdx = 0;
+    g.currencies = { '下品灵石': 5000, '中品灵石': 0, '上品灵石': 0 };
+    ok(S.activeBeastSkillEffect(g, 'gather') === 1, '玄水护盾天赋=采集+1');
+    const realm = availableMysticRealms(g).find((m) => !m.requiresMap && g.player.level >= m.minLevel && m.rewards && m.rewards.materials && m.rewards.materials.length);
+    if (realm) {
+      let allBonus = true, anyDrop = false;
+      for (let i = 0; i < 40; i++) {
+        const gg = mk(); gg.currencies = { '下品灵石': 5000, '中品灵石': 0, '上品灵石': 0 };
+        gg.beasts.slots = [{ name: '玄水龟', element: '水', star: 1, power: 10, skill: '玄水护盾', desc: 'x' }];
+        gg.beasts.activeIdx = 0;
+        const rep = S.exploreMysticRealm(gg, realm.id, 1);
+        const drop = rep.logs.find((l) => l.startsWith('获得材料：'));
+        if (drop) { anyDrop = true; if (!drop.includes('玄水护盾相助')) allBonus = false; }
+      }
+      ok(anyDrop, '秘境确有灵材掉落');
+      ok(allBonus, '玄水护盾出战时每次灵材掉落均带 +1 加成文案');
+    }
+  }
+}
+
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

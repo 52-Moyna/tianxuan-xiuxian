@@ -21,7 +21,7 @@ import {
   CAVE_LEVELS, CURRENCIES, ARTS, FATE_DICE, WIN_RATE_FEEDBACK, DIVINATION,
   DESTINY_LINES, NPC_SURNAMES, NPC_GIVEN, NPC_TRAITS, NPC_JOBS, NPC_SKILLS,
   DAOYUAN_LEVELS, FACTIONS, WORLD_EVENTS, BEASTS, RELATION_RULES, DEEP_NPC_EVENTS, COMMISSION_TASKS,
-  SAVE_VERSION, GAME_START_YEAR, SAVE_CODE_CHARS, EQUIP_SLOTS, EQUIP_GRADES, rollEquipGrade, getEquipGradeByLevel, makeEquipName, getEquipGrade, MATERIAL_TYPES, PILL_GRADES, rollPillGrade, calcEquipPower, bagGradeOf, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_UPGRADE_BASE, BEAST_WINRATE,
+  SAVE_VERSION, GAME_START_YEAR, SAVE_CODE_CHARS, EQUIP_SLOTS, EQUIP_GRADES, rollEquipGrade, getEquipGradeByLevel, makeEquipName, getEquipGrade, MATERIAL_TYPES, PILL_GRADES, rollPillGrade, calcEquipPower, bagGradeOf, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_UPGRADE_BASE, BEAST_WINRATE, BEAST_SKILL_EFFECTS,
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
@@ -740,6 +740,22 @@ export function activeBeastBonus(state) {
   return 2 + (star - 1) * 2;
 }
 
+/** 出战灵兽的「伴生天赋」技能名（仅当前出战灵兽；无出战返回 null）。 */
+export function activeBeastSkill(state) {
+  const beasts = state?.beasts;
+  if (!beasts || beasts.activeIdx == null || beasts.activeIdx < 0) return null;
+  const act = beasts.slots?.[beasts.activeIdx];
+  if (!act) return null;
+  return act.skill || null;
+}
+/** 读取出战灵兽某天赋效果的数值（未装备/无该天赋返回 undefined）。 */
+export function activeBeastSkillEffect(state, key) {
+  const sk = activeBeastSkill(state);
+  if (!sk) return undefined;
+  const eff = BEAST_SKILL_EFFECTS[sk];
+  return eff ? eff[key] : undefined;
+}
+
 /** 预估战斗最终胜率（纯函数，不修改任何状态，供战前展示）。
  *  与 resolveBattle 的加成口径保持一致，但不掷命运骰子（战前未知），也不触发胜负副作用。 */
 export function previewBattle(state, enemy, type, tactic = 'normal', blessed = false) {
@@ -766,6 +782,10 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
   const actIdx = state.beasts?.activeIdx;
   if (actIdx != null && actIdx >= 0 && state.beasts.slots?.[actIdx]) {
     apply(activeBeastBonus(state), 'activeBeast');
+    // 出战灵兽「伴生天赋」：风刃突袭先手 +5%；幻境迷心越级（敌方等级高于己方）额外 +8%
+    const skill = activeBeastSkill(state);
+    if (skill === '风刃突袭') apply(5, 'skill');
+    else if (skill === '幻境迷心' && enemy && enemy.level > state.player.level) apply(8, 'skill');
   }
   // 丹毒 / 伤势 惩罚
   const toxic = Number(state.flags?.pillToxicity || 0);
@@ -821,6 +841,9 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     const ACTIVE_BEAST_BONUS = 2 + (star - 1) * 2; // 1★+2% → 5★+10%
     finalRate = Math.min(95, finalRate + ACTIVE_BEAST_BONUS);
     logs.push(`出战灵兽「${act.name}」（${star}★）冲锋在前，誓死护主，胜率 +${ACTIVE_BEAST_BONUS}%。`);
+    // 出战灵兽「伴生天赋」：风刃突袭先手 +5%；幻境迷心越级额外 +8%
+    if (act.skill === '风刃突袭') { finalRate = Math.min(95, finalRate + 5); logs.push(`「${act.name}」风刃突袭抢占先手，胜率 +5%。`); }
+    else if (act.skill === '幻境迷心' && enemy.level > state.player.level) { finalRate = Math.min(95, finalRate + 8); logs.push(`「${act.name}」幻境迷心惑乱强敌，越级胜率 +8%。`); }
   }
   // 丹毒过高降低胜率
   const toxic = Number(state.flags?.pillToxicity || 0);
@@ -891,6 +914,7 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
   } else {
     // 护符抵挡：非切磋失败且持有护符时，消耗一张护符抵消损失
     let wardKind = null;
+    const relief = activeBeastSkillEffect(state, 'defeatRelief');
     if (type !== 'qiecuo') {
       const wFull = state.items.find((i) => i.名称 === '护身符');
       const wLow = state.items.find((i) => i.名称 === '低阶护身符' || i.名称 === '低阶符箓' || i.名称 === '简易阵旗');
@@ -909,17 +933,17 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
       const danger = enemy.danger || (REGION_TRAVEL[state.world.regionId]?.danger) || 2;
       const pen = beastDefeatPenalty(danger, { ally: allyAided, tactic });
       logs.push('你重伤遁走，需休养数月（本月行动收益减半）。');
-      if (wardKind !== 'ward') {
+      if (wardKind !== 'ward' && !relief) {
         state.flags.wounded = pen.wounded;
       } else {
-        logs.push('护身符光华流转，替你挡去重伤，安然脱身。');
+        logs.push(wardKind ? '护身符光华流转，替你挡去重伤，安然脱身。' : '铁背苍熊铁背护体，替你挡去重伤，安然脱身。');
       }
       if (pen.loseStones > 0) {
-        if (!wardKind) {
+        if (!wardKind && !relief) {
           const lost = Math.round(totalStones(state) * pen.loseStones);
           if (lost > 0) { spendStones(state, lost); logs.push(`险地溃败，被劫去灵石约${lost}。`); }
         } else {
-          logs.push('护符护体，灵石分毫未失。');
+          logs.push(wardKind ? '护符护体，灵石分毫未失。' : '铁背护体，灵石分毫未失。');
         }
       }
     } else {
@@ -931,18 +955,18 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
       back = Math.max(1, Math.round(back * penaltyMul));
       loseRate = Math.min(1, loseRate * penaltyMul);
       if (allyAided) { back = Math.max(1, Math.round(back * 0.5)); loseRate = Math.min(1, loseRate * 0.5); }
-      if (wardKind !== 'ward') {
+      if (wardKind !== 'ward' && !relief) {
         p.level = Math.max(1, p.level - back);
         p.exp = 0;
       } else {
-        logs.push('护身符碎裂，替你稳住道基，修为未损。');
+        logs.push(wardKind ? '护身符碎裂，替你稳住道基，修为未损。' : '铁背苍熊铁背护体，替你稳住道基，修为未损。');
       }
-      if (!wardKind) {
+      if (!wardKind && !relief) {
         const lost = Math.round(totalStones(state) * loseRate * 0.5);
         spendStones(state, lost);
         logs.push(`修为倒退至 ${realmLevelName(p.level)}，损失灵石约${lost}。`);
       } else {
-        logs.push('护符护体，灵石分毫未失。');
+        logs.push(wardKind ? '护符护体，灵石分毫未失。' : '铁背护体，灵石分毫未失。');
       }
     }
     addDaoBaseExp(state, '道心', Rng.int(1, 4), logs); // 败中磨砺
@@ -2749,8 +2773,11 @@ export function exploreMysticRealm(state, realmId, depth = 1) {
   // 材料掉落
   if (realm.rewards.materials?.length) {
     const matName = Rng.pick(realm.rewards.materials);
-    const mat = { 名称: matName, 类型: '材料', 数量: Math.max(1, Math.round(Rng.int(1, 3) * dcfg.matMul)), 描述: '秘境所得' };
-    if (storeItem(state, mat)) logs.push(`获得材料：${matName} ×${mat.数量}。`);
+    let matQty = Math.max(1, Math.round(Rng.int(1, 3) * dcfg.matMul));
+    const gather = activeBeastSkillEffect(state, 'gather'); // 玄水护盾：出战灵兽助采集，灵材 +1
+    if (gather) matQty += gather;
+    const mat = { 名称: matName, 类型: '材料', 数量: matQty, 描述: '秘境所得' };
+    if (storeItem(state, mat)) logs.push(`获得材料：${matName} ×${mat.数量}${gather ? '（玄水护盾相助，灵材丰盈）' : ''}。`);
   }
   // 法宝掉落（深度越高越易出高阶法宝）
   const artChance = (realm.rewards.artifactChance + findBonus) * dcfg.artMul;
