@@ -1772,6 +1772,35 @@ ok(stHT.beasts.maxSlots === ms0 + 1, '服用灵兽契约灵兽栏上限 +1');
 }
 
 
+
+/* ---------- 灵兽「涅槃残焰」：出战渡劫失败保命（境界不跌落，确定性） ---------- */
+{
+  // 先建好 state（用真实随机），再覆盖 Math.random 恒为 0.999 强制突破失败（Rng.chance 必返 false）。
+  const realRandom = Math.random;
+  const gNo = S.createNewGame({ name: '涅槃对照', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gNo);
+  gNo.player.level = 20; // 筑基瓶颈，失败倒退 1 级
+  const gYes = S.createNewGame({ name: '涅槃保命', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gYes);
+  ensureBeastState(gYes);
+  gYes.player.level = 20;
+  gYes.beasts.slots = [{ name: '幼凰', element: '火', star: 5, power: 200, skill: '涅槃残焰', desc: '极稀有灵兽' }];
+  gYes.beasts.activeIdx = 0;
+  try {
+    Math.random = () => 0.999;
+    const lvB = gNo.player.level;
+    const repNo = S.attemptBreakthrough(gNo);
+    ok(!repNo.success, '强制失败：突破未成功（无涅槃灵兽）');
+    ok(gNo.player.level === lvB - 1, `无涅槃灵兽失败跌落1级（${lvB}→${gNo.player.level}）`);
+    ok(repNo.logs.some((l) => l.includes('渡劫失败')), '无涅槃灵兽失败文案出现');
+    const lvY = gYes.player.level;
+    const repYes = S.attemptBreakthrough(gYes);
+    ok(!repYes.success, '强制失败：突破未成功（涅槃灵兽在场）');
+    ok(gYes.player.level === lvY, `涅槃残焰保命：境界不跌落（${lvY}→${gYes.player.level}）`);
+    ok(repYes.logs.some((l) => l.includes('涅槃残焰')), '涅槃残焰保命文案出现');
+  } finally { Math.random = realRandom; }
+}
+
 console.log(`\n===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
 process.exit(fail ? 1 : 0);

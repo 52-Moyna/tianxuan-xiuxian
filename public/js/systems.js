@@ -640,9 +640,16 @@ export function attemptBreakthrough(state) {
       logs.push('💀 飞升之劫失败，魂飞魄散……但一线真灵不灭，可入轮回转世。');
       p.exp = 0;
     } else {
-      p.level = Math.max(1, p.level - back);
-      p.exp = 0;
-      logs.push(`⚡ 渡劫失败！${bn.fail}。修为跌落至 ${realmLevelName(p.level)}。`);
+      const nirvana = activeBeastSkillEffect(state, 'tribulationSave');
+      if (nirvana) {
+        const nBeast = state.beasts?.slots?.[state.beasts.activeIdx];
+        logs.push(`🔥 出战灵兽「${nBeast?.name || '灵兽'}」涅槃残焰燃起，替你挡下天劫反噬，修为未损！`);
+        p.exp = 0; // 仍清当前层经验，但境界不跌落
+      } else {
+        p.level = Math.max(1, p.level - back);
+        p.exp = 0;
+        logs.push(`⚡ 渡劫失败！${bn.fail}。修为跌落至 ${realmLevelName(p.level)}。`);
+      }
     }
   }
   refreshDerived(state);
