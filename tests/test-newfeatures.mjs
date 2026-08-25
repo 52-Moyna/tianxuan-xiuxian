@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -639,6 +639,43 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   growHerbs(g2);
   ok(g2.cave.garden[0].progress === 2, '洞府 Lv.5 灵泉涌动，月度自然生长 +2');
   ok(g2.cave.garden[0].irrigatedThisMonth === 0, '灵泉下跨月浇灌额度重置正常');
+}
+
+/* ---------- 灵泉·引泉升级（可成长叠加，确定性） ---------- */
+{
+  ok(HERB_SPRING_MAX === 3, '灵泉引泉上限 HERB_SPRING_MAX=3');
+  ok(HERB_SPRING_COST_BASE === 400, '引泉费用基数 HERB_SPRING_COST_BASE=400');
+  // 加法式：洞府基础 + 引泉重数
+  const lowS = S.createNewGame({ name: '引泉低', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(lowS); lowS.cave = lowS.cave || {}; lowS.cave.level = 0;
+  ok(herbSpringBonus(lowS) === 0, '洞府 Lv.0 灵泉总加成=0（基础0+引泉0）');
+  const highS = S.createNewGame({ name: '引泉高', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(highS); highS.cave = highS.cave || {}; highS.cave.level = 6; highS.cave.springLevel = 2;
+  ok(herbSpringBonus(highS) === 3, '洞府 Lv.6 + 引泉2重 = 灵泉总加成 3');
+  // 升级：费用递增、扣灵石、重数+1、封顶、不足拒绝
+  const gS = S.createNewGame({ name: '引泉升级', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gS); gS.cave = gS.cave || {}; gS.currencies = gS.currencies || {}; gS.currencies['下品灵石'] = 5000;
+  const beforeS = gS.currencies['下品灵石'];
+  const rS1 = upgradeHerbSpring(gS);
+  ok(rS1.ok && gS.cave.springLevel === 1 && beforeS - gS.currencies['下品灵石'] === HERB_SPRING_COST_BASE * 1, '首次引泉：重数1、扣费=400');
+  const rS2 = upgradeHerbSpring(gS);
+  ok(rS2.ok && gS.cave.springLevel === 2 && beforeS - gS.currencies['下品灵石'] === HERB_SPRING_COST_BASE * (1 + 2), '二次引泉：重数2、累计扣费=1200');
+  const rS3 = upgradeHerbSpring(gS);
+  ok(rS3.ok && gS.cave.springLevel === 3, '三次引泉达上限3');
+  const rS4 = upgradeHerbSpring(gS);
+  ok(!rS4.ok && gS.cave.springLevel === 3, '已达上限拒绝再引泉');
+  const poorS = S.createNewGame({ name: '引泉贫', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(poorS); poorS.cave = poorS.cave || {}; poorS.currencies = poorS.currencies || {}; poorS.currencies['下品灵石'] = 100;
+  const rS5 = upgradeHerbSpring(poorS);
+  ok(!rS5.ok && (poorS.cave.springLevel || 0) === 0, '灵石不足引泉被拒且重数不变');
+  // 引泉叠加后影响 growHerbs 自然生长（确定性）
+  const gG = S.createNewGame({ name: '引泉生长', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(gG); gG.cave = gG.cave || {}; gG.cave.garden = []; gG.cave.level = 6; gG.cave.springLevel = 2; gG.currencies = gG.currencies || {}; gG.currencies['下品灵石'] = 1000;
+  const plantG = plantHerb(gG, 'yushu');
+  ok(plantG.ok && gG.cave.garden.length === 1, '引泉生长：播种成功入列');
+  const bp = gG.cave.garden[0].progress;
+  growHerbs(gG);
+  ok(gG.cave.garden[0].progress === bp + 1 + 3, '引泉叠加后月自然生长 +4（基础1+引泉3）');
 }
 
 /* ---------- 观星卜算（数据驱动罗盘选项，确定性收益） ---------- */

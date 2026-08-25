@@ -216,7 +216,7 @@ export function totalEquipPower(state) {
 
 export function ensureLifeState(state) {
   if (!state.world) state.world = { year: 1000, month: 1, turns: 0, region: '中州圣城', regionId: 'zhongzhou', news: [] };
-  if (!state.cave) state.cave = { level: 0, name: CAVE_LEVELS[0].name, bonus: 0 };
+  if (!state.cave) state.cave = { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0 };
   state.cave.garden = Array.isArray(state.cave.garden) ? state.cave.garden : [];
   const regionName = String(state.world.region || '中州圣城');
   const found = Object.entries(REGION_NAMES).find(([id, name]) => id === state.world.regionId || name === regionName || regionName.includes(name));
@@ -537,8 +537,12 @@ export function growHerbs(state) {
 export const HERB_IRRIGATE_COST = 15;
 /** 单株每月可浇灌次数上限：防止用灵石无限瞬间催熟，保留「时间」维度 */
 export const HERB_IRRIGATE_CAP_PER_MONTH = 2;
-/** 灵泉涌动阈值：洞府达到此等级（Lv.5+），灵泉自然涌动，灵草每月额外 +1 自然生长 */
+/** 灵泉涌动阈值：洞府达到此等级（Lv.5+），灵泉自然涌动，灵草每月额外 +1 自然生长（基础加成） */
 export const HERB_SPRING_LEVEL = 5;
+/** 灵泉可成长上限：玩家可耗灵石引泉，使灵泉涌动额外叠加（每重 +1 月生长） */
+export const HERB_SPRING_MAX = 3;
+/** 引泉升级费用基数：第 k 重费用 = HERB_SPRING_COST_BASE × k（k 从 1 起） */
+export const HERB_SPRING_COST_BASE = 400;
 /** 单株累计浸润可转化为收获产量加成的上限：防止付费无限堆产，保留平衡 */
 export const HERB_IRRIGATE_YIELD_CAP = 3;
 /** 炼丹催化材料：开炉时若持有，自动消耗 1 份以提升成丹率（确定性、无 RNG）。
@@ -554,7 +558,33 @@ export const ALCHEMY_CATALYSTS = {
  * 与浇灌（付费单次 +1）互补：高等级洞府的灵草园收获更快，是洞府长线投资的回报之一。
  */
 export function herbSpringBonus(state) {
-  return (state.cave?.level || 0) >= HERB_SPRING_LEVEL ? 1 : 0;
+  // 基础加成（洞府>=Lv.5 自动涌动）叠加可成长的引泉重数，确定性、无 RNG。
+  const base = (state.cave?.level || 0) >= HERB_SPRING_LEVEL ? 1 : 0;
+  const grown = state.cave?.springLevel || 0;
+  return base + grown;
+}
+
+/**
+ * 引泉升级：消耗下品灵石，提升灵泉涌动重数（每重灵草月生长额外 +1）。
+ * 与洞府等级的基础加成叠加，提供灵草园长线投资回报，确定性、无 RNG。
+ */
+export function upgradeHerbSpring(state) {
+  ensureLifeState(state);
+  const cur = state.cave?.springLevel || 0;
+  if (cur >= HERB_SPRING_MAX) {
+    return { ok: false, logs: [`灵泉已臻「${HERB_SPRING_MAX}重涌动」之境，无需再引。`] };
+  }
+  const cost = HERB_SPRING_COST_BASE * (cur + 1);
+  if ((state.currencies?.['下品灵石'] || 0) < cost) {
+    return { ok: false, logs: [`引泉需 ${cost} 下品灵石，灵石不足。`] };
+  }
+  state.currencies['下品灵石'] -= cost;
+  state.cave.springLevel = cur + 1;
+  return {
+    ok: true,
+    cost,
+    logs: [`你引动地脉灵泉，灵泉涌动升至 ${state.cave.springLevel} 重！灵草每月自然生长额外 +${state.cave.springLevel} 月（基础涌动另计）。`],
+  };
 }
 
 /* ============================================================
@@ -670,7 +700,7 @@ function alchemyAddStones(state, amt) {
 
 /** 初始化丹炉状态（丹炉并行炼制队列 + 统计） */
 export function ensureAlchemyState(state) {
-  state.cave = state.cave || { level: 0, name: CAVE_LEVELS[0].name, bonus: 0 };
+  state.cave = state.cave || { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0 };
   state.cave.alchemy = Array.isArray(state.cave.alchemy) ? state.cave.alchemy : [];
   state.flags = state.flags || {};
   if (typeof state.flags.refinedPills !== 'number') state.flags.refinedPills = 0;

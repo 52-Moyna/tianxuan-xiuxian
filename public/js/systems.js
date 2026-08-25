@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -1161,6 +1161,14 @@ export function generateCompass(state) {
     opts.push({ icon: '🏠', tag: '经营', title: `升级洞府（${CAVE_LEVELS[state.cave.level + 1].name}）`, desc: `花费灵石${(state.cave.level + 1) * CAVE_UPGRADE_BASE}，修炼加成+${Math.round(CAVE_LEVELS[state.cave.level + 1].bonus * 100)}%。`, action: { type: 'upgradeCave' } });
   }
 
+  // —— 引泉升级（灵石充裕且未达上限时出现） ——
+  {
+    const cur = state.cave?.springLevel || 0;
+    if (cur < HERB_SPRING_MAX && canAfford(state, HERB_SPRING_COST_BASE * (cur + 1))) {
+      opts.push({ icon: '💧', tag: '经营', title: `引泉升级（灵泉涌动 ${cur}→${cur + 1} 重）`, desc: `花费灵石${HERB_SPRING_COST_BASE * (cur + 1)}，灵草每月自然生长额外 +1 月（与洞府基础涌动叠加）。`, action: { type: 'upgradeHerbSpring' } });
+    }
+  }
+
   // 新增玩法选项（秘境/拍卖/灵兽/宗门/机缘）
   opts.push(...extraCompassOptions(state));
 
@@ -1545,6 +1553,11 @@ export function performAction(state, option, extra = {}) {
         state.cave.bonus = CAVE_LEVELS[state.cave.level].bonus;
         logs.push(`洞府升级成功！现为「${state.cave.name}」，修炼加成+${Math.round(state.cave.bonus * 100)}%。`);
       } else logs.push('灵石不足，升级作罢。');
+      break;
+    }
+    case 'upgradeHerbSpring': {
+      const r = upgradeHerbSpring(state);
+      logs.push(...r.logs);
       break;
     }
     case 'social': {
