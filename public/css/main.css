@@ -1578,6 +1578,9 @@ button { font-family: inherit; }
 .enhance-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-soft); }
 .enhance-cell span { font-size: .72rem; color: var(--text-faint); }
 .enhance-cell b { font-size: 1rem; color: var(--gold); }
+.enhance-preview { text-align: center; font-size: .92rem; color: var(--text-dim); padding: 8px 10px; border-radius: 10px; background: linear-gradient(180deg, rgba(212,175,55,.10), rgba(212,175,55,.04)); border: 1px solid var(--gold-soft); }
+.enhance-preview .enhance-up { color: var(--gold); font-size: 1rem; }
+.enhance-preview .enhance-gain { color: #7ec98a; font-weight: 600; margin-left: 4px; }
 
 /* N. 灵草园（洞府） */
 .herb-row { display: grid; grid-template-columns: 1fr 150px auto; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-soft); margin-bottom: 8px; transition: border-color .2s, transform .15s, box-shadow .2s; }

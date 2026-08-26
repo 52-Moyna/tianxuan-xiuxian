@@ -1902,6 +1902,62 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(Array.isArray(logs2) && logs2.join('').includes('换装'), 'useItem 返回换装日志');
 }
 
+/* ---------- 装备淬炼·成功预览（2026-08-26 打磨：enhancePreview 确定性预览） ---------- */
+{
+  const eq = S.createNewGame({ name: '淬炼预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(eq);
+  // 先生成到局部变量再赋值，避免 generateEquip 内部 ensureLifeState 重建 equipment 覆盖手动赋值
+  const w = S.generateEquip(eq, 'weapon', 3, '试剑·淬');
+  eq.equipment.weapon = w;
+  S.enhancePreview(eq, { where: 'equip', slot: 'weapon' }); // 触发一次迁移固化 weapon 槽
+  const lvl = eq.equipment.weapon.等级;
+  const pv = S.enhancePreview(eq, { where: 'equip', slot: 'weapon' });
+  ok(pv.ok, 'enhancePreview·可行装备返回 ok');
+  ok(pv.level === lvl, 'enhancePreview·等级一致');
+  ok(pv.nextLevel === lvl + 1, 'enhancePreview·成功后等级 +1');
+  ok(pv.curPower === eq.equipment.weapon.战力, 'enhancePreview·当前战力一致');
+  ok(pv.gain > 0, 'enhancePreview·战力增益为正');
+  ok(pv.nextPower === pv.curPower + pv.gain, 'enhancePreview·nextPower = curPower + gain');
+  ok(pv.cost === 40 * (lvl + 1), 'enhancePreview·灵石消耗公式 40*(L+1)');
+  ok(pv.rate === Math.max(35, 88 - lvl * 2), 'enhancePreview·成功率公式');
+  // 备用栏路径：push 到 stash 并触发迁移（migrateEquipment 保留 stash）
+  const sw = S.generateEquip(eq, 'armor', 5, '玄甲·淬');
+  eq.equipment.stash.push(sw);
+  S.enhancePreview(eq, { where: 'equip', slot: 'weapon' });
+  ok(S.enhancePreview(eq, { where: 'stash', idx: 0 }).ok, 'enhancePreview·备用栏路径可用');
+  // 满级（Lv.30）拒绝：直接抬高已迁移装备的等级，再预览（迁移 normalizeEquip 保留等级）
+  eq.equipment.weapon.等级 = 30;
+  const pv30 = S.enhancePreview(eq, { where: 'equip', slot: 'weapon' });
+  ok(!pv30.ok && pv30.max === true, 'enhancePreview·满级返回 ok:false/max');
+  ok(!S.enhanceEquip(eq, { where: 'equip', slot: 'weapon' }).ok, 'enhanceEquip·满级拒绝');
+  eq.equipment.weapon = null;
+  ok(!S.enhancePreview(eq, { where: 'equip', slot: 'weapon' }).ok, 'enhancePreview·无装备返回 ok:false');
+  // enhanceEquip 结构校验（成功率 RNG，用循环确保至少成功一次以验证成功分支）
+  const w2 = S.generateEquip(eq, 'weapon', 2, '试剑·二');
+  eq.equipment.weapon = w2;
+  S.enhancePreview(eq, { where: 'equip', slot: 'weapon' });
+  const startLvl = eq.equipment.weapon.等级;
+  let succeeded = false;
+  for (let i = 0; i < 25 && !succeeded; i++) {
+    S.addStones(eq, 100000);
+    const before = S.totalStones(eq);
+    const curLvl = eq.equipment.weapon.等级; // 调用前捕获，避免成功后等级+1 干扰断言
+    const res = S.enhanceEquip(eq, { where: 'equip', slot: 'weapon' });
+    ok(res.ok === true, 'enhanceEquip·返回 ok');
+    ok(res.cost === 40 * (curLvl + 1), 'enhanceEquip·消耗与预览公式一致');
+    ok(res.rate === Math.max(35, 88 - curLvl * 2), 'enhanceEquip·成功率与预览公式一致');
+    ok(S.totalStones(eq) === before - res.cost, 'enhanceEquip·灵石已扣');
+    if (res.success) {
+      succeeded = true;
+      ok(eq.equipment.weapon.等级 === startLvl + 1, 'enhanceEquip·成功后等级 +1');
+      ok(eq.equipment.weapon.战力 === res.newPower, 'enhanceEquip·成功后战力=预览');
+      break;
+    }
+  }
+  ok(succeeded, 'enhanceEquip·高成功率下至少成功一次（验证成功分支）');
+}
+
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

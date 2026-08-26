@@ -1949,17 +1949,16 @@ function renderEquipSection() {
 function enhanceEquipModal(state, target) {
   const item = target.where === 'stash' ? state.equipment.stash[target.idx] : state.equipment[target.slot];
   if (!item || !item.名称 || item.名称 === '无') return;
-  const level = Number(item.等级) || 1;
-  if (level >= 30) { toast('该装备已臻化境，无法继续淬炼。', 'warn'); return; }
-  const cost = 40 * (level + 1);
-  const rate = Math.max(35, 88 - level * 2);
+  const pv = S.enhancePreview(state, target);
+  if (!pv.ok) { toast(pv.logs ? pv.logs[0] : '该装备已臻化境，无法继续淬炼。', 'warn'); return; }
   const m = openModal(`
     <div class="enhance-wrap">
       <div class="enhance-head">淬炼 · ${item.名称}</div>
-      <div class="enhance-info">当前 <b>Lv.${level}</b> ｜ 战力 <b>+${item.战力}</b>${gradeName(item.品阶) ? ` ｜ ${gradeName(item.品阶)}` : ''}</div>
+      <div class="enhance-info">当前 <b>Lv.${pv.level}</b> ｜ 战力 <b>+${pv.curPower}</b>${gradeName(item.品阶) ? ` ｜ ${gradeName(item.品阶)}` : ''}</div>
+      <div class="enhance-preview">淬炼成功 → <b class="enhance-up">Lv.${pv.nextLevel} ｜ 战力 +${pv.nextPower}</b> <span class="enhance-gain">（+${pv.gain}）</span></div>
       <div class="enhance-grid">
-        <div class="enhance-cell"><span>耗灵石</span><b>${cost}</b></div>
-        <div class="enhance-cell"><span>成功率</span><b>${rate}%</b></div>
+        <div class="enhance-cell"><span>耗灵石</span><b>${pv.cost}</b></div>
+        <div class="enhance-cell"><span>成功率</span><b>${pv.rate}%</b></div>
         <div class="enhance-cell"><span>失败损耗</span><b>仅灵石</b></div>
       </div>
       <div class="opt-desc">淬炼成功则等级 +1、战力同步提升；失败仅损耗灵石，装备无损（友好设计，避免数值崩坏与挫败）。</div>
