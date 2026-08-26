@@ -733,6 +733,25 @@ export function isRecipeUnlocked(state, recipeId) {
   }
 }
 
+/**
+ * 开炉成丹率预览（与 settleRefine 同口径，但不消耗材料/状态）。
+ * 返回 { baseRate, caveBonus, catalystBonus, rate }，供丹炉面板在开炉前展示真实期望成丹率，
+ * 让玩家看清洞府丹炉加成与催化材料加成，做出更明智的投入决策（确定性、无 RNG）。
+ */
+export function refineRate(state, recipeId) {
+  const r = PILL_RECIPES[recipeId];
+  if (!r) return null;
+  const baseRate = r.baseRate;
+  const caveBonus = Math.round((state.cave?.bonus || 0) * 30);
+  let catalystBonus = 0;
+  for (const [cname, cfg] of Object.entries(ALCHEMY_CATALYSTS)) {
+    const it = state.items.find((x) => x.名称 === cname);
+    if (it && it.数量 >= 1) catalystBonus += cfg.bonus;
+  }
+  const rate = Math.min(98, baseRate + caveBonus + catalystBonus);
+  return { baseRate, caveBonus, catalystBonus, rate };
+}
+
 /** 开炉炼制：校验解锁/材料/灵石 → 扣材料与灵石 → 写入「炼制中」队列 */
 export function refinePill(state, recipeId, opts = {}) {
   ensureLifeState(state);

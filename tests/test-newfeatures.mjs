@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -1957,6 +1957,48 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(succeeded, 'enhanceEquip·高成功率下至少成功一次（验证成功分支）');
 }
 
+
+/* ---------- 丹炉成丹率确定性预览 ---------- */
+{
+  const ar = S.createNewGame({
+    name: '成丹率预览', gender: '男', raceId: 'human', ageId: 'young',
+    regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot(),
+  });
+  ensureLifeState(ar);
+  ok(refineRate(ar, '不存在') === null, 'refineRate·未知丹方返回 null');
+
+  const rec = PILL_RECIPES['聚气丹']; // baseRate 92
+  // 1) 基础：无洞府加成、无催化
+  ar.cave.bonus = 0;
+  let pr = refineRate(ar, '聚气丹');
+  ok(pr.baseRate === rec.baseRate, 'refineRate·基础成丹率=丹方 baseRate');
+  ok(pr.caveBonus === 0, 'refineRate·无洞府时无丹炉加成');
+  ok(pr.catalystBonus === 0, 'refineRate·无催化材料时无催化加成');
+  ok(pr.rate === Math.min(98, rec.baseRate), 'refineRate·期望率=基础(未超上限)');
+
+  // 2) 洞府丹炉加成：bonus 0.5 → caveBonus = round(0.5*30)=15
+  ar.cave.bonus = 0.5;
+  pr = refineRate(ar, '聚气丹');
+  ok(pr.caveBonus === 15, 'refineRate·洞府bonus0.5→丹炉加成15');
+  ok(pr.rate === Math.min(98, rec.baseRate + 15), 'refineRate·叠加丹炉加成后期望率正确');
+
+  // 3) 催化加成：持「年份灵草」+8、「私藏丹方·残卷」+15
+  storeItem(ar, { 名称: '年份灵草', 类型: '材料', 数量: 1, 描述: '催化材料' });
+  pr = refineRate(ar, '聚气丹');
+  ok(pr.catalystBonus === 8, 'refineRate·年份灵草催化+8');
+  storeItem(ar, { 名称: '私藏丹方·残卷', 类型: '材料', 数量: 1, 描述: '催化材料' });
+  pr = refineRate(ar, '聚气丹');
+  ok(pr.catalystBonus === 23, 'refineRate·双催化合计+23');
+  ok(pr.rate === Math.min(98, rec.baseRate + 15 + 23), 'refineRate·洞府+双催化期望率累加正确');
+
+  // 4) 封顶 98：筑基丹(base80) + 洞府0.8(24) + 双催化(23) = 127 → 98
+  ar.cave.bonus = 0.8;
+  const recB = PILL_RECIPES['筑基丹'];
+  pr = refineRate(ar, '筑基丹');
+  ok(pr.caveBonus === 24, 'refineRate·洞府bonus0.8→丹炉加成24');
+  ok(pr.rate === 98, 'refineRate·超出部分封顶98');
+  ok(pr.rate === Math.min(98, recB.baseRate + 24 + 23), 'refineRate·与结算公式等价(封顶)');
+}
 
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);

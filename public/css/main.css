@@ -1723,3 +1723,8 @@ button { font-family: inherit; }
 
 /* 装备对比弹窗·套装归属徽标（2026-08-26 打磨） */
 .compare-set{font-size:.72rem;color:#c9a14a;margin-top:3px;letter-spacing:.5px}
+
+
+/* 丹炉面板 · 期望成丹率预览（与 settleRefine 同口径，确定性） */
+.ar-rate { color: var(--jade); font-weight: 700; }
+.ar-bonus { color: var(--text-dim); font-size: .68rem; margin-left: 2px; }

@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2542,6 +2542,7 @@ function renderCenter() {
         <div class="alchemy-recipes">
           ${recipes.map((r) => {
             const unlocked = isRecipeUnlocked(st, r.id);
+            const pr = refineRate(st, r.id);
             const matsOk = Object.entries(r.need).every(([n, c]) => (st.items.find((x) => x.名称 === n)?.数量 || 0) >= c);
             const stoneOk = !r.stoneCost || S.totalStones(st) >= r.stoneCost;
             const full = cave.alchemy.length >= alchemySlots(st);
@@ -2549,7 +2550,7 @@ function renderCenter() {
             return `
             <div class="alchemy-recipe ${cls}">
               <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span></div>
-              <div class="ar-meta">耗时 ${r.months}月 ｜ 基础成丹 ${r.baseRate}%</div>
+              <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}）</span></div>
               <div class="ar-need">
                 ${Object.entries(r.need).map(([n, c]) => {
                   const have = st.items.find((x) => x.名称 === n)?.数量 || 0;
