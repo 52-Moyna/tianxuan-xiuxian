@@ -2024,6 +2024,35 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(S.regionEncounterRate(weakState, 'haiwai') === S.previewBattle(weakState, repEnemy, 'yaoshou', 'normal', false).finalRate, 'regionEncounterRate 与 previewBattle 中点复算一致');
 }
 
+/* ---------- 秘境探索·护宝妖兽预估胜率（确定性预览） ---------- */
+{
+  // 护宝妖兽取 stronger 等级区间中点（与 makeEnemy 一致，+15% 上浮）；深度1/2 不缩放，胜率应一致
+  const st = S.createNewGame({ name: '秘境胜率', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  const r1 = S.mysticBeastRate(st, 1);
+  const r2 = S.mysticBeastRate(st, 2);
+  ok(r1 === r2, `秘境护宝妖兽·深度1与2胜率一致(${r1}/${r2})`);
+  // 深度3 妖兽更强（1.2倍等级/1.3倍战力），胜率应不高于深度1
+  const r3 = S.mysticBeastRate(st, 3);
+  ok(r3 <= r1, `秘境护宝妖兽·深度3胜率不高于深度1(${r3}<=${r1})`);
+  // 与 previewBattle 对同代表妖兽复算一致（深度1，无缩放）
+  const reg = REGION_TRAVEL[st.world.regionId] || REGION_TRAVEL.zhongzhou;
+  const { min, max } = beastLevelRange(st.world.regionId, true);
+  const mlv = Math.max(1, Math.round((min + max) / 2));
+  const mpower = Math.round(beastPowerOfLevel(mlv, reg.danger || 2) * 1.15);
+  const repEnemy = { name: '护宝妖兽', level: mlv, power: mpower, beast: true, realm: S.realmLevelName(mlv), danger: reg.danger || 2, regionId: st.world.regionId };
+  ok(r1 === S.previewBattle(st, repEnemy, 'yaoshou', 'normal', false).finalRate, 'mysticBeastRate 与 previewBattle 复算一致(深度1)');
+  // 护宝妖兽 +15% 上浮应使胜率不高于「未上浮」的同中点妖兽
+  const repEnemyNoStrong = { name: '护宝妖兽', level: mlv, power: beastPowerOfLevel(mlv, reg.danger || 2), beast: true, realm: S.realmLevelName(mlv), danger: reg.danger || 2, regionId: st.world.regionId };
+  const rateNoStrong = S.previewBattle(st, repEnemyNoStrong, 'yaoshou', 'normal', false).finalRate;
+  ok(r1 <= rateNoStrong, `护宝妖兽+15%上浮使胜率不高于未上浮(${r1}<=${rateNoStrong})`);
+  // 高阶修士碾压护宝妖兽（封顶95）
+  const strong = S.createNewGame({ name: '秘境胜率2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(strong);
+  strong.player.level = 80; strong.player.power = 6000;
+  ok(S.mysticBeastRate(strong, 3) >= 90, `高阶修士·深度3护宝妖兽胜率仍高(${S.mysticBeastRate(strong, 3)}%)`);
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

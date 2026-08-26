@@ -841,6 +841,24 @@ export function regionEncounterRate(state, regionId) {
   return pv.finalRate;
 }
 
+/**
+ * 秘境探索·护宝妖兽预估胜率（纯函数，不修改状态，供深度选择面板展示）。
+ * 与 exploreMysticRealm 实际遭遇口径一致：护宝妖兽取 stronger 等级区间中点，
+ * 深度 >=3 时按 1.2 倍等级 / 1.3 倍战力上浮；复用 previewBattle 同口径加成，确定性无 RNG。
+ */
+export function mysticBeastRate(state, depth = 1) {
+  const regionId = state.world.regionId || 'zhongzhou';
+  const reg = REGION_TRAVEL[regionId] || REGION_TRAVEL.zhongzhou;
+  const { min, max } = beastLevelRange(regionId, true); // 护宝妖兽 stronger
+  let lv = Math.max(1, Math.round((min + max) / 2));
+  const danger = Math.min(5, Math.max(2, reg.danger || 2));
+  let power = Math.round(beastPowerOfLevel(lv, danger) * 1.15); // 与 makeEnemy 的 stronger 上浮一致
+  if (depth >= 3) { power = Math.round(power * 1.3); lv = Math.round(lv * 1.2); }
+  const enemy = { name: '护宝妖兽', level: lv, power, beast: true, realm: realmLevelName(lv), danger, regionId };
+  const pv = previewBattle(state, enemy, 'yaoshou', 'normal', false);
+  return pv.finalRate;
+}
+
 export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal', blessed = false) {
   const p = state.player;
   const logs = [];

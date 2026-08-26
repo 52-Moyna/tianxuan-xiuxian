@@ -1538,6 +1538,7 @@ async function chooseMysticDepth() {
           <div class="depth-opt">
             <div class="depth-name">${d.name}<span class="depth-idx">第 ${depths.indexOf(d) + 1} 层</span></div>
             <div class="depth-detail">灵石×${d.stoneMul} ｜ 材料×${d.matMul} ｜ 法宝×${d.artMul} ｜ 妖兽风险 +${Math.round(d.beastAdd * 100)}%${d.hiddenChance > 0 ? ` ｜ 隐藏奇遇 ${Math.round(d.hiddenChance * 100)}%` : ''}</div>
+            ${(() => { const wr = S.mysticBeastRate(st, depths.indexOf(d) + 1); return `<div class="region-winrate ${wr >= 70 ? 'wr-high' : wr >= 40 ? 'wr-mid' : 'wr-low'}" title="基于该深度护宝妖兽典型等级（等级区间中点，深度≥3 更强）估算的胜率，实际遭遇等级会在区间内浮动">预估护宝妖兽胜率 ${wr}%</div>`; })()}
             <button class="btn btn-sm btn-gold" data-depth="${depths.indexOf(d) + 1}">深入${d.name}</button>
           </div>`).join('')}
       </div>
