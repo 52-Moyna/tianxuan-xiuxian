@@ -823,6 +823,24 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
   return { rate: Math.round(rate), finalRate: Math.round(cur), sameLevel, breakdown: bd };
 }
 
+
+
+/**
+ * 地域「典型遭遇胜率」预估（纯函数，不改动 state，供疆域图地域卡在玩家决定前往前展示）。
+ * 取该地域妖兽等级区间的中点作为"典型遭遇"，复用 previewBattle 同口径加成，给出确定性预估
+ * （不含命运骰子与胜负副作用）。实际遭遇等级在 [min,max] 内浮动，故仅作参考。
+ */
+export function regionEncounterRate(state, regionId) {
+  const reg = REGION_TRAVEL[regionId] || REGION_TRAVEL.zhongzhou;
+  const { min, max } = beastLevelRange(regionId, false);
+  const lv = Math.max(1, Math.round((min + max) / 2)); // 典型遭遇等级（区间中点）
+  const danger = Math.min(5, Math.max(2, reg.danger || 2));
+  const power = beastPowerOfLevel(lv, danger);
+  const enemy = { name: '妖兽', level: lv, power, beast: true, realm: realmLevelName(lv), danger, regionId };
+  const pv = previewBattle(state, enemy, 'yaoshou', 'normal', false);
+  return pv.finalRate;
+}
+
 export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal', blessed = false) {
   const p = state.player;
   const logs = [];

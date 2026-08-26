@@ -2712,6 +2712,7 @@ function renderCenter() {
       const isNeighbor = (cur.neighbors || []).includes(r.id);
       const marketCount = (REGION_MARKET[r.id] || []).length;
       const canGo = isNeighbor && !isCur && !traveling;
+      const winRate = S.regionEncounterRate(st, r.id);
       return `
         <div class="region-card ${isCur ? 'current' : ''}">
           <div class="region-head">
@@ -2723,6 +2724,7 @@ function renderCenter() {
           <div class="region-meta">
             <span class="region-danger" title="危险度">危险 ${dangerStars(t.danger || 2)}</span>
             <span class="region-req">建议 ${S.realmLevelName(t.realmReq || 1)}</span>
+            <span class="region-winrate ${winRate >= 70 ? 'wr-high' : winRate >= 40 ? 'wr-mid' : 'wr-low'}" title="基于该地域典型妖兽等级（等级区间中点）估算的遭遇胜率，实际遭遇等级会在区间内浮动">预估遭遇 ${winRate}%</span>
           </div>
           <div class="region-bonus">地域加成：${bonusText(r.bonus)}</div>
           <div class="region-routes">

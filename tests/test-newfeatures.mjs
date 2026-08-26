@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -1998,6 +1998,30 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(pr.caveBonus === 24, 'refineRate·洞府bonus0.8→丹炉加成24');
   ok(pr.rate === 98, 'refineRate·超出部分封顶98');
   ok(pr.rate === Math.min(98, recB.baseRate + 24 + 23), 'refineRate·与结算公式等价(封顶)');
+}
+
+/* ---------- 疆域图·地域典型遭遇胜率预估（确定性预览） ---------- */
+{
+  // 新手（低境界低战力）踏入高危地域「海外仙岛」(danger5) 胜率应偏低
+  const weakState = S.createNewGame({ name: '胜率测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(weakState);
+  const haiwaiWeak = S.regionEncounterRate(weakState, 'haiwai');
+  ok(haiwaiWeak < 50, `新手海外仙岛典型遭遇胜率偏低(${haiwaiWeak}%)`);
+  // 高境界高战力修士回到低危「中州」(danger2) 应碾压（封顶95）
+  const strongState = S.createNewGame({ name: '胜率测试2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(strongState);
+  strongState.player.level = 80; strongState.player.power = 5000;
+  const zhongzhouStrong = S.regionEncounterRate(strongState, 'zhongzhou');
+  ok(zhongzhouStrong >= 90, `高阶修士中州遭遇胜率高(${zhongzhouStrong}%)`);
+  // 中等修士（25级/战力300）：低危地域胜率应明显高于高危地域
+  const midState = S.createNewGame({ name: '胜率测试3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(midState);
+  midState.player.level = 25; midState.player.power = 300;
+  ok(S.regionEncounterRate(midState, 'zhongzhou') > S.regionEncounterRate(midState, 'haiwai'), '中等修士·低危地域胜率高于高危地域');
+  // 与 previewBattle 对同中点妖兽复算一致
+  const mid = Math.round((beastLevelRange('haiwai', false).min + beastLevelRange('haiwai', false).max) / 2);
+  const repEnemy = { name: '妖兽', level: mid, power: beastPowerOfLevel(mid, 5), beast: true, realm: S.realmLevelName(mid), danger: 5, regionId: 'haiwai' };
+  ok(S.regionEncounterRate(weakState, 'haiwai') === S.previewBattle(weakState, repEnemy, 'yaoshou', 'normal', false).finalRate, 'regionEncounterRate 与 previewBattle 中点复算一致');
 }
 
 console.log(`
