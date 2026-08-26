@@ -1717,3 +1717,6 @@ button { font-family: inherit; }
 /* 天机运势横幅（观星卜算所得，天机简报顶部展示） */
 .omen-line { background: linear-gradient(90deg, rgba(201,160,220,.20), rgba(111,168,220,.10)); border-left: 3px solid #c9a0dc; padding: 6px 10px; border-radius: 8px; margin-bottom: 6px; color: #ecdcf7; font-size: 13px; }
 .omen-line b { color: #fff; }
+
+/* 装备对比弹窗·套装归属徽标（2026-08-26 打磨） */
+.compare-set{font-size:.72rem;color:#c9a14a;margin-top:3px;letter-spacing:.5px}

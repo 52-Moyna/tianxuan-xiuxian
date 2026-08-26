@@ -1996,8 +1996,36 @@ function requestEquip(state, stashIdx) {
     toast('已装备', 'gold'); renderAll();
   }
 }
+/** 行囊「装备」按钮：与备用栏路径一致，换装前弹对比（旧 vs 新），避免误换降级装备 */
+function requestEquipFromBag(state, invIdx) {
+  const it = state.items[invIdx];
+  if (!it) return;
+  const equipData = it._equip || it;
+  const slot = equipData.部位 || S.guessEquipSlot(it);
+  const old = state.equipment[slot];
+  if (old) {
+    const newItem = {
+      名称: equipData.名称 || it.名称,
+      品阶: equipData.品阶 || (typeof it.品阶 === 'string' ? it.品阶 : null),
+      等级: equipData.等级 || it.等级 || 1,
+      战力: equipData.战力 || it.战力 || 0,
+      部位: slot,
+    };
+    compareEquipModal(old, newItem, () => {
+      const logs = S.useItem(state, invIdx);
+      if (logs) { logs.forEach((l) => pushLog(l)); toast(logs[0] || '装备已更换', 'gold'); }
+      renderAll();
+    });
+  } else {
+    const logs = S.useItem(state, invIdx);
+    if (logs) { logs.forEach((l) => pushLog(l)); toast(logs[0] || '已装备', 'gold'); }
+    renderAll();
+  }
+}
+
 function compareEquipModal(oldItem, newItem, onConfirm) {
   const slotName = EQUIP_SLOTS.find((s) => s.id === newItem.部位)?.name || '装备';
+  const setOf = (n) => (typeof CX !== 'undefined' && CX.itemSetOf) ? CX.itemSetOf(n) : null;
   const diff = (Number(newItem.战力) || 0) - (Number(oldItem.战力) || 0);
   const diffCls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
   const diffTxt = diff === 0 ? '战力持平' : (diff > 0 ? `战力 +${diff}` : `战力 ${diff}`);
@@ -2010,6 +2038,7 @@ function compareEquipModal(oldItem, newItem, onConfirm) {
           <div class="compare-name">${oldItem.名称}</div>
           <div class="compare-power">战力 +${oldItem.战力}</div>
           <div class="compare-meta">${gradeNameOf(oldItem)}</div>
+          ${setOf(oldItem.名称) ? `<div class="compare-set">🌟 ${setOf(oldItem.名称)}套装</div>` : ''}
         </div>
         <div class="compare-vs"><div class="compare-diff ${diffCls}">${diffTxt}</div></div>
         <div class="compare-col new">
@@ -2017,6 +2046,7 @@ function compareEquipModal(oldItem, newItem, onConfirm) {
           <div class="compare-name">${newItem.名称}</div>
           <div class="compare-power">战力 +${newItem.战力}</div>
           <div class="compare-meta">${gradeNameOf(newItem)}</div>
+          ${setOf(newItem.名称) ? `<div class="compare-set">🌟 ${setOf(newItem.名称)}套装</div>` : ''}
         </div>
       </div>
       <div class="modal-actions">
@@ -2300,7 +2330,10 @@ function renderCenter() {
       renderAll();
     });
     box.querySelectorAll('[data-use]').forEach((b) => b.addEventListener('click', () => {
-      const logs = S.useItem(st, Number(b.dataset.use));
+      const idx = Number(b.dataset.use);
+      const it = st.items[idx];
+      if (it && isEquipable(it)) { requestEquipFromBag(st, idx); return; }
+      const logs = S.useItem(st, idx);
       if (logs) { logs.forEach((l) => pushLog(l)); toast(logs[0], 'gold'); renderAll(); }
     }));
     box.querySelectorAll('[data-codex]').forEach((b) => b.addEventListener('click', () => {

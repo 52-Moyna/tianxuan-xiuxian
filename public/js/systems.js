@@ -2218,7 +2218,7 @@ export function generateEquip(state, slot, levelHint, fixedName) {
   };
 }
 
-function guessEquipSlot(item) {
+export function guessEquipSlot(item) {
   if (item.类型 === '法宝') return 'artifact';
   const name = String(item.名称 || '');
   if (/剑|刀|枪|锤|梭|环|铃|扇/.test(name)) return 'weapon';

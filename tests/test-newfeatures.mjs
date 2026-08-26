@@ -1873,6 +1873,35 @@ ok(rc.ok && rc.total >= 800 + 1800 + 5000, '一键领取含三档收集奖励（
 const vAfter = achievementView(sAll);
 ok(vAfter.filter((a) => ACH_MILESTONE_IDS.has(a.id)).every((a) => a.claimed), '三档收集奖励均已领取');
 
+/* ---------- 行囊换装对比链路（2026-08-26 打磨：装备对比提示） ---------- */
+// guessEquipSlot 已导出（行囊装备物品推算槽位的依据，requestEquipFromBag 依赖）
+ok(typeof S.guessEquipSlot === 'function', 'guessEquipSlot 已导出为函数');
+ok(S.guessEquipSlot({ 名称: '青锋剑', 类型: '装备' }) === 'weapon', 'guessEquipSlot·剑类→武器槽');
+ok(S.guessEquipSlot({ 名称: '玄铁重甲', 类型: '装备' }) === 'armor', 'guessEquipSlot·甲类→护甲槽');
+ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'guessEquipSlot·靴类→鞋子槽');
+// 行囊「装备」经 requestEquipFromBag 确认后调用的就是 useItem 此路径：
+// 目标部位已有旧装时，旧装备进入备用栏、新装备生效（保障对比弹窗的语义正确）
+{
+  const eq = S.createNewGame({ name: '换装链路', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(eq);
+  // 第一件：弱武器（Lv.1）直接装备，无旧装
+  const w1 = S.generateEquip(eq, 'weapon', 1, '试剑·壹');
+  eq.items.push({ 名称: w1.名称, 类型: '装备', 数量: 1, 描述: w1.描述, _equip: w1 });
+  S.useItem(eq, eq.items.length - 1);
+  ok(eq.equipment.weapon && eq.equipment.weapon.名称 === '试剑·壹', '首次装备·武器生效');
+  ok((eq.equipment.stash || []).length === 0, '首次装备无旧装·备用栏为空');
+  // 第二件：强武器（Lv.5）触发换装，旧装备进入备用栏（requestEquipFromBag 确认后调用的正是此路径）
+  const w2 = S.generateEquip(eq, 'weapon', 5, '试剑·贰');
+  const p2 = w2.战力;
+  eq.items.push({ 名称: w2.名称, 类型: '装备', 数量: 1, 描述: w2.描述, _equip: w2 });
+  const logs2 = S.useItem(eq, eq.items.length - 1);
+  ok(eq.equipment.weapon && eq.equipment.weapon.名称 === '试剑·贰', '换装后·新武器生效');
+  ok(eq.equipment.weapon.战力 === p2, '新武器战力正确');
+  ok((eq.equipment.stash || []).some((e) => e.名称 === '试剑·壹'), '旧武器进入备用栏');
+  ok((eq.equipment.stash || []).length === 1, '备用栏恰有 1 件');
+  ok(Array.isArray(logs2) && logs2.join('').includes('换装'), 'useItem 返回换装日志');
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
