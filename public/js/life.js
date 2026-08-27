@@ -523,6 +523,30 @@ export function harvestHerb(state, idx) {
   return { ok: true, logs: [`「${h.name}」已收获，但灵种异变，未见产出。`] };
 }
 
+/**
+ * 灵草园「一键收获」：批量收获所有已成熟灵草（progress>=grow）。
+ * 按成熟株索引降序处理（splice 不影响更低索引），结果确定性无 RNG。
+ * 返回 { ok, count, logs }。
+ */
+export function harvestAllHerbs(state) {
+  ensureLifeState(state);
+  const garden = state.cave.garden || [];
+  const matureIdx = [];
+  for (let i = 0; i < garden.length; i++) {
+    const h = garden[i];
+    if (h && h.progress >= h.grow) matureIdx.push(i);
+  }
+  if (!matureIdx.length) return { ok: false, count: 0, logs: ['灵草园中没有已成熟的灵草。'] };
+  const logs = [];
+  let count = 0;
+  for (const idx of matureIdx.sort((a, b) => b - a)) {
+    const r = harvestHerb(state, idx);
+    if (r.ok) count++;
+    logs.push(...(r.logs || []));
+  }
+  return { ok: count > 0, count, logs };
+}
+
 /** 月度生长：所有灵草进度 +1（于 settleMonth 调用）；同时重置本月浇灌额度 */
 export function growHerbs(state) {
   ensureLifeState(state);

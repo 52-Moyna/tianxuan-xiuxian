@@ -518,9 +518,20 @@ export function cultivateGainPreview(state, mode = 'normal') {
   const boneMul = 1 + p.daoBase['根骨'].level / 200;
   const omen = omenMul(state, 'cultivate');
   const gain = Math.round(base * rootMul * caveMul * gradeMul * boneMul * toxicMul * boostMul * omen);
+  // 闭关走火入魔提示：真实机制为「连续闭关>=3月触发 qihuo 事件」（需 Lv.30+）；
+  // 让累积风险对玩家可感知，且低等级不再虚报风险。
+  let note;
+  if (mode !== 'seclusion') note = '稳定·无风险';
+  else if (p.level < 30) note = '闭关·稳定（Lv.30 后久闭有走火入魔风险）';
+  else {
+    const streak = state.flags?.seclusionStreak || 0;
+    note = streak >= 2
+      ? `闭关·连关${streak}月，再闭关将走火入魔（满3月必触发）`
+      : '闭关·走火入魔风险（连续闭关积累）';
+  }
   return {
     mode, base, rootMul, caveMul, sectBonus, gradeMul, boneMul, toxicMul, boostMul, omen, gain,
-    note: mode === 'seclusion' ? '闭关·有走火入魔风险' : '稳定·无风险',
+    note,
   };
 }
 

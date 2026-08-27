@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -2117,6 +2117,35 @@ ok(S.destinyRewardPreview(state).includes('封号'), '末阶段封号奖励预�
 const daoIdx = lineStages.findIndex((x) => x.reward.type === '道基');
 if (daoIdx >= 0) { state.destiny.stage = daoIdx; ok(S.destinyRewardPreview(state).includes('道基'), '道基奖励预览包含「道基」'); }
 state.destiny.stage = savedStage;
+
+/* ---------- 灵草园「一键收获」+ 闭关连续风险可感知 ---------- */
+// 一键收获：播种若干株并强制成熟，批量收获应全部入库
+const hg = S.createNewGame({ name: '收获测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(hg);
+hg.cave.level = 4; hg.currencies['下品灵石'] = 99999;
+const seedPool = ['lingcao', 'huoqing', 'yushu', 'yuehua'];
+let plantedN = 0;
+for (let i = 0; i < 4; i++) { if (plantHerb(hg, seedPool[i]).ok) plantedN++; }
+ok(plantedN >= 3, `一键收获测试：播种至少 3 株（实际 ${plantedN}）`);
+hg.cave.garden.forEach((h) => { h.progress = h.grow; }); // 强制全部成熟
+const beforeItems = hg.items.length;
+const ha = harvestAllHerbs(hg);
+ok(ha.ok && ha.count === plantedN, `一键收获成熟 ${plantedN} 株（实际 ${ha.count}）`);
+ok(hg.cave.garden.length === 0, '一键收获后灵田清空');
+ok(hg.items.length > beforeItems, '一键收获产物入储物袋');
+const ha2 = harvestAllHerbs(hg);
+ok(!ha2.ok && ha2.count === 0, '灵田无成熟株时一键收获返回失败且不误处理');
+
+// 闭关连续风险可感知提示
+const sp = S.createNewGame({ name: '闭关', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(sp);
+sp.player.level = 10;
+ok(S.cultivateGainPreview(sp, 'normal').note === '稳定·无风险', '普通修炼提示稳定无风险');
+ok(S.cultivateGainPreview(sp, 'seclusion').note.includes('Lv.30'), '低等级闭关不再虚报走火入魔风险');
+sp.player.level = 40; sp.flags.seclusionStreak = 0;
+ok(S.cultivateGainPreview(sp, 'seclusion').note.includes('走火入魔风险'), '高等级闭关提示走火入魔风险');
+sp.flags.seclusionStreak = 2;
+ok(S.cultivateGainPreview(sp, 'seclusion').note.includes('再闭关将走火入魔'), '连关2月提示再闭关将触发走火入魔');
 
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);

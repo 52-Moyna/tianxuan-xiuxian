@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2598,6 +2598,7 @@ function renderCenter() {
             <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
           </div>`;
         }).join('') : '<div class="opt-desc">灵田空置，挑选一株灵草播下灵种吧。</div>'}
+        ${garden.some((h) => h.progress >= h.grow) ? `<button class="btn btn-gold btn-block" id="btn-harvest-all" style="margin:6px 0 4px">🌿 一键收获成熟灵草（${garden.filter((h) => h.progress >= h.grow).length} 株）</button>` : ''}
         <div class="side-subtitle">播种灵草</div>
         <div class="herb-seed-list">
           ${herbs.map((hb) => `
@@ -2634,6 +2635,13 @@ function renderCenter() {
       toast(r.ok ? r.logs[0] : (r.logs[0] || '无法收获'), r.ok ? 'gold' : 'warn');
       renderAll();
     }));
+    const haBtn = box.querySelector('#btn-harvest-all');
+    if (haBtn) haBtn.addEventListener('click', () => {
+      const r = harvestAllHerbs(st);
+      (r.logs || []).forEach((l) => pushLog(l));
+      toast(r.ok ? `已收获 ${r.count} 株灵草` : (r.logs[0] || '无可收获灵草'), r.ok ? 'gold' : 'warn');
+      renderAll();
+    });
     box.querySelectorAll('[data-irrigate]').forEach((b) => b.addEventListener('click', () => {
       const r = irrigateHerb(st, Number(b.dataset.irrigate));
       (r.logs || []).forEach((l) => pushLog(l));
