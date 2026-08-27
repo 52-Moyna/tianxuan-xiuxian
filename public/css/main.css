@@ -1403,6 +1403,8 @@ button { font-family: inherit; }
 .region-winrate.wr-high { color: var(--jade); border: 1px solid rgba(143,191,159,.5); }
 .region-winrate.wr-mid { color: var(--gold); border: 1px solid rgba(216,177,90,.5); }
 .region-winrate.wr-low { color: var(--danger); border: 1px solid rgba(225,110,110,.5); }
+.beast-rate { margin: 4px 0 2px; font-size: 13px; color: var(--muted); }
+.beast-rate .region-winrate { font-size: 12px; }
 .region-bonus { font-size: .78rem; color: var(--text-faint, #9aa0a8); }
 .region-routes { font-size: .78rem; color: var(--text); }
 .region-routes i { font-style: normal; color: var(--jade); margin-right: 4px; }

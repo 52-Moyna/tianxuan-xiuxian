@@ -2573,12 +2573,12 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
   ensureBeastState(state);
   if (!canTameBeast(state)) return { ok: false, logs: ['灵兽栏已满，无法再收服新灵兽。'] };
   const beast = { ...beastTemplate, power: beastTemplate.power + Rng.int(-2, 4), tamed: true };
-  let rate = 30 + (state.arts['御兽']?.level || 0) * 2;
+  // 先按当前状态算成功率（含自动投喂驯兽口粮），再消耗道具，保证数值与预览一致
+  const rate = tameBeastRate(state, beastTemplate, useIncense);
   let usedFood = false;
   if (useIncense) {
     const idx = state.items.findIndex((i) => i.名称 === '驭兽香');
     if (idx >= 0) {
-      rate += 20;
       state.items[idx].数量 -= 1;
       if (state.items[idx].数量 <= 0) state.items.splice(idx, 1);
     }
@@ -2587,14 +2587,11 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
   const foodIdx = state.items.findIndex((i) => i.名称 === '驯兽口粮');
   if (foodIdx >= 0) {
     const food = state.items[foodIdx];
-    rate += (food.effect && typeof food.effect.tame === 'number') ? food.effect.tame : 15;
     food.数量 -= 1;
     if (food.数量 <= 0) state.items.splice(foodIdx, 1);
     usedFood = true;
   }
   const foodNote = usedFood ? '（已投喂驯兽口粮，收服概率提升）' : '';
-  if (state.player.level < beast.minLevel) rate -= 20;
-  rate = Math.min(90, Math.max(10, rate));
   if (Rng.chance(rate / 100)) {
     state.beasts.slots.push(beast);
     state.beasts.tamedCount += 1;
@@ -2612,6 +2609,19 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
     return { ok: true, logs: [`你成功收服「${beast.name}」！${beast.desc} 战力 +${beast.power}。${foodNote}`] };
   }
   return { ok: false, logs: [`收服失败，「${beast.name}」挣脱了你的束缚，扬长而去。${foodNote}`] };
+}
+
+/** 灵兽收服成功率预览：纯函数，不消耗状态，与 tameBeast 同口径（确定性、无 RNG） */
+export function tameBeastRate(state, beastTemplate, useIncense = false) {
+  ensureLifeState(state);
+  ensureBeastState(state);
+  let rate = 30 + (state.arts['御兽']?.level || 0) * 2;
+  if (useIncense && state.items.some((i) => i.名称 === '驭兽香')) rate += 20;
+  const food = state.items.find((i) => i.名称 === '驯兽口粮');
+  if (food) rate += (food.effect && typeof food.effect.tame === 'number') ? food.effect.tame : 15;
+  if (state.player.level < beastTemplate.minLevel) rate -= 20;
+  rate = Math.min(90, Math.max(10, rate));
+  return rate;
 }
 
 /** 指定/取消出战灵兽（出战者在战斗中额外护主，提高胜率） */

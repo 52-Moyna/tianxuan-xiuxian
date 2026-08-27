@@ -1577,14 +1577,16 @@ async function chooseSectDepth() {
 async function flowTameBeast() {
   const st = GameState.data;
   const beasts = CX.BEAST_TEMPLATES.filter((b) => st.player.level >= b.minLevel - 10);
+  const hasIncense = st.items.some((i) => i.名称 === '驭兽香');
   const m = openModal(`
-    <div class="choice-intro">你前往灵兽栖息地。御兽等级越高，收服成功率越高。当前灵兽栏：${st.beasts?.slots?.length || 0}/${st.beasts?.maxSlots || 1}。</div>
-    ${beasts.map((b, i) => `<div class="beast-slot">
+    <div class="choice-intro">你前往灵兽栖息地。御兽等级越高，收服成功率越高；下方为各灵兽预估收服率。当前灵兽栏：${st.beasts?.slots?.length || 0}/${st.beasts?.maxSlots || 1}。</div>
+    ${beasts.map((b, i) => { const rt = S.tameBeastRate(st, b, false); const rtCls = rt >= 70 ? 'wr-high' : rt >= 40 ? 'wr-mid' : 'wr-low'; const rtInc = hasIncense ? '（用驭兽香 +20%）' : ''; return `<div class="beast-slot">
       <div class="beast-name">🐺 ${b.name} <span class="codex-rarity">Lv.${b.minLevel}+</span></div>
       <div class="beast-skill">技能：${b.skill}</div>
       <div class="beast-desc">${b.desc} 战力加成 +${b.power}</div>
+      <div class="beast-rate"><span class="region-winrate ${rtCls}">预估收服率 ${rt}%</span>${rtInc}</div>
       <div class="modal-actions"><button class="btn btn-sm btn-gold" data-beast="${i}">尝试收服</button></div>
-    </div>`).join('')}
+    </div>`; }).join('')}
     <div class="modal-actions"><button class="btn" id="btn-back-beast">返回本月选择</button></div>`,
     { title: '灵兽栖息地', lock: true, cls: 'modal-lg' });
   let settled = false;
