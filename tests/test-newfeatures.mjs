@@ -2147,6 +2147,22 @@ ok(S.cultivateGainPreview(sp, 'seclusion').note.includes('走火入魔风险'), 
 sp.flags.seclusionStreak = 2;
 ok(S.cultivateGainPreview(sp, 'seclusion').note.includes('再闭关将走火入魔'), '连关2月提示再闭关将触发走火入魔');
 
+/* ---------- 秘境收益确定性预览（宗门秘境 / 秘境探索） ---------- */
+const rpS = S.createNewGame({ name: '预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(rpS);
+const rpR1 = S.sectRealmRewardPreview(rpS, 1);
+ok(rpR1.contribution === 30 && rpR1.stones === 80 && rpR1.crystal === 1 && rpR1.pill === 0, '宗门秘境 d1：贡献+30 灵石+80 灵脉晶+1 无聚气丹');
+const rpR2 = S.sectRealmRewardPreview(rpS, 2);
+ok(rpR2.contribution === 48 && rpR2.stones === 128 && rpR2.crystal === 3 && rpR2.pill === 1, '宗门秘境 d2：贡献+48 灵石+128 灵脉晶+3 聚气丹+1');
+const rpR3 = S.sectRealmRewardPreview(rpS, 3);
+ok(rpR3.contribution === 72 && rpR3.stones === 192 && rpR3.crystal === 5 && rpR3.pill === 2, '宗门秘境 d3：贡献+72 灵石+192 灵脉晶+5 聚气丹+2');
+const rpMr = S.createNewGame({ name: '预览2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+ensureLifeState(rpMr);
+const rpPm = S.mysticRealmRewardPreview(rpMr, 'qingxu', 1);
+ok(rpPm && rpPm.stoneMin === 50 && rpPm.stoneMax === 200 && rpPm.matMin === 1 && rpPm.matMax === 3, '青虚秘境 d1：灵石 50~200 材料 1~3');
+ok(rpPm.artChance === 5 && rpPm.fee === 0 && !rpPm.requiresMap, '青虚秘境 d1：法宝 5% 无护阵费 非残图秘境');
+const rpPy = S.mysticRealmRewardPreview(rpMr, 'yifu', 3);
+ok(rpPy && rpPy.requiresMap && rpPy.fee === 100 && rpPy.artChance >= 100, '海上遗府 d3：需残图 护阵费 100 法宝必得');
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

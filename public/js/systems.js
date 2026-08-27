@@ -2880,6 +2880,47 @@ function awardAuctionItem(state, item, amount) {
  * ========================================================== */
 // 海上遗府（需残图秘境）进入需缴纳的护阵灵石；海岛通行令可减 20%（持久生效、不消耗）
 const MYSTIC_REALM_ENTRY_FEE = 100;
+/**
+ * 宗门秘境收益确定性预览（与 exploreSectRealm 同口径，不消耗状态）。
+ * 用于「深度选择」界面在进入前展示真实收益，辅助投资决策。
+ */
+export function sectRealmRewardPreview(state, depth = 1) {
+  depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
+  const dcfg = MYSTIC_DEPTH.of(depth);
+  const contribution = Math.round(30 * dcfg.stoneMul);
+  const stones = Math.round(80 * dcfg.stoneMul);
+  const crystal = Math.max(1, Math.round(depth * dcfg.matMul));
+  const pill = depth >= 2 ? Math.max(1, Math.round(dcfg.artMul)) : 0;
+  return { contribution, stones, crystal, pill };
+}
+
+/**
+ * 秘境探索收益区间预览（与 exploreMysticRealm 同口径，不消耗状态）。
+ * 灵石/材料为区间估值（实际取区间随机数），法宝/妖兽为概率。
+ */
+export function mysticRealmRewardPreview(state, realmId, depth = 1) {
+  const realm = MYSTIC_REALMS.find((r) => r.id === realmId);
+  depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
+  const dcfg = MYSTIC_DEPTH.of(depth);
+  if (!realm) return null;
+  const stoneMin = Math.round(realm.rewards.stones[ 0 ] * dcfg.stoneMul);
+  const stoneMax = Math.round(realm.rewards.stones[ 1 ] * dcfg.stoneMul);
+  const matMin = Math.max(1, Math.round(1 * dcfg.matMul));
+  const matMax = Math.max(1, Math.round(3 * dcfg.matMul));
+  const setFlags = setBonusFlags(state);
+  const findBonus = setFlags.mysticFind || 0;
+  const artChance = Math.min(100, Math.round((realm.rewards.artifactChance + findBonus) * dcfg.artMul * 100));
+  const beastChance = Math.round(Math.min(0.92, realm.beastChance + dcfg.beastAdd) * 100);
+  let fee = 0;
+  if (realm.requiresMap) {
+    const relicDiscount = state.items
+      .filter((i) => i.effect && i.effect.relic)
+      .reduce((mx, i) => Math.max(mx, i.effect.relic || 0), 0);
+    fee = Math.max(0, Math.round(MYSTIC_REALM_ENTRY_FEE * (1 - relicDiscount / 100)));
+  }
+  return { stoneMin, stoneMax, matMin, matMax, artChance, beastChance, fee, requiresMap: !!realm.requiresMap, name: realm.name };
+}
+
 export function exploreMysticRealm(state, realmId, depth = 1) {
   ensureLifeState(state);
   const realm = MYSTIC_REALMS.find((r) => r.id === realmId);

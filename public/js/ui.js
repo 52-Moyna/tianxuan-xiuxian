@@ -991,7 +991,7 @@ async function onCompassPick(option) {
     }
 
     if (option.action.type === 'mystic') {
-      const depth = await chooseMysticDepth();
+      const depth = await chooseMysticDepth(option.action.realmId);
       if (!depth) return;
       const r = S.performAction(GameState.data, option, { depth });
       await resolveFlows(r, option);
@@ -1526,7 +1526,7 @@ async function flowAuction() {
 }
 
 /* ---------------- 秘境探索深度选择 ---------------- */
-async function chooseMysticDepth() {
+async function chooseMysticDepth(realmId) {
   const st = GameState.data;
   const depths = D.MYSTIC_DEPTH.levels;
   let pick = null;
@@ -1534,13 +1534,14 @@ async function chooseMysticDepth() {
     const m = openModal(`
       <div class="choice-intro">选择本次探索的深度。越深，灵石、材料与法宝越丰厚，但护宝妖兽更凶、更可能出现隐藏奇遇。</div>
       <div class="depth-list">
-        ${depths.map((d) => `
+        ${depths.map((d) => { const dv = depths.indexOf(d) + 1; const pw = S.mysticRealmRewardPreview(st, realmId, dv); const rng = pw ? `灵石 +${pw.stoneMin}~${pw.stoneMax} ｜ 材料 ×${pw.matMin}~${pw.matMax} ｜ 法宝 ${pw.artChance >= 100 ? '必得' : pw.artChance + '%'}${pw.fee > 0 ? ` ｜ 护阵灵石 -${pw.fee}` : ''}` : ''; return `
           <div class="depth-opt">
-            <div class="depth-name">${d.name}<span class="depth-idx">第 ${depths.indexOf(d) + 1} 层</span></div>
+            <div class="depth-name">${d.name}<span class="depth-idx">第 ${dv} 层</span></div>
             <div class="depth-detail">灵石×${d.stoneMul} ｜ 材料×${d.matMul} ｜ 法宝×${d.artMul} ｜ 妖兽风险 +${Math.round(d.beastAdd * 100)}%${d.hiddenChance > 0 ? ` ｜ 隐藏奇遇 ${Math.round(d.hiddenChance * 100)}%` : ''}</div>
-            ${(() => { const wr = S.mysticBeastRate(st, depths.indexOf(d) + 1); return `<div class="region-winrate ${wr >= 70 ? 'wr-high' : wr >= 40 ? 'wr-mid' : 'wr-low'}" title="基于该深度护宝妖兽典型等级（等级区间中点，深度≥3 更强）估算的胜率，实际遭遇等级会在区间内浮动">预估护宝妖兽胜率 ${wr}%</div>`; })()}
-            <button class="btn btn-sm btn-gold" data-depth="${depths.indexOf(d) + 1}">深入${d.name}</button>
-          </div>`).join('')}
+            ${(() => { const wr = S.mysticBeastRate(st, dv); return `<div class="region-winrate ${wr >= 70 ? 'wr-high' : wr >= 40 ? 'wr-mid' : 'wr-low'}" title="基于该深度护宝妖兽典型等级（等级区间中点，深度≥3 更强）估算的胜率，实际遭遇等级会在区间内浮动">预估护宝妖兽胜率 ${wr}%</div>`; })()}
+            <div class="depth-detail">预计收益：${rng}</div>
+            <button class="btn btn-sm btn-gold" data-depth="${dv}">深入${d.name}</button>
+          </div>`; }).join('')}
       </div>
       <div class="modal-actions"><button class="btn" id="btn-cancel-depth">取消</button></div>`,
       { title: '秘境探索 · 深度选择', lock: true, cls: 'modal-lg' });
@@ -1552,18 +1553,19 @@ async function chooseMysticDepth() {
 
 /* ---------------- 宗门秘境深度选择 ---------------- */
 async function chooseSectDepth() {
+  const st = GameState.data;
   const depths = D.MYSTIC_DEPTH.levels;
   let pick = null;
   await new Promise((resolve) => {
     const m = openModal(`
       <div class="choice-intro">选择本次潜修的纵深。越深，宗门贡献、灵石与材料越丰厚；深处更藏有宗门丹房旧藏（聚气丹）。无妖兽风险。</div>
       <div class="depth-list">
-        ${depths.map((d) => `
+        ${depths.map((d) => { const dv = depths.indexOf(d) + 1; const rw = S.sectRealmRewardPreview(st, dv); return `
           <div class="depth-opt">
-            <div class="depth-name">${d.name}<span class="depth-idx">第 ${depths.indexOf(d) + 1} 层</span></div>
-            <div class="depth-detail">贡献&灵石×${d.stoneMul} ｜ 材料×${d.matMul}${d.depth >= 2 ? ' ｜ 深处得聚气丹' : ''}</div>
-            <button class="btn btn-sm btn-gold" data-depth="${depths.indexOf(d) + 1}">深入${d.name}</button>
-          </div>`).join('')}
+            <div class="depth-name">${d.name}<span class="depth-idx">第 ${dv} 层</span></div>
+            <div class="depth-detail">贡献 +${rw.contribution} ｜ 灵石 +${rw.stones} ｜ 灵脉晶 +${rw.crystal}${dv >= 2 ? ` ｜ 聚气丹 +${rw.pill}` : ''}</div>
+            <button class="btn btn-sm btn-gold" data-depth="${dv}">深入${d.name}</button>
+          </div>`; }).join('')}
       </div>
       <div class="modal-actions"><button class="btn" id="btn-cancel-sectdepth">取消</button></div>`,
       { title: '宗门秘境 · 深度选择', lock: true, cls: 'modal-lg' });
