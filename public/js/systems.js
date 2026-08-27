@@ -502,6 +502,28 @@ export function cultivate(state, mode = 'normal') {
   return { gain, logs, levelUps: ups };
 }
 
+/** 修炼收益确定性预览（与 cultivate 同口径；基础取 Rng 区间中点，无 RNG 波动） */
+export function cultivateGainPreview(state, mode = 'normal') {
+  const p = state.player;
+  const tech = state.techniques.find((t) => t.名称 === p.mainTechnique);
+  const grade = TECHNIQUE_GRADES.find((g) => g.name === (tech?.品级 || '凡品'));
+  const base = mode === 'seclusion' ? 42 : 22; // Rng.int(30,55)/Rng.int(15,30) 期望中点
+  const sectBonus = sectCultivateBonus(state);
+  const toxic = Number(state.flags?.pillToxicity || 0);
+  const toxicMul = toxic >= 85 ? 0.55 : toxic >= 60 ? 0.75 : toxic >= 35 ? 0.9 : 1;
+  const boostMul = (state.flags?.cultivateBoostMonths || 0) > 0 ? 1.15 : 1;
+  const rootMul = p.spiritRoot.speed;
+  const caveMul = 1 + (state.cave.bonus || 0) + sectBonus;
+  const gradeMul = grade.expMul;
+  const boneMul = 1 + p.daoBase['根骨'].level / 200;
+  const omen = omenMul(state, 'cultivate');
+  const gain = Math.round(base * rootMul * caveMul * gradeMul * boneMul * toxicMul * boostMul * omen);
+  return {
+    mode, base, rootMul, caveMul, sectBonus, gradeMul, boneMul, toxicMul, boostMul, omen, gain,
+    note: mode === 'seclusion' ? '闭关·有走火入魔风险' : '稳定·无风险',
+  };
+}
+
 /** 道基加经验（含升级） */
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
@@ -1228,7 +1250,17 @@ export function generateCompass(state) {
 
   // 给界面层提供"点进去前看得懂"的结果预览，具体判定仍在玩法系统内完成。
   return opts.map((o) => {
-    if (o.action.type === 'cultivate') return { ...o, preview: o.action.mode === 'seclusion' ? '收益：修为较多，道心也会成长' : '收益：稳定修为，风险低' };
+    if (o.action.type === 'cultivate') {
+      const m = o.action.mode === 'seclusion' ? 'seclusion' : 'normal';
+      const pv = cultivateGainPreview(state, m);
+      const cavePct = Math.round((pv.caveMul - 1) * 100);
+      const bonePct = Math.round((pv.boneMul - 1) * 100);
+      const parts = [`基础${pv.base}`, `灵根×${pv.rootMul}`, `洞府/宗门+${cavePct}%`, `功法×${pv.gradeMul}`, `根骨+${bonePct}%`];
+      if (pv.toxicMul !== 1) parts.push(`丹毒×${pv.toxicMul}`);
+      if (pv.boostMul !== 1) parts.push(`聚灵×${pv.boostMul}`);
+      parts.push(`运势×${pv.omen}`);
+      return { ...o, preview: `预计修为 +${pv.gain}（${pv.note}）`, previewTitle: `修炼收益拆解：${parts.join(' ｜ ')} ≈ ${pv.gain}` };
+    }
     if (o.action.type === 'explore') return { ...o, preview: '收益：材料、灵石或修为；可能进入斗法' };
     if (o.action.type === 'market') return { ...o, preview: '不会立刻结束本月，可购买、出售后再决定' };
     if (o.action.type === 'socialList' || o.action.type === 'social') return { ...o, preview: '收益：好感、道基或关系层级；切磋会进入斗法' };

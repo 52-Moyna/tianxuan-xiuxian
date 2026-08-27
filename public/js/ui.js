@@ -917,7 +917,7 @@ function refreshCompass() {
       <span class="ci-body">
         <span class="ci-title">${o.title}${recommended ? ' <em class="recommend">推荐</em>' : ''}${o.risk ? ' <em class="risk">有风险</em>' : ''}${done ? ' <em class="done">本月已进行</em>' : ''}</span>
         <span class="ci-desc">${done ? '本月已进行过，进入下月后可再次选择。' : o.desc}</span>
-        ${o.preview && !done ? `<span class="ci-preview">${o.preview}</span>` : ''}
+        ${o.preview && !done ? `<span class="ci-preview"${o.previewTitle ? ` title="${o.previewTitle}"` : ''}>${o.preview}</span>` : ''}
       </span>
       <span class="ci-tag">${o.tag}</span>`;
     if (!done) el.addEventListener('click', () => onCompassPick(o));

@@ -2083,6 +2083,28 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(rb && typeof rb.ok === 'boolean' && Array.isArray(rb.logs), 'tameBeast 仍返回结构化结果');
 }
 
+/* ---------- 修炼收益确定性预览 ---------- */
+const cgN = S.cultivateGainPreview(state, 'normal');
+const cgS = S.cultivateGainPreview(state, 'seclusion');
+ok(cgN && cgN.gain > 0 && cgS && cgS.gain > 0, '修炼预览收益为正');
+ok(cgS.gain > cgN.gain, `闭关预览收益高于普通修炼(${cgS.gain}>${cgN.gain})`);
+const cgBefore = S.cultivateGainPreview(state, 'normal').gain;
+const _savedLv = state.cave.level, _savedBonus = state.cave.bonus;
+state.cave.level = Math.min(8, state.cave.level + 1);
+state.cave.bonus = (state.cave.bonus || 0) + 0.25;
+const cgAfter = S.cultivateGainPreview(state, 'normal').gain;
+ok(cgAfter > cgBefore, `洞府加成提升后预览收益增加(${cgAfter}>${cgBefore})`);
+state.cave.level = _savedLv; state.cave.bonus = _savedBonus;
+const cgA = S.cultivateGainPreview(state, 'normal').gain;
+const cgB = S.cultivateGainPreview(state, 'normal').gain;
+ok(cgA === cgB, '修炼预览确定性（同状态两次一致，无 RNG 波动）');
+const _savedTox = state.flags.pillToxicity;
+const cgLowTox = S.cultivateGainPreview(state, 'normal').gain;
+state.flags.pillToxicity = 90;
+const cgHighTox = S.cultivateGainPreview(state, 'normal').gain;
+ok(cgHighTox < cgLowTox, `丹毒升高拉低修炼预览收益(${cgHighTox}<${cgLowTox})`);
+state.flags.pillToxicity = _savedTox;
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
