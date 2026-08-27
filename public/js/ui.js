@@ -2207,6 +2207,20 @@ function renderCenter() {
         </div>
         <ul id="news-list" class="news-list"></ul>
       </div>
+      ${(() => {
+        const dt = S.destinyCurrent(st);
+        const total = D.DESTINY_LINES[st.destiny.lineId].stages.length;
+        const idx = st.destiny.stage;
+        const avail = S.destinyAvailable(st);
+        let statusHtml;
+        if (!dt) statusHtml = '<span class="dp-status dp-done">🎊 天命已圆满</span>';
+        else if (avail) statusHtml = '<span class="dp-status dp-ready">✅ 时机已至：年初「顺应天命」即可推进（' + dt.name + '）</span>';
+        else statusHtml = '<span class="dp-status dp-wait">尚需 Lv.' + Math.max(0, dt.reqLv - st.player.level) + ' 级（要求 Lv.' + dt.reqLv + '）</span>';
+        return '<div class="panel panel-destiny-progress">' +
+          '<div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h6"/></svg>' +
+          '<span class="pt-text">天命主线</span><span class="panel-hint">' + st.destiny.lineName + '</span></div>' +
+          '<div class="dp-stage">第 ' + (idx + 1) + ' / ' + total + ' 阶段 · ' + (dt ? dt.name : '已圆满') + '</div>' + statusHtml + '</div>';
+      })()}
       <div class="panel panel-core">
         <div class="panel-title">
           <svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"/></svg>

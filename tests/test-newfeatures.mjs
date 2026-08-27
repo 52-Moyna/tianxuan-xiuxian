@@ -1,6 +1,6 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
-import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST } from '../public/js/data.js';
+import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
@@ -2104,6 +2104,19 @@ state.flags.pillToxicity = 90;
 const cgHighTox = S.cultivateGainPreview(state, 'normal').gain;
 ok(cgHighTox < cgLowTox, `丹毒升高拉低修炼预览收益(${cgHighTox}<${cgLowTox})`);
 state.flags.pillToxicity = _savedTox;
+
+
+/* ---------- 天命奖励确定性预览 ---------- */
+const dp0 = S.destinyRewardPreview(state);
+ok(typeof dp0 === 'string' && dp0.startsWith('奖励：'), '天命奖励预览返回确定性文案');
+ok(S.destinyRewardPreview(state) === dp0, '天命奖励预览确定性（无 RNG 波动）');
+const savedStage = state.destiny.stage;
+const lineStages = DESTINY_LINES[state.destiny.lineId].stages;
+state.destiny.stage = lineStages.length - 1;
+ok(S.destinyRewardPreview(state).includes('封号'), '末阶段封号奖励预览正确');
+const daoIdx = lineStages.findIndex((x) => x.reward.type === '道基');
+if (daoIdx >= 0) { state.destiny.stage = daoIdx; ok(S.destinyRewardPreview(state).includes('道基'), '道基奖励预览包含「道基」'); }
+state.destiny.stage = savedStage;
 
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);

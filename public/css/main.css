@@ -1734,3 +1734,12 @@ button { font-family: inherit; }
 /* 丹炉面板 · 期望成丹率预览（与 settleRefine 同口径，确定性） */
 .ar-rate { color: var(--jade); font-weight: 700; }
 .ar-bonus { color: var(--text-dim); font-size: .68rem; margin-left: 2px; }
+
+
+/* 天命进度卡（主页常驻） */
+.panel-destiny-progress { }
+.dp-stage { margin: 8px 0 6px; font-size: 14px; font-weight: 600; color: var(--gold); }
+.dp-status { display: inline-block; margin-top: 2px; padding: 4px 12px; border-radius: 999px; font-size: 13px; border: 1px solid; }
+.dp-ready { color: var(--jade); border-color: var(--jade); }
+.dp-wait  { color: var(--gold-soft); border-color: var(--gold-soft); }
+.dp-done  { color: var(--gold); border-color: var(--gold); }

@@ -1072,6 +1072,27 @@ export function destinyAvailable(state) {
   const st = destinyCurrent(state);
   return st && state.player.level >= st.reqLv;
 }
+
+/**
+ * 天命当前阶段奖励的确定性预览（用于罗盘「顺应天命」选项的收益展示）。
+ * 不改变状态，仅展示真实将发放的奖励，帮助玩家决策。
+ */
+export function destinyRewardPreview(state) {
+  const st = destinyCurrent(state);
+  if (!st || !st.reward) return '主线奖励，推进世界故事';
+  const r = st.reward;
+  switch (r.type) {
+    case '道基': return `奖励：${r.key}+${r.val}（道基）`;
+    case '货币': return `奖励：下品灵石+${r.val}`;
+    case '功法': {
+      const g = D.TECHNIQUE_GRADES.find((x) => x.id === r.grade);
+      return `奖励：功法《${r.name}》（${g ? g.name : r.grade}）`;
+    }
+    case '装备': return `奖励：${r.name}（战力法宝，入备用栏）`;
+    case '称号': return `奖励：封号「${r.title}」`;
+    default: return r.text || '主线奖励，推进世界故事';
+  }
+}
 /** 推进天命主线一阶段 */
 export function advanceDestiny(state) {
   const st = destinyCurrent(state);
@@ -1265,7 +1286,7 @@ export function generateCompass(state) {
     if (o.action.type === 'market') return { ...o, preview: '不会立刻结束本月，可购买、出售后再决定' };
     if (o.action.type === 'socialList' || o.action.type === 'social') return { ...o, preview: '收益：好感、道基或关系层级；切磋会进入斗法' };
     if (o.action.type === 'breakthrough') return { ...o, preview: '高风险：成功跨越瓶颈，失败会损失修为' };
-    if (o.action.type === 'destiny') return { ...o, preview: '收益：主线奖励，推进世界故事' };
+    if (o.action.type === 'destiny') return { ...o, preview: destinyRewardPreview(state) };
     if (o.action.type === 'art') return { ...o, preview: '收益：技艺经验与灵石；可返回重新选择' };
     return { ...o, preview: '收益：推进本月状态与世界变化' };
   });
