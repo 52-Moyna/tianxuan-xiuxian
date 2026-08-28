@@ -1705,6 +1705,30 @@ const idxYS = pickLastIdx(stYS.items, (i) => i.名称 === '延寿丹' && i.effec
 S.useItem(stYS, idxYS);
 ok(stYS.player.lifespan === lifeBefore + 20, '服用拍卖延寿丹寿元上限 +20');
 
+// 延寿丹「一生最多 3 颗」上限：第 4 颗服用失效（不消耗、不累加、寿命不变），兑现图鉴承诺
+// 注：storeItem 按名称合并，4 颗注入后合并为「数量 4」的单一条目，服用按该条目递减。
+{
+  const stCap = S.createNewGame({ name: '延寿上限', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(stCap);
+  stCap.inventory.capacity = 1000;
+  const life0 = stCap.player.lifespan;
+  for (let i = 0; i < 4; i++) grantAuctionItem(stCap, poolYS); // 4 颗合并为「数量 4」
+  const idxYs = pickLastIdx(stCap.items, (i) => i.名称 === '延寿丹' && i.effect && i.effect.lifespan);
+  ok(idxYs >= 0 && stCap.items[idxYs].数量 === 4, '延寿上限：注入 4 颗（合并为数量 4）');
+  S.useItem(stCap, idxYs); S.useItem(stCap, idxYs); S.useItem(stCap, idxYs); // 服满 3 颗（同条目递减，索引稳定）
+  ok(stCap.player.lifespan === life0 + 60, '延寿上限：服满 3 颗寿元 +60');
+  ok(stCap.player.lifespanPillsTaken === 3, '延寿上限：服用计数 = 3');
+  ok(stCap.items[idxYs] && stCap.items[idxYs].数量 === 1, '延寿上限：3 颗已消耗、剩 1 颗');
+  const before4 = stCap.player.lifespan;
+  const logs4 = S.useItem(stCap, idxYs) || [];
+  ok(stCap.player.lifespan === before4, '延寿上限：第 4 颗服用不增加寿元');
+  ok(stCap.player.lifespanPillsTaken === 3, '延寿上限：第 4 颗不累加计数');
+  ok(logs4.join('').includes('一生至多可服 3 颗'), '延寿上限：第 4 颗返回拒绝文案');
+  ok(stCap.items[idxYs] && stCap.items[idxYs].数量 === 1, '延寿上限：第 4 颗未被消耗（仍留储物袋）');
+  const fresh = S.createNewGame({ name: '新世', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ok(fresh.player.lifespanPillsTaken === 0, '延寿上限：转世新一生计数归零（newGame 重置）');
+}
+
 // 灵兽契约服用拓宽灵兽栏
 const stHT = S.createNewGame({ name: '拍卖契约', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
 ensureLifeState(stHT);

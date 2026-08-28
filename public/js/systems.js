@@ -414,6 +414,7 @@ export function createNewGame(opts) {
       daoYun: yun ? { id: yun.id, name: yun.name, level: 1, exp: 0 } : { id: 'none', name: '未觉醒', level: 1, exp: 0 },
       level, exp: 0, daoBase,
       lifespan: 100, power: 1, realmName: '凡人境', lifeBonus: ageGroup.mods.寿元修正 || 0,
+      lifespanPillsTaken: 0, // 延寿丹：当前轮回一生至多服用 3 颗，超出则经脉难承（转世后随 newGame 归零）
     },
     currencies: { 下品灵石: pack.stones, 中品灵石: 0, 上品灵石: 0, 极品灵石: 0, 灵晶: 0 },
     techniques: [{ 名称: startTechName, 品级: '凡品', 等级: 1, 经验: 0 }],
@@ -2223,8 +2224,16 @@ export function useItem(state, idx) {
     state.flags.cultivateBoostMonths = Math.max(state.flags.cultivateBoostMonths || 0, m);
     logs.push(`灵力充盈，未来 ${m} 月修炼效率提升。`);
   }
-  // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖
+  // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖。
+  // 图鉴承诺「一生最多服用 3 颗」：对延寿丹按当前轮回计数，满 3 则经脉难承、本次服用失效（不消耗、不累加）。
   if (it.effect.lifespan) {
+    if (it.名称 === '延寿丹') {
+      const taken = state.player.lifespanPillsTaken || 0;
+      if (taken >= 3) {
+        return [`「延寿丹」一生至多可服 3 颗，你已服满（${taken} 颗），经脉难承更多药力，此丹暂难生效（留于储物袋即可）。`];
+      }
+      state.player.lifespanPillsTaken = taken + 1;
+    }
     const yrs = it.effect.lifespan;
     state.player.lifeBonus = (state.player.lifeBonus || 0) + yrs;
     refreshDerived(state);
