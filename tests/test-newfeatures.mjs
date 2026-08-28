@@ -2214,6 +2214,18 @@ const cst = mkCrisisState({ age: 95, lifespan: 100, toxic: 90 });
 S.lifespanWarning(cst); S.toxicityWarning(cst);
 ok(cst.player.age === 95 && cst.player.lifespan === 100 && cst.flags.pillToxicity === 90, '危机预警纯函数：完全不改动原状态');
 
+// 解药服用闭环：危机预警下手握解药，服用即生效（对应横幅「服用」按钮逻辑）
+const scCure = JSON.parse(JSON.stringify(state));
+scCure.player.age = scCure.player.lifespan - 3; // 触发 danger 预警
+scCure.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 }, toxicity: 15 });
+const li = scCure.items.length - 1;
+ok(S.lifespanWarning(scCure).level === 'danger' && S.useItem(scCure, li) && scCure.player.lifespan > (state.player.lifespan || 0), '寿元将尽+持有延寿丹：服用提升寿元上限');
+const stCure = JSON.parse(JSON.stringify(state));
+stCure.flags = Object.assign({}, stCure.flags, { pillToxicity: 90, wounded: 2 }); // 触发 danger 预警
+stCure.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '清伤', effect: { heal: true }, toxicity: 0 });
+const ti = stCure.items.length - 1;
+ok(S.toxicityWarning(stCure).level === 'danger' && S.useItem(stCure, ti) && (stCure.flags.wounded || 0) === 0, '丹毒攻心+持有凝血丹：服用清除全部伤势');
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

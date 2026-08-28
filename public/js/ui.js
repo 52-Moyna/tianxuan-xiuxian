@@ -703,6 +703,13 @@ function fmtStonesShort() {
   return `${fmtBig(c['下品灵石'] || 0)}下｜${fmtBig(c['中品灵石'] || 0)}中｜${fmtBig(c['上品灵石'] || 0)}上｜${fmtBig(c['极品灵石'] || 0)}极｜${fmtBig(c['灵晶'] || 0)}晶`;
 }
 
+// 在行囊中按名称查找物品索引（危机预警一键服用解药等场景复用）
+function findItemIndex(state, name) {
+  const items = state.items || [];
+  for (let i = 0; i < items.length; i++) if (items[i].名称 === name) return i;
+  return -1;
+}
+
 export function renderAll() {
   const st = GameState.data;
   if (!st) return;
@@ -724,13 +731,24 @@ export function renderAll() {
   const toxWarn = S.toxicityWarning(st);
   const toxEl = $('#st-toxic'); if (toxEl) toxEl.textContent = `${toxWarn.toxic}`;
   const toxRow = $('#st-toxic-row'); if (toxRow) toxRow.classList.toggle('danger', toxWarn.level !== 'ok');
-  // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径
+  // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
     const warns = [lifeWarn, toxWarn].filter((w) => w.level !== 'ok');
     if (warns.length) {
       banner.className = `crisis-banner ${warns.some((w) => w.level === 'danger') ? 'danger' : 'warn'}`;
-      banner.innerHTML = warns.map((w) => `<div class="cb-item">${w.hint}</div>`).join('');
+      banner.innerHTML = warns.map((w) => {
+        const cure = w === lifeWarn ? '延寿丹' : '凝血丹';
+        const cidx = findItemIndex(st, cure);
+        const btn = cidx >= 0 ? ` <button class="cb-cure" data-cure="${cidx}">服用${cure}</button>` : '';
+        return `<div class="cb-item">${w.hint}${btn}</div>`;
+      }).join('');
+      banner.querySelectorAll('[data-cure]').forEach((b) => b.addEventListener('click', () => {
+        const cidx = Number(b.dataset.cure);
+        const logs = S.useItem(st, cidx);
+        if (logs) { logs.forEach((l) => pushLog(l)); toast(logs[0], 'gold'); }
+        renderAll();
+      }));
       banner.style.display = '';
     } else {
       banner.style.display = 'none';
