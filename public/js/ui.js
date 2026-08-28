@@ -713,12 +713,29 @@ export function renderAll() {
   // 顶栏（SVG 线描图标 + 文本，统一仙侠风格）
   const ICO = (d) => `<svg class="gm-ico" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   $('#tb-time').innerHTML = `${ICO('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')}天玄历·${w.year}年·${D.MONTH_NAMES[w.month - 1]}`;
-  // 英雄卡生命体征：骨龄 / 寿元余 / 气血(血条) / 伤势，渲染到头像下方的 #hero-vitals
+  // 英雄卡生命体征：骨龄 / 寿元余 / 气血(血条) / 伤势 / 丹毒，渲染到头像下方的 #hero-vitals
   const wounds = st.flags?.wounded || 0;
-  const lifeLeft = Math.max(0, p.lifespan - p.age);
+  const lifeWarn = S.lifespanWarning(st);
+  const lifeLeft = lifeWarn.lifeLeft;
   const ageEl = $('#st-age'); if (ageEl) ageEl.textContent = `${p.age} 岁`;
   const lifeEl = $('#st-life'); if (lifeEl) lifeEl.textContent = `${lifeLeft} 年`;
-  const lifeRow = $('#st-life-row'); if (lifeRow) lifeRow.classList.toggle('danger', lifeLeft <= 10);
+  const lifeRow = $('#st-life-row'); if (lifeRow) lifeRow.classList.toggle('danger', lifeWarn.level !== 'ok');
+  // 丹毒生命体征（状态卡直接可见当前丹毒，偏高时整行标红）
+  const toxWarn = S.toxicityWarning(st);
+  const toxEl = $('#st-toxic'); if (toxEl) toxEl.textContent = `${toxWarn.toxic}`;
+  const toxRow = $('#st-toxic-row'); if (toxRow) toxRow.classList.toggle('danger', toxWarn.level !== 'ok');
+  // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径
+  const banner = $('#crisis-banner');
+  if (banner) {
+    const warns = [lifeWarn, toxWarn].filter((w) => w.level !== 'ok');
+    if (warns.length) {
+      banner.className = `crisis-banner ${warns.some((w) => w.level === 'danger') ? 'danger' : 'warn'}`;
+      banner.innerHTML = warns.map((w) => `<div class="cb-item">${w.hint}</div>`).join('');
+      banner.style.display = '';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
   // 气血条：100 为满血，每层伤势扣 15 点，最低 5
   const maxHp = 100;
   const hpPct = Math.round((Math.max(5, maxHp - wounds * 15) / maxHp) * 100);

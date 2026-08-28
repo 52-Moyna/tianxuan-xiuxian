@@ -535,6 +535,39 @@ export function cultivateGainPreview(state, mode = 'normal') {
   };
 }
 
+/** 寿元危机预警（纯函数，不修改状态；供状态卡展示）。
+ *  level: 'danger' 命悬一线（余寿≤8年）、'warn' 寿元将尽（≤20年）、'ok' 安康。
+ *  hint 指向已实现的延寿途径：延寿丹(+20年)/冲击更高境界增寿/寿元耗尽转世。 */
+export function lifespanWarning(state) {
+  const p = state.player;
+  const lifeLeft = Math.max(0, (p.lifespan || 0) - (p.age || 0));
+  let level = 'ok', hint = '';
+  if (lifeLeft <= 8) {
+    level = 'danger';
+    hint = '寿元将尽！可服「延寿丹」(+20年)、冲击更高境界增寿，或寿元耗尽后转世续道。';
+  } else if (lifeLeft <= 20) {
+    level = 'warn';
+    hint = '寿元渐少，留意「延寿丹」（坊市/拍卖/宗门兑换所可得）以备不时之需。';
+  }
+  return { level, lifeLeft, hint };
+}
+
+/** 丹毒危机预警（纯函数，不修改状态；供状态卡展示）。
+ *  level: 'danger' 剧毒攻心(≥85)、'warn' 丹毒累积(≥60)、'ok' 清净。
+ *  hint 提醒减服毒性丹药，必要时用「凝血丹」清伤（无毒副作用）。 */
+export function toxicityWarning(state) {
+  const toxic = Number(state.flags?.pillToxicity || 0);
+  let level = 'ok', hint = '';
+  if (toxic >= 85) {
+    level = 'danger';
+    hint = '丹毒攻心！再服毒丹将重创修为，可服「凝血丹」清伤（无毒）或暂停服丹。';
+  } else if (toxic >= 60) {
+    level = 'warn';
+    hint = '丹毒累积偏多，服丹收益下降、风险升高，宜暂缓毒性丹药。';
+  }
+  return { level, toxic, hint };
+}
+
 /** 道基加经验（含升级） */
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
