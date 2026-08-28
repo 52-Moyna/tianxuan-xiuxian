@@ -643,6 +643,7 @@ export function wizardNext() {
       if (state.player.daoBase[k]) state.player.daoBase[k].level += lv;
     }
     if (WIZARD.inherit.tech) state.techniques.push({ ...WIZARD.inherit.tech });
+    if (WIZARD.inherit.yunExp) state.player.daoYun.exp += WIZARD.inherit.yunExp;
     S.refreshDerived(state);
     toast('前世遗泽已随你转世', 'gold');
   }
@@ -1791,6 +1792,31 @@ function npcInteractModal(npc) {
   });
 }
 
+/* ---------------- 转世继承预览 ---------------- */
+/** 转世前展示将继承的具体内容，确认后再执行转世（确定性预览，对齐「投资型决策确定性预览」主题）。 */
+function openReincarnatePreview(st, onConfirm) {
+  const pv = S.reincarnatePreview(st);
+  const daoRows = pv.daoList.map((d) => `<div class="ri-row"><span>${d.name}</span><b>${d.cur} → <span class="ri-up">${d.next}</span>（+${(d.add)}）</b></div>`).join('');
+  const m = openModal(`
+    <div class="modal-title">🔄 轮回转世 · 遗泽预览</div>
+    <p class="modal-text">魂归轮回，以下<b>前世遗泽</b>将随你转世；其余（境界、装备、灵兽、灵草、宗门、寿元等）皆重置：</p>
+    <div class="ri-box">
+      <div class="ri-row"><span>🪙 继承灵石</span><b>${pv.stones}（半数，共 ${pv.totalStones}）</b></div>
+      ${daoRows}
+      <div class="ri-row"><span>✨ 道韵经验</span><b>+${pv.yunExp}</b></div>
+      <div class="ri-row"><span>📜 主修功法</span><b>${pv.techName}</b></div>
+    </div>
+    <div class="opt-desc" style="margin-top:6px">提示：转世开启全新一生，挚友羁绊（${pv.heirs.length ? pv.heirs.join('、') : '暂未结交'}）需重新结缘。</div>
+    <div class="modal-actions">
+      <button class="btn btn-gold" data-v="1">确认转世</button>
+      <button class="btn" data-v="0">再想想</button>
+    </div>`, { lock: true });
+  m.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => {
+    closeModal();
+    if (b.dataset.v === '1') onConfirm();
+  }));
+}
+
 /* ---------------- 寿元已尽 / 转世 ---------------- */
 async function flowDeath() {
   const st = GameState.data;
@@ -1807,9 +1833,11 @@ async function flowDeath() {
   });
   const { resetSave } = await import('./save.js');
   if (re === 're') {
-    const inherit = S.reincarnate(st, false);
-    await resetSave();
-    startCreation(inherit);
+    openReincarnatePreview(st, async () => {
+      const inherit = S.reincarnate(st, false);
+      await resetSave();
+      startCreation(inherit);
+    });
   } else {
     await resetSave();
     location.reload();
@@ -3010,12 +3038,12 @@ function renderSettingsPanel(box) {
   box.querySelector('#btn-import-save').addEventListener('click', () => importSaveModal(box));
   box.querySelector('#btn-guide-settings').addEventListener('click', showBeginnerGuide);
   box.querySelector('#btn-reincarnate').addEventListener('click', async () => {
-    if (await confirmModal('确定转世重修？将继承半数灵石、三成道基与主修功法。', '转世', '再想想')) {
+    openReincarnatePreview(st, async () => {
       const { resetSave } = await import('./save.js');
       const inherit = S.reincarnate(st, false);
       await resetSave();
       startCreation(inherit);
-    }
+    });
   });
   box.querySelector('#btn-hard-reset').addEventListener('click', async () => {
     if (await confirmModal('⚠️ 将移空当前存档槽（移入历史备份），确定重开？', '删档重开', '取消')) {

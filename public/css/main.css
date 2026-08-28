@@ -1456,6 +1456,14 @@ button { font-family: inherit; }
 }
 .modal-actions .btn { min-width: 92px; justify-content: center; }
 .modal .opt-desc, .modal-text { line-height: 1.75; }
+/* 转世继承预览 */
+.ri-box { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(212,175,55,.10), rgba(212,175,55,.03)); border: 1px solid var(--gold-soft); }
+.ri-box .ri-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px dashed var(--line-soft); font-size: .9rem; }
+.ri-box .ri-row:last-child { border-bottom: none; }
+.ri-box .ri-row > span { color: var(--text-dim); }
+.ri-box .ri-row > b { color: var(--text); text-align: right; }
+.ri-box .ri-up { color: var(--gold); }
+.ri-box .ri-row b .ri-up { font-weight: 700; }
 
 /* E. 暗色主题自定义滚动条（Webkit / Firefox），统一滚动观感 */
 .hero-card, .center-view, .side-drawer, .modal, .log-list, .log-entries,

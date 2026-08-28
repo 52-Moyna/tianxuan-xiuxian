@@ -2615,17 +2615,39 @@ export function sectExchange(state, itemId) {
   return { ok: true, logs };
 }
 
-export function reincarnate(state, full) {
-  if (full) return null; // 完全重开：由 UI 走新建流程
-  // 轮回转世：继承部分遗产
-  const inherit = {
+/** 轮回转世：计算可继承的遗产（纯函数，只读 state，不修改）。 */
+function computeInherit(state) {
+  return {
     stones: Math.floor(totalStones(state) * 0.5),
     daoBase: Object.fromEntries(Object.entries(state.player.daoBase).map(([k, v]) => [k, Math.floor(v.level * 0.3)])),
     yunExp: Math.floor(state.player.daoYun.exp * 0.2),
     tech: state.techniques.find((t) => t.名称 === state.player.mainTechnique),
     heirs: state.npcs.filter((n) => n.favor >= 80).slice(0, 2).map((n) => n.name),
   };
-  return inherit;
+}
+
+export function reincarnate(state, full) {
+  if (full) return null; // 完全重开：由 UI 走新建流程
+  // 轮回转世：继承部分遗产
+  return computeInherit(state);
+}
+
+/** 转世继承预览：纯函数，返回玩家转世后将继承的具体内容（确定性、无 RNG），供 UI 确认前展示。 */
+export function reincarnatePreview(state) {
+  const inh = computeInherit(state);
+  const total = totalStones(state);
+  const daoList = Object.entries(inh.daoBase).map(([k, add]) => {
+    const cur = (state.player.daoBase[k] && state.player.daoBase[k].level) || 0;
+    return { name: k, cur, add, next: cur + add };
+  });
+  return {
+    stones: inh.stones,
+    totalStones: total,
+    daoList,
+    yunExp: inh.yunExp,
+    techName: inh.tech ? inh.tech.名称 : '（无主修功法）',
+    heirs: inh.heirs,
+  };
 }
 
 /* ============================================================
