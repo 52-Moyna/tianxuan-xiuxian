@@ -1130,7 +1130,7 @@ export function destinyRewardPreview(state) {
     case '道基': return `奖励：${r.key}+${r.val}（道基）`;
     case '货币': return `奖励：下品灵石+${r.val}`;
     case '功法': {
-      const g = D.TECHNIQUE_GRADES.find((x) => x.id === r.grade);
+      const g = TECHNIQUE_GRADES.find((x) => x.id === r.grade);
       return `奖励：功法《${r.name}》（${g ? g.name : r.grade}）`;
     }
     case '装备': return `奖励：${r.name}（战力法宝，入备用栏）`;
@@ -1531,6 +1531,16 @@ export const WANDER_EVENTS = [
       const f = Rng.int(20, 90);
       addStones(state, f);
       logs.push(`林间一具前辈遗骸旁，你取走「${eq.名称}」（${getEquipGrade(eq.品阶)?.name || eq.品阶}，战力+${eq.战力}）与灵石${f}枚，合十致意后将其安葬。`);
+      return { logs };
+    },
+  },
+  {
+    id: 'relic_frag', weight: 5, regionBoost: { xiji: 1.3, nanming: 1.2 },
+    run(state) {
+      const logs = [];
+      const frag = { 名称: '残片法宝', 类型: '材料', 数量: 1, 描述: '法宝残片，可在百艺·炼器「残片修复」中重铸为可用法宝（需辅以星砂）。', 价值: 60 };
+      if (storeItem(state, frag)) logs.push('残垣断壁间，你拾得一截「法宝残片」，虽失灵性，仍可熔炼重铸。');
+      else logs.push('废墟中似有「法宝残片」，储物袋已满只得作罢。');
       return { logs };
     },
   },
@@ -2415,7 +2425,26 @@ export function practiceArt(state, artName, recipeId = '', slotOverride, batch =
       storeItem(state, item);
       state.inventory.used = inventoryUsed(state);
       const slotName = EQUIP_SLOTS.find((s) => s.id === slotOverride)?.name || '装备';
-      logs.push(`你凝火锻器，自由锻造出「${equip.名称}」（${slotName}，战力+${equip.战力}）。`);
+      logs.push(`你凝火锻2器，自由锻造出「${equip.名称}」（${slotName}，战力+${equip.战力}）。`);
+    } else if (artName === '炼器' && recipe.id === 'repair_canpian') {
+      // 残片修复：法宝残片（游历/秘境战利品）+ 星砂 → 重铸为可用灵珠法宝（确定性，无 RNG）
+      const repairedName = '灵珠法宝';
+      const artPower = calcEquipPower('artifact', 3, getEquipGrade('faqi'));
+      const artItem = {
+        名称: repairedName, 类型: '法宝', 数量: 1,
+        描述: `法宝残片重铸而成的「${repairedName}」（法器），战力+${artPower}。`,
+        _equip: { 名称: repairedName, 类型: '法宝', 部位: 'artifact', 品阶: '法器', 等级: 3, 战力: artPower, 描述: `法宝残片重铸而成的「${repairedName}」（法器），战力+${artPower}。` },
+        价值: 200,
+      };
+      if (!canStore(state, artItem)) return ['储物袋空间不足，请先出售或扩容。'];
+      for (const [nm, cnt] of Object.entries(recipe.need)) {
+        const it = state.items.find((x) => x.名称 === nm);
+        if (!it) return ['材料不足，无法开工。'];
+        it.数量 -= cnt; if (it.数量 <= 0) state.items.splice(state.items.indexOf(it), 1);
+      }
+      storeItem(state, artItem);
+      state.inventory.used = inventoryUsed(state);
+      logs.push(`你将「残片法宝」投入地火，辅以「星砂」熔炼重铸，一枚「${repairedName}」（法器，战力+${artPower}）焕发新生！`);
     } else {
       // 套装加成：炼器/炼丹时品质和经验提升
       const expMul = setFlags.craftExp ? (1 + setFlags.craftExp) : 1;

@@ -102,6 +102,8 @@ export const ART_RECIPES = {
     // 宗门灵脉晶真实消费点：将「宗门灵脉晶」（宗门秘境产出）作为炼器材料，使其成为可用灵材而非死道具
     { id: 'lingmai_shi', name: '灵脉石饰', need: { '宗门灵脉晶': 1, '矿石': 2 }, output: { name: '灵脉石饰', type: '装备', quantity: 1, level: 5, 部位: 'accessory', desc: '宗门秘境灵脉凝琢的石饰，温养元神，战力 +5。' }, value: 220 },
     { id: 'free', name: '自由锻造', need: { '赤铜精': 1 }, output: { type: '装备', quantity: 1, level: 3, desc: '自选部位锻造一件装备，战力随品阶浮动。' }, value: 200 },
+    // 残片修复：法宝残片（游历/秘境战利品）+ 星砂 → 重铸为可用灵珠法宝，消除「残片法宝」死道具与“待修复成长”假承诺
+    { id: 'repair_canpian', name: '残片修复', need: { '残片法宝': 1, '星砂': 1 }, output: { name: '灵珠法宝', type: '法宝', quantity: 1, level: 3, desc: '由法宝残片重铸而成的灵珠法宝（法器）。' }, value: 220 },
   ],
   制符: [
     { id: '护身符', name: '护身符', need: { '冰魄符纸': 1, '海灵珠': 1 }, output: { name: '护身符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '战斗失败时减轻损失。' }, value: 100 },

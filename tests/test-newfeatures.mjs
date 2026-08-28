@@ -2250,6 +2250,30 @@ stCure.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '�
 const ti = stCure.items.length - 1;
 ok(S.toxicityWarning(stCure).level === 'danger' && S.useItem(stCure, ti) && (stCure.flags.wounded || 0) === 0, '丹毒攻心+持有凝血丹：服用清除全部伤势');
 
+// —— 残片法宝：死道具→炼器「残片修复」闭环（消除“待修复成长”假承诺）——
+ok(ART_RECIPES.炼器.some((r) => r.id === 'repair_canpian'), '残片修复：炼器配方已登记');
+const rcBase = JSON.parse(JSON.stringify(state));
+rcBase.items.push({ 名称: '残片法宝', 类型: '材料', 数量: 1, 描述: '法宝残片', 价值: 60 });
+rcBase.items.push({ 名称: '星砂', 类型: '材料', 数量: 1, 描述: '高阶炼器材料', 价值: 120 });
+S.practiceArt(rcBase, '炼器', 'repair_canpian');
+const rcArt = rcBase.items.find((x) => x.名称 === '灵珠法宝');
+ok(rcArt && rcArt.类型 === '法宝' && rcArt._equip && rcArt._equip.战力 > 0, '残片修复：消耗残片+星砂产出可装备灵珠法宝（战力>0）');
+ok(!rcBase.items.find((x) => x.名称 === '残片法宝'), '残片修复：残片法宝已被消耗');
+ok(!rcBase.items.find((x) => x.名称 === '星砂'), '残片修复：星砂消耗1份');
+const rcNo = JSON.parse(JSON.stringify(state));
+rcNo.items.push({ 名称: '星砂', 类型: '材料', 数量: 1, 描述: '高阶炼器材料', 价值: 120 });
+const rcLogs = S.practiceArt(rcNo, '炼器', 'repair_canpian');
+ok(rcLogs.some((l) => l.includes('材料不足')), '残片修复：缺残片时拒绝并提示材料不足');
+const rcEquip = JSON.parse(JSON.stringify(rcBase));
+const rcIdx = rcEquip.items.findIndex((x) => x.名称 === '灵珠法宝');
+S.useItem(rcEquip, rcIdx);
+ok(rcEquip.equipment.artifact && rcEquip.equipment.artifact.名称 === '灵珠法宝' && rcEquip.equipment.artifact.战力 > 0, '残片修复产出可被装备为灵珠法宝，法宝槽战力>0');
+const rcFrag = JSON.parse(JSON.stringify(state));
+rcFrag.items.push({ 名称: '残片法宝', 类型: '材料', 数量: 1, 描述: '法宝残片', 价值: 60 });
+const rcFragIdx = rcFrag.items.length - 1;
+const rcFragRes = S.useItem(rcFrag, rcFragIdx);
+ok(rcFragRes === null && rcFrag.items[rcFragIdx].名称 === '残片法宝', '残片法宝：类型材料不会被误装备/误消耗');
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

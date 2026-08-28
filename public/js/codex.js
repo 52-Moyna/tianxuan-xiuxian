@@ -143,7 +143,7 @@ const EQUIP_GRID = [
   ['accessory', 'lingbao', 'eq_ac_kongjian', '空间戒指', '灵宝', '天命、秘境、拍卖会', '内含独立空间', '储物袋容量+30格'],
   ['accessory', 'xianqi', 'eq_ac_taixu_jie', '太虚戒', '仙器', '飞升机缘、终局', '太虚造化'],
   // —— 法宝（7品阶） ——
-  ['artifact', 'fan', 'eq_af_canpian', '残片法宝', '凡器', '炼器、战利品', '法宝残片，待修复成长'],
+  ['artifact', 'fan', 'eq_af_canpian', '残片法宝', '凡器', '炼器、战利品（游历/秘境掉落）', '法宝残片，可在百艺·炼器「残片修复」（辅以星砂）重铸为可用灵珠法宝。'],
   ['artifact', 'faqi', 'eq_af_lingzhu_fa', '灵珠法宝', '法器', '炼器、坊市', '灵珠形态，可成长'],
   ['artifact', 'lingqi', 'eq_af_baoyin', '宝印法宝', '灵器', '炼器、秘境', '印信形态，威慑力强'],
   ['artifact', 'fabao', 'eq_af_xianjian', '仙剑法宝', '法宝', '秘境、天命', '剑形，攻伐利器'],
