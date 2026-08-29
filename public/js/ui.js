@@ -761,6 +761,21 @@ export function renderAll() {
   } else if (beastRow) {
     beastRow.style.display = 'none';
   }
+  // 聚灵加成常驻显示：服用聚灵丹/布下聚灵阵旗后，未来数月修炼效率 +15%（flags.cultivateBoostMonths），
+  // 此前仅在「修炼」行动预览里可见（聚灵×1.15），切走即不可知；现做英雄卡常驻行，
+  // 延续「跨标签页不可见状态常驻化」主题，让玩家随时知晓聚灵增益还剩几月
+  const julingMonths = (st.flags?.cultivateBoostMonths || 0);
+  const julingRow = document.getElementById('st-juling-row');
+  const julingB = document.getElementById('st-juling');
+  if (julingRow && julingB) {
+    if (julingMonths > 0) {
+      julingRow.style.display = '';
+      julingB.innerHTML = '×1.15 · 余 ' + julingMonths + ' 月';
+      julingB.title = '聚灵加成生效中：修炼效率 +15%（来自聚灵丹或聚灵阵旗），剩余 ' + julingMonths + ' 月后消退';
+    } else {
+      julingRow.style.display = 'none';
+    }
+  }
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {

@@ -474,6 +474,9 @@ button { font-family: inherit; }
 .beast-row { background: linear-gradient(90deg, rgba(116,179,156,.16), rgba(116,179,156,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
 .beast-row .vital-label { color: var(--jade, #74b39c); }
 .beast-row b { color: var(--jade, #74b39c); font-weight: 600; }
+.juling-row { background: linear-gradient(90deg, rgba(126,155,214,.16), rgba(126,155,214,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
+.juling-row .vital-label { color: #7e9bd6; }
+.juling-row b { color: #7e9bd6; font-weight: 600; }
 .omen-ico { margin-right: 2px; }
 /* 危机预警横幅：寿元将尽 / 丹毒攻心时给出可行的延寿·解毒途径 */
 .crisis-banner { margin: 4px 0 2px; padding: 8px 10px; border-radius: 10px; font-size: .8rem; line-height: 1.5; display: flex; flex-direction: column; gap: 5px; }
