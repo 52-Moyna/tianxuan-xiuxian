@@ -2311,6 +2311,20 @@ function studyPreviewGroup() {
 }
 studyPreviewGroup();
 
+/* ---------- 宗门任务 / 兑换所 确定性预览 ---------- */
+{
+  const st = S.createNewGame({ name: '宗门预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  S.joinSect(st, '预览宗门');
+  const normal = S.sectTaskPreview(st, 'escort');
+  ok(normal && normal.contribution > 0 && normal.wuxing[0] === 3 && normal.wuxing[1] === 8 && normal.battle === null, '常规宗门任务预览：贡献>0、悟性 3~8、无战斗');
+  const subdue = S.sectTaskPreview(st, 'subdue');
+  ok(subdue && typeof subdue.battle === 'number' && subdue.battle >= 0 && subdue.battle <= 100, '降服任务预览：返回 0~100 区间预估胜率');
+  ok(S.sectTaskPreview(st, '不存在的任务') === null, '未知任务 id 预览返回 null');
+  const p1 = S.sectTaskPreview(st, 'escort'), p2 = S.sectTaskPreview(st, 'escort');
+  ok(p1.contribution === p2.contribution && p1.wuxing[1] === p2.wuxing[1], '宗门任务预览纯函数：重复调用结果一致（无副作用）');
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

@@ -2886,6 +2886,24 @@ export function doSectTask(state, taskId) {
   return { logs };
 }
 
+/**
+ * 宗门任务奖励确定性预览（与 doSectTask 同口径，不消耗状态、无 RNG）。
+ * - 常规任务：贡献 +X、悟性 +3~8（与 doSectTask 的 Rng.int(3,8) 一致）。
+ * - 「降服试炼恶修」(subdue)：触发战斗，给出基于典型敌人力量的预估胜率。
+ */
+export function sectTaskPreview(state, taskId) {
+  const task = SECT_TASKS.find((t) => t.id === taskId);
+  if (!task) return null;
+  const out = { id: task.id, name: task.name, desc: task.desc, contribution: task.contribution, wuxing: [3, 8], battle: null };
+  if (task.id === 'subdue') {
+    // 代表性试炼恶修：玩家境界 +5、战力约玩家 1.05 倍（对齐 makeEnemy 区间中点）
+    const p = state.player;
+    const enemy = { name: '宗门试炼恶修', level: Math.max(1, p.level + 5), power: Math.max(1, Math.round(p.power * 1.05)), beast: false };
+    out.battle = previewBattle(state, enemy, 'shengci').rate;
+  }
+  return out;
+}
+
 /* ============================================================
  * 十七、拍卖会（竞价玩法）
  * ========================================================== */

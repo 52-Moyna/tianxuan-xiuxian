@@ -1666,15 +1666,24 @@ async function flowSectTask() {
       <button class="btn btn-sm ${st.sect.stipend > 0 ? 'btn-gold' : 'btn-dim'}" data-claimstipend ${st.sect.stipend > 0 ? '' : 'disabled'}>领取俸禄</button>
     </div>
     <div class="choice-intro">选择一个宗门任务执行：</div>
-    ${CX.SECT_TASKS.map((t) => `<div class="sect-task">
-      <div class="codex-body"><b>${t.name}</b><div class="codex-source">${t.desc} ｜ 贡献 +${t.contribution}</div></div>
-      <button class="btn btn-sm btn-gold" data-task="${t.id}">执行</button>
-    </div>`).join('')}
+    ${CX.SECT_TASKS.map((t) => {
+      const pv = S.sectTaskPreview(st, t.id);
+      const reward = pv.battle != null
+        ? `贡献 +${pv.contribution} ｜ 降服试炼恶修（预估胜率 ${pv.battle}%）`
+        : `贡献 +${pv.contribution} ｜ 悟性 +${pv.wuxing[0]}~${pv.wuxing[1]}`;
+      return `<div class="sect-task">
+        <div class="codex-body"><b>${t.name}</b><div class="codex-source">${t.desc}</div><div class="codex-effect">预计奖励：${reward}</div></div>
+        <button class="btn btn-sm btn-gold" data-task="${t.id}">执行</button>
+      </div>`;
+    }).join('')}
     <div class="choice-intro">宗门兑换所（消耗贡献）：</div>
-    ${CX.SECT_EXCHANGE.map((e) => `<div class="sect-task">
-      <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div></div>
-      <button class="btn btn-sm ${st.sect.contribution >= e.cost ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${st.sect.contribution >= e.cost ? '' : 'disabled'}>兑换</button>
-    </div>`).join('')}
+    ${CX.SECT_EXCHANGE.map((e) => {
+      const get = e.type === 'stones' ? `下品灵石 +${e.amount}` : `丹药：${e.item} ×${e.qty || 1}`;
+      return `<div class="sect-task">
+        <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div><div class="codex-effect">可得：${get}</div></div>
+        <button class="btn btn-sm ${st.sect.contribution >= e.cost ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${st.sect.contribution >= e.cost ? '' : 'disabled'}>兑换</button>
+      </div>`;
+    }).join('')}
     <div class="modal-actions"><button class="btn" id="btn-back-sect">返回本月选择</button></div>`,
     { title: '宗门任务', lock: true, cls: 'modal-lg' });
   let settled = false;
