@@ -2376,6 +2376,21 @@ ok(de.buffs && de.buffs.power === 100 && de.buffs.expireMonth === state.world.ye
 ok(isRecipeUnlocked({ player: { level: 21 }, sect: { rank: 0 }, arts: { 炼丹: { level: 0 } }, flags: {} }, '狂战丹') === true, '狂战丹在筑基期（21级）解锁');
 ok(isRecipeUnlocked({ player: { level: 1 }, sect: { rank: 0 }, arts: { 炼丹: { level: 0 } }, flags: {} }, '狂战丹') === false, '狂战丹在低等级未解锁');
 
+// 闭关走火入魔风险预警（纯函数，与修炼弹窗同口径；Lv.30+ 连关满 3 月触发）
+ok(S.seclusionRiskWarning(state).level === 'ok', '低等级无闭关风险预警');
+state.player.level = 35;
+state.flags.seclusionStreak = 0;
+ok(S.seclusionRiskWarning(state).level === 'ok', 'Lv.30+ 连关0月无预警');
+state.flags.seclusionStreak = 1;
+const sw1 = S.seclusionRiskWarning(state);
+ok(sw1.level === 'warn' && sw1.streak === 1 && sw1.text === '连续闭关 1 月', 'Lv.30+ 连关1月 warn');
+state.flags.seclusionStreak = 2;
+const sw2 = S.seclusionRiskWarning(state);
+ok(sw2.level === 'danger' && sw2.streak === 2 && sw2.text === '连续闭关 2 月', 'Lv.30+ 连关2月 danger（再闭关即触发）');
+state.flags.seclusionStreak = 3;
+ok(S.seclusionRiskWarning(state).level === 'danger', 'Lv.30+ 连关3月 danger（必触发走火入魔）');
+state.flags.seclusionStreak = 0;
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

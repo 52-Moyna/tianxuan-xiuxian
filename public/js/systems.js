@@ -612,6 +612,18 @@ export function toxicityWarning(state) {
 }
 
 /** 道基加经验（含升级） */
+/** 闭关走火入魔风险预警（纯函数，不修改状态；供英雄卡常驻展示）。
+ *  真实机制：Lv.30+ 连续闭关（state.flags.seclusionStreak）满 3 月必触发走火入魔（qihuo，渡劫大幅衰减、修为倒退）。
+ *  此前该风险仅在「修炼」弹窗内可见、切走即丢失；现做常驻预警，让玩家随时知晓连关积累。
+ *  level: 'danger' 连关≥2（再闭关即触发）、'warn' 连关≥1（风险积累）、'ok' 安全。 */
+export function seclusionRiskWarning(state) {
+  const p = state.player;
+  const streak = Number(state.flags?.seclusionStreak || 0);
+  if (p.level < 30 || streak < 1) return { level: 'ok', streak: 0, text: '' };
+  if (streak >= 2) return { level: 'danger', streak, text: `连续闭关 ${streak} 月` };
+  return { level: 'warn', streak, text: `连续闭关 ${streak} 月` };
+}
+
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
   const db = state.player.daoBase[name];

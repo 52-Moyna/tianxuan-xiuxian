@@ -793,6 +793,22 @@ export function renderAll() {
       buffRow.style.display = 'none';
     }
   }
+  // 闭关走火入魔风险常驻预警：Lv.30+ 连续闭关（flags.seclusionStreak）满 3 月必触发走火入魔，
+  // 此前该风险仅在「修炼」弹窗内可见、切走即丢失；现做英雄卡常驻行，延续「跨标签页不可见状态常驻化」+「危机预警」主题，
+  // 让玩家随时知晓连关积累，避免误入走火入魔。
+  const seclWarn = S.seclusionRiskWarning(st);
+  const seclRow = document.getElementById('st-seclusion-row');
+  const seclB = document.getElementById('st-seclusion');
+  if (seclRow && seclB) {
+    if (seclWarn.level !== 'ok') {
+      seclRow.style.display = '';
+      seclRow.classList.toggle('danger', seclWarn.level === 'danger');
+      seclB.textContent = seclWarn.text;
+      seclB.title = '连续闭关累积：Lv.30+ 连续闭关满 3 月将触发走火入魔（渡劫大幅衰减、修为倒退）。当前已连续 ' + seclWarn.streak + ' 月，下月再闭关即触发，建议改普通修炼化解。';
+    } else {
+      seclRow.style.display = 'none';
+    }
+  }
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {

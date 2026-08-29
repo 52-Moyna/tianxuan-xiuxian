@@ -480,6 +480,10 @@ button { font-family: inherit; }
 .buff-row { background: linear-gradient(90deg, rgba(224,138,74,.16), rgba(224,138,74,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
 .buff-row .vital-label { color: #e08a4a; }
 .buff-row b { color: #e08a4a; font-weight: 600; }
+.seclusion-row { border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
+.seclusion-row .vital-label { color: var(--gold, #d4af37); }
+.seclusion-row b { color: var(--gold, #d4af37); font-weight: 600; }
+.seclusion-row.danger .vital-label, .seclusion-row.danger b { color: var(--danger); }
 .omen-ico { margin-right: 2px; }
 /* 危机预警横幅：寿元将尽 / 丹毒攻心时给出可行的延寿·解毒途径 */
 .crisis-banner { margin: 4px 0 2px; padding: 8px 10px; border-radius: 10px; font-size: .8rem; line-height: 1.5; display: flex; flex-direction: column; gap: 5px; }
