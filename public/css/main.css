@@ -496,6 +496,8 @@ button { font-family: inherit; }
 .stat b { margin-left: auto; font-size: .9rem; color: var(--text); }
 .stat.wide { grid-column: 1 / -1; }
 .stat.wide b { font-weight: 600; }
+.stat.has-ward { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--bg-2)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent); }
+.stat.has-ward .stat-label { color: var(--gold); }
 
 /* 灵根 / 道韵卡片：纵向展示，元素用 chip，观感更清晰 */
 .stat.root-stat, .stat.yun-stat {

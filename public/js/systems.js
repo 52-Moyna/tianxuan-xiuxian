@@ -1855,6 +1855,13 @@ export function performAction(state, option, extra = {}) {
  * 完成后进入冷却，防止无限刷取，使委托成为持续但克制的长期玩法。*/
 export const COMMISSION_COOLDOWN = 3;
 
+// 护身类道具（败北时自动消耗一件替你挡灾）：用于英雄卡常驻展示
+// 名称与 resolveBattle 的 wardKind 判定保持一致（高阶护身符挡重伤+护灵石，其余挡重伤）
+export const WARD_ITEM_NAMES = ['护身符', '低阶护身符', '低阶符箓', '简易阵旗'];
+export function wardItems(state) {
+  return (state.items || []).filter((x) => WARD_ITEM_NAMES.includes(x.名称));
+}
+
 function countItem(state, name) {
   return (state.items || []).filter((x) => x.名称 === name).reduce((s, x) => s + (Number(x.数量) || 1), 0);
 }

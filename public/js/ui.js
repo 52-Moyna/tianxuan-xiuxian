@@ -841,6 +841,22 @@ export function renderAll() {
   $('#st-arts').textContent = arts || '尚未涉猎';
   renderChronicle();
 
+  // 护身道具常驻显示（败北时自动挡灾，跨标签页可见）
+  const wardHeld = S.wardItems(st);
+  const wardCount = wardHeld.reduce((s, x) => s + (Number(x.数量) || 1), 0);
+  const wardStatEl = document.getElementById('st-ward');
+  if (wardStatEl) {
+    wardStatEl.textContent = wardCount > 0 ? wardCount + ' 件' : '0';
+    const wardTile = document.getElementById('st-ward-stat');
+    if (wardTile) {
+      wardTile.classList.toggle('has-ward', wardCount > 0);
+      const hasHigh = wardHeld.some((x) => x.名称 === '护身符');
+      wardTile.title = wardCount > 0
+        ? '持有护身道具 ' + wardCount + ' 件' + (hasHigh ? '（含高阶护身符：败北时挡重伤并护住灵石）' : '（败北时自动消耗一件替你挡去重伤）')
+        : '未持有护身道具：败北将直接承受重伤与损失，可在坊市或结交道友处获取';
+    }
+  }
+
   // 道基条
   const daoBaseTotal = Object.values(p.daoBase || {}).reduce((s, v) => s + (v.level || 0), 0);
   const milestone = D.getDaoBaseMilestoneBonus ? D.getDaoBaseMilestoneBonus(daoBaseTotal) : null;
