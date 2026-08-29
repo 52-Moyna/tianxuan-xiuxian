@@ -731,6 +731,19 @@ export function renderAll() {
   const toxWarn = S.toxicityWarning(st);
   const toxEl = $('#st-toxic'); if (toxEl) toxEl.textContent = `${toxWarn.toxic}`;
   const toxRow = $('#st-toxic-row'); if (toxRow) toxRow.classList.toggle('danger', toxWarn.level !== 'ok');
+  // 天机运势常驻显示：卜算所得的 omen 加成跨月生效，玩家在任意标签页都能看到当前运势（影响修炼/灵草/商道/悟性），弥补仅仙途新闻列表可见的不足
+  const omenNow = st.flags?.omen && omenActive(st) ? st.flags.omen : null;
+  const omenRow = $('#st-omen-row');
+  const omenB = $('#st-omen');
+  if (omenRow && omenB) {
+    if (omenNow) {
+      omenRow.style.display = '';
+      omenB.innerHTML = `<span class="omen-ico">${omenNow.icon}</span>${omenNow.label}`;
+      omenB.title = `${omenNow.desc}（生效至 ${omenNow.expireYear}年${omenNow.expireMonth}月）`;
+    } else {
+      omenRow.style.display = 'none';
+    }
+  }
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
