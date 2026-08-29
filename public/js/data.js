@@ -331,6 +331,7 @@ export const PILL_RECIPES = {
   炎玉丹: { id: '炎玉丹', name: '炎玉丹', icon: '🟤', tier: 6, need: { '炎玉灵枣': 1, '火精枣': 2 }, stoneCost: 80, months: 2, baseRate: 78, effect: { daoBase: { keys: ['根骨', '道心'], min: 4, max: 8 } }, toxicity: 16, output: { name: '炎玉丹', type: '丹药', value: 300, desc: '炎玉灵枣温补根基，服用后随机提升一项道基 4~8 级。' } },
   玉华丹: { id: '玉华丹', name: '玉华丹', icon: '🟡', tier: 7, need: { '玉华灵髓': 1, '玉髓芝': 1 }, stoneCost: 120, months: 3, baseRate: 74, effect: { daoBase: { keys: ['悟性', '气运'], min: 5, max: 10 } }, toxicity: 18, output: { name: '玉华丹', type: '丹药', value: 360, desc: '玉华灵髓凝练的圣丹，服用后随机提升一项道基 5~10 级。' } },
   露华丹: { id: '露华丹', name: '露华丹', icon: '💧', tier: 8, need: { '露华玉液': 1, '天材地宝·月华露': 1 }, stoneCost: 160, months: 3, baseRate: 70, effect: { heal: true, wuxing: 200 }, toxicity: 8, output: { name: '露华丹', type: '丹药', value: 420, desc: '露华玉液所化玉丹，服用后伤势尽去、悟性经验 +200。' } },
+  狂战丹: { id: '狂战丹', name: '狂战丹', icon: '🔴', tier: 6, need: { '凝火奇实': 1, '火精枣': 2, '星砂': 1 }, stoneCost: 90, months: 2, baseRate: 76, effect: { power: 150, powerMonths: 3 }, toxicity: 14, output: { name: '狂战丹', type: '丹药', value: 280, desc: '燃血狂战之丹，服用后未来 3 月战力临时 +150；连续服用会累积丹毒。' } },
 };
 /** 丹方解锁门槛说明（供 UI 提示） */
 export const PILL_UNLOCK_HINT = {
@@ -345,6 +346,7 @@ export const PILL_UNLOCK_HINT = {
   炎玉丹: '金丹期（40级）、宗门内门（rank2）或累计炼丹 15 炉解锁，需炎玉灵枣（灵草杂交）。',
   玉华丹: '金丹期（40级）或宗门核心（rank3）解锁，需玉华灵髓（灵草杂交）。',
   露华丹: '元婴期（60级）或宗门核心（rank3）解锁，需露华玉液（灵草杂交）。',
+  狂战丹: '筑基期（21级）或炼丹百艺小成（Lv.2）解锁，需凝火奇实/火精枣/星砂。',
 };
 
 /* ---------------- 封号 / 称号系统 ----------------

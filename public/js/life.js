@@ -250,6 +250,9 @@ export function ensureLifeState(state) {
   ensureAuctionState(state);
   ensureCodexState(state);
   state.flags = state.flags || {};
+  state.buffs = (state.buffs && typeof state.buffs === 'object') ? state.buffs : {};
+  state.buffs.power = Number(state.buffs.power) || 0;
+  state.buffs.expireMonth = Number(state.buffs.expireMonth) || 0;
   if (state.flags.omen && typeof state.flags.omen !== 'object') state.flags.omen = null;
   state.flags.pillToxicity = Math.max(0, Number(state.flags.pillToxicity) || 0);
   state.flags.seclusionStreak = Math.max(0, Number(state.flags.seclusionStreak) || 0);
@@ -757,6 +760,7 @@ export function isRecipeUnlocked(state, recipeId) {
     case '炎玉丹': return lvl >= 40 || sectRank >= 2 || (state.flags?.refinedPills || 0) >= 15;
     case '玉华丹': return lvl >= 40 || sectRank >= 3;
     case '露华丹': return lvl >= 60 || sectRank >= 3;
+    case '狂战丹': return lvl >= 21 || artLv >= 2;
     default: return false;
   }
 }

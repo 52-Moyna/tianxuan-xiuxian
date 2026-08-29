@@ -53,7 +53,7 @@ function fresh() {
   base.items = [];
   base.flags = base.flags || {};
   const rWeak = S.breakthroughRate(base);
-  base.buffs = { power: 5000 }; // 丹药增益计入战力，验证渡劫参考战力
+  base.buffs = { power: 5000, expireMonth: 99999 }; // 丹药增益计入战力（未过期），验证渡劫参考战力
   const rStrong = S.breakthroughRate(base);
   ok(rStrong > rWeak, `渡劫成功率随战力提升（弱${rWeak}% → 强${rStrong}%）`);
 }

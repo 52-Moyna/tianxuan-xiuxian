@@ -2345,6 +2345,37 @@ studyPreviewGroup();
   ok(S.wardItems(st).length === 3, '护身计数：非护身类物品（丹药）不计入统计');
 }
 
+/* ---------- 临时战力增益（丹药增益 buff） ---------- */
+// 直接构造一颗狂战丹并服用，验证 buff 生效、战力提升、跨月过期、存档往返、解锁判定
+const beforePower = S.calcPower(state);
+state.items.push({ 名称: '狂战丹', 类型: '丹药', 数量: 1, 描述: '测试', effect: { power: 150, powerMonths: 3 }, toxicity: 0 });
+const buffIdx = state.items.length - 1;
+const buffLogs = S.useItem(state, buffIdx);
+ok(buffLogs && buffLogs.some((l) => l.includes('战力临时')), '服用战力丹写入临时增益日志');
+ok(state.buffs && state.buffs.power === 150, 'buffs.power 已置为 150');
+ok(state.buffs && state.buffs.expireMonth === state.world.year * 12 + state.world.month + 3, 'buffs 过期月份=当前+3');
+ok(S.calcPower(state) === beforePower + 150, '临时战力增益已计入 calcPower（+150）');
+const buffBd = S.powerBreakdown(state);
+ok(buffBd.items.find((x) => x.label === '丹药增益').value === 150, '战力拆解丹药增益项=150');
+ok(S.activeBuffPower(state) === 150, 'activeBuffPower 返回当前增益 150');
+// 跨月推进 3 个月后过期
+for (let i = 0; i < 3; i++) { state.world.month++; if (state.world.month > 12) { state.world.month = 1; state.world.year++; } }
+S.refreshDerived(state);
+ok(S.activeBuffPower(state) === 0, '3 月后临时增益过期（activeBuffPower=0）');
+ok(S.calcPower(state) === beforePower, '过期后战力回落至服用前');
+// 存档往返（过期态应被清理为 power=0）
+let ser = serialize(state);
+let de = deserialize(ser);
+ok(de.buffs && de.buffs.power === 0, '存档往返：过期态 buffs.power=0');
+// 未过期 buff 持久化
+state.buffs = { power: 100, expireMonth: state.world.year * 12 + state.world.month + 2 };
+ser = serialize(state);
+de = deserialize(ser);
+ok(de.buffs && de.buffs.power === 100 && de.buffs.expireMonth === state.world.year * 12 + state.world.month + 2, '未过期 buff 存档往返正确');
+// 解锁判定：筑基期（21级）解锁、低等级不解锁
+ok(isRecipeUnlocked({ player: { level: 21 }, sect: { rank: 0 }, arts: { 炼丹: { level: 0 } }, flags: {} }, '狂战丹') === true, '狂战丹在筑基期（21级）解锁');
+ok(isRecipeUnlocked({ player: { level: 1 }, sect: { rank: 0 }, arts: { 炼丹: { level: 0 } }, flags: {} }, '狂战丹') === false, '狂战丹在低等级未解锁');
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

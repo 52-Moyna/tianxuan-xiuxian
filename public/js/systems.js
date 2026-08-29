@@ -50,6 +50,22 @@ export function realmLevelName(level) {
 /** 套装共鸣战力封顶：防止多套装叠加使战力无上限膨胀，保持战力平衡。 */
 const SET_POWER_CAP = 30;
 
+/** 当前生效的临时战力增益（来自战力类丹药 buff）。
+ *  state.buffs = { power, expireMonth }，expireMonth 为全局月序号 year*12+month；
+ *  超过 expireMonth 即视为过期，返回 0（此前该字段恒为 0，是死字段）。 */
+export function activeBuffPower(state) {
+  const b = state.buffs;
+  if (!b || !b.power) return 0;
+  const cur = (state.world.year * 12) + state.world.month;
+  return cur < b.expireMonth ? b.power : 0;
+}
+/** 临时战力增益剩余月数（过期返回 0），供战力拆解与英雄卡显示。 */
+export function buffMonthsLeft(state) {
+  const b = state.buffs;
+  if (!b || !b.power) return 0;
+  const cur = (state.world.year * 12) + state.world.month;
+  return Math.max(0, b.expireMonth - cur);
+}
 export function calcPower(state) {
   ensureLifeState(state);
   const p = state.player;
@@ -69,7 +85,7 @@ export function calcPower(state) {
   const setFlags = setBonusFlags(state);
   const setBonus = Math.min(setFlags.power || 0, SET_POWER_CAP);
   const daoYunPower = (p.daoYun?.level || 0) * 3;
-  const pillPower = (state.buffs?.power || 0);
+  const pillPower = activeBuffPower(state);
   // 道基根基：每级 0.5 战力（向下取整），避免初始道基等级堆出过半总战力。
   const daoBasePower = Math.floor(totalDaoBaseLevel(state) * 0.5);
   const milestone = getDaoBaseMilestoneBonus(totalDaoBaseLevel(state));
@@ -105,7 +121,7 @@ export function powerBreakdown(state) {
   const setFlags = setBonusFlags(state);
   const setBonus = Math.min(setFlags.power || 0, SET_POWER_CAP);
   const daoYunPower = (p.daoYun?.level || 0) * 3;
-  const pillPower = (state.buffs?.power || 0);
+  const pillPower = activeBuffPower(state);
   // 道基根基：每级 0.5 战力（向下取整），避免初始道基等级堆出过半总战力。
   const daoBasePower = Math.floor(totalDaoBaseLevel(state) * 0.5);
   const milestone = getDaoBaseMilestoneBonus(totalDaoBaseLevel(state));
@@ -119,7 +135,7 @@ export function powerBreakdown(state) {
     { label: '灵兽助阵', value: beastPowerVal, hint: `${state.beasts?.slots?.length || 0} 只` },
     { label: '套装共鸣', value: setBonus, hint: setBonus > 0 ? '已激活' : '无' },
     { label: '先天道韵', value: daoYunPower, hint: p.daoYun?.name || '未觉醒' },
-    { label: '丹药增益', value: pillPower, hint: pillPower ? '临时' : '无' },
+    { label: '丹药增益', value: pillPower, hint: pillPower ? ('临时·余' + buffMonthsLeft(state) + '月') : '无' },
     { label: '道基根基', value: daoBasePower, hint: `总 Lv.${totalDaoBaseLevel(state)}` },
   ];
   const totalRaw = items.reduce((s, it) => s + it.value, 0);
@@ -133,6 +149,12 @@ export function refreshDerived(state) {
   state.player.power = calcPower(state);
   state.player.lifespan = realmOf(state.player.level).life + (state.player.lifeBonus || 0);
   checkTitles(state); // 幂等：达成即授予封号
+  // 临时战力增益到期清理：到期后将 buff 清零，避免 state.buffs 长期残留过期数值
+  const _bf = state.buffs;
+  if (_bf && _bf.power) {
+    const _cur = (state.world.year * 12) + state.world.month;
+    if (_cur >= _bf.expireMonth) { _bf.power = 0; _bf.expireMonth = 0; }
+  }
 }
 
 /**
@@ -443,6 +465,7 @@ export function createNewGame(opts) {
       return eq;
     })(),
     flags: { focusMonths: 0, lastFocus: '', noGuideMonths: 0, wounded: 0, companion: '', companionMonths: 0 },
+    buffs: { power: 0, expireMonth: 0 },
     chronicle: [],
     settings: { avatarPreset: 'sword' },
     logs: [],
@@ -2260,6 +2283,17 @@ export function useItem(state, idx) {
     const m = it.effect.cultivateBoostMonths;
     state.flags.cultivateBoostMonths = Math.max(state.flags.cultivateBoostMonths || 0, m);
     logs.push(`灵力充盈，未来 ${m} 月修炼效率提升。`);
+  }
+  // 临时战力增益：服用后未来若干月战力临时提升（state.buffs.power），过期自动失效。
+  // 此前该字段在 calcPower 中恒为 0（死字段），现接入真实丹药效果（如狂战丹），
+  // 让「丹药增益」战力拆解项与英雄卡不再恒显「无」。
+  if (it.effect.power) {
+    const months = it.effect.powerMonths || 1;
+    const cur = state.world.year * 12 + state.world.month;
+    state.buffs = state.buffs || { power: 0, expireMonth: 0 };
+    state.buffs.power = Math.max(state.buffs.power || 0, it.effect.power);
+    state.buffs.expireMonth = Math.max(state.buffs.expireMonth || 0, cur + months);
+    logs.push(`药力激荡，未来 ${months} 月战力临时 +${it.effect.power}。`);
   }
   // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖。
   // 图鉴承诺「一生最多服用 3 颗」：对延寿丹按当前轮回计数，满 3 则经脉难承、本次服用失效（不消耗、不累加）。

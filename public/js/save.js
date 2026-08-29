@@ -172,6 +172,8 @@ export function serialize(state) {
         道侣: state.flags?.companion || '',
         同行月数: state.flags?.companionMonths || 0,
         秘境最深: state.flags?.mysticDeepest || 0,
+        丹药增益: state.buffs?.power || 0,
+        增益到期月: state.buffs?.expireMonth || 0,
       },
     },
     '图鉴.ini': {
@@ -285,6 +287,7 @@ export function deserialize(files) {
       news: get('世界.ini', '演化').近期动态 || [],
     },
     flags: { focusMonths: 0, lastFocus: '', noGuideMonths: 0, wounded: 0, companion: '', companionMonths: 0 },
+    buffs: { power: Number(get('设置.ini', '标记状态').丹药增益) || 0, expireMonth: Number(get('设置.ini', '标记状态').增益到期月) || 0 },
     chronicle: [],
     settings: { ...get('设置.ini', '游戏设置') },
     logs: [],

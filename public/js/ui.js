@@ -776,6 +776,23 @@ export function renderAll() {
       julingRow.style.display = 'none';
     }
   }
+  // 临时战力增益常驻显示：服用战力类丹药（如狂战丹）后，未来数月战力临时提升（state.buffs.power），
+  // 此前该状态完全不可见（且 calcPower 中恒为 0，是死字段）；现做英雄卡常驻行，
+  // 延续「跨标签页不可见状态常驻化」主题，让玩家随时知晓临时战力增益还剩几月
+  const buffPower = S.activeBuffPower(st);
+  const buffRow = document.getElementById('st-buff-row');
+  const buffB = document.getElementById('st-buff');
+  if (buffRow && buffB) {
+    if (buffPower > 0) {
+      const cur = st.world.year * 12 + st.world.month;
+      const buffLeft = Math.max(0, (st.buffs?.expireMonth || 0) - cur);
+      buffRow.style.display = '';
+      buffB.innerHTML = '战力+' + buffPower + ' · 余 ' + buffLeft + ' 月';
+      buffB.title = '临时战力增益生效中：战力 +' + buffPower + '，剩余 ' + buffLeft + ' 月后消退（服用战力类丹药获得）';
+    } else {
+      buffRow.style.display = 'none';
+    }
+  }
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
