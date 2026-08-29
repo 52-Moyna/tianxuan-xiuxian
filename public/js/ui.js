@@ -799,6 +799,22 @@ export function renderAll() {
   $('#tb-loc').innerHTML = `${ICO('<path d="M12 22s7-6 7-12a7 7 0 1 0-14 0c0 6 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>')}${w.region}`;
   $('#tb-stones').innerHTML = `${ICO('<path d="M6 3h12l3 6-9 12L3 9z"/>')}${fmtStonesShort()}`;
   $('#tb-code').innerHTML = `${ICO('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9l-3 3 3 3M16 9l3 3-3 3"/>')}道果码 ${st.meta.saveCode}`;
+  // 顶栏「灵草园成熟」常驻提示：灵草园成熟状态此前仅洞府页可见，切走即不可知；
+  // 此处把「已成熟可收获」做成全局 chip，点击直达洞府一键收获（延续跨标签页不可见状态常驻化主题）
+  const herbGarden = (st.cave && Array.isArray(st.cave.garden)) ? st.cave.garden : [];
+  const matureCount = herbGarden.filter((h) => h.progress >= h.grow).length;
+  const herbChip = document.getElementById('tb-herb');
+  if (herbChip) {
+    if (matureCount > 0) {
+      herbChip.style.display = '';
+      herbChip.innerHTML = `${ICO('<path d="M12 22c0-6 4-10 8-12-3 1-6 3-8 6-2-3-5-5-8-6 4 2 8 6 8 12z"/>')}灵草园 ${matureCount} 株待收`;
+      herbChip.classList.add('tb-clickable');
+      herbChip.title = `灵草园有 ${matureCount} 株灵草已成熟，点击前往洞府一键收获`;
+      herbChip.onclick = () => { if (typeof setSideTab === 'function') setSideTab('cave'); };
+    } else {
+      herbChip.style.display = 'none';
+    }
+  }
 
   // 状态卡
   const need = S.expNeed(p.level);

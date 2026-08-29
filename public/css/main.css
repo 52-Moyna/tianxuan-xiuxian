@@ -364,6 +364,10 @@ button { font-family: inherit; }
 .tb-chip .ico { width: 14px; height: 14px; }
 .tb-stones { color: var(--gold); border-color: var(--gold-soft); }
 .tb-code { color: var(--jade); }
+.tb-herb { color: var(--jade); border-color: var(--jade-soft); }
+.tb-clickable { cursor: pointer; }
+.tb-clickable:hover { filter: brightness(1.12); }
+
 .tb-life.danger { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); }
 .tb-wounded { color: var(--warn); border-color: var(--warn); background: rgba(220,180,70,.1); font-weight: 600; }
 /* 气血条 */
