@@ -744,6 +744,23 @@ export function renderAll() {
       omenRow.style.display = 'none';
     }
   }
+  // 出战灵兽常驻显示：当前出战灵兽的护主加成与伴生天赋生死攸关（如涅槃残焰渡劫保命），
+  // 玩家在任意标签页都能看到是哪只灵兽在护主，弥补仅灵兽面板可见、切标签页即丢失的不足
+  const beastRow = $('#st-beast-row');
+  const beastB = $('#st-beast');
+  const beastsState = st.beasts;
+  if (beastRow && beastB && beastsState && beastsState.activeIdx != null && beastsState.activeIdx >= 0 && beastsState.slots && beastsState.slots[beastsState.activeIdx]) {
+    const ab = beastsState.slots[beastsState.activeIdx];
+    const abElem = ({ 风: '🌪️', 土: '🪨', 幻: '👻', 雷: '⚡', 水: '💧', 火: '🔥' })[ab.element] || '✨';
+    const abBonus = S.activeBeastBonus(st);
+    const abSkill = S.activeBeastSkill(st);
+    const abTalent = abSkill ? (BEAST_TALENT_TEXT[abSkill] || '') : '';
+    beastRow.style.display = '';
+    beastB.innerHTML = abElem + ' ' + ab.name;
+    beastB.title = '出战灵兽「' + ab.name + '」' + ab.element + '系·★' + (ab.star || 1) + '｜护主胜率 +' + abBonus + '%（出战）' + (abTalent ? '｜天赋：' + abTalent : '') + '｜灵兽面板可更换';
+  } else if (beastRow) {
+    beastRow.style.display = 'none';
+  }
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
