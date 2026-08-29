@@ -454,6 +454,9 @@ export function createNewGame(opts) {
       state.inventory.bagName = bagNameByCapacity(100, '乾坤储物袋');
     }
   }
+  // 修复：主修功法同时写入 player.mainTechnique（与全部读取点/UI「设为主修」一致），
+  // 否则新游戏开局主修功法不会被功法加成与研读逻辑识别。
+  state.player.mainTechnique = startTechName;
   ensureLifeState(state);
   refreshDerived(state);
   return state;
@@ -534,6 +537,22 @@ export function cultivateGainPreview(state, mode = 'normal') {
     mode, base, rootMul, caveMul, sectBonus, gradeMul, boneMul, toxicMul, boostMul, omen, gain,
     note,
   };
+}
+
+/**
+ * 研读功法（study）行动确定性收益预览（不改动 state）。
+ * 主修功法经验固定 +40、临界则可能突破；悟性按真实区间 8~15 展示（不造假、无 RNG）。
+ */
+export function studyGainPreview(state) {
+  const tech = state.techniques.find((t) => t.名称 === (state.player.mainTechnique || state.mainTechnique));
+  if (!tech) return '尚未主修功法，研读仅得悟性';
+  const g = TECHNIQUE_GRADES.find((x) => x.name === (tech.品级 || '凡品'));
+  const maxLv = g ? g.maxLv : 99;
+  if (tech.等级 >= maxLv) return `《${tech.名称}》已至${tech.品级}瓶颈，研读难有寸进（仅得悟性）`;
+  const need = tech.等级 * 20;
+  const after = tech.经验 + 40;
+  const breakHint = after >= need ? `研读后将突破至第${tech.等级 + 1}层` : `距突破还差${need - after}经验`;
+  return `研读《${tech.名称}》·功法经验+40（需${need}）｜${breakHint}｜悟性+（8~15）`;
 }
 
 /** 寿元危机预警（纯函数，不修改状态；供状态卡展示）。
@@ -1333,6 +1352,7 @@ export function generateCompass(state) {
     if (o.action.type === 'breakthrough') return { ...o, preview: '高风险：成功跨越瓶颈，失败会损失修为' };
     if (o.action.type === 'destiny') return { ...o, preview: destinyRewardPreview(state) };
     if (o.action.type === 'art') return { ...o, preview: '收益：技艺经验与灵石；可返回重新选择' };
+    if (o.action.type === 'study') return { ...o, preview: studyGainPreview(state) };
     return { ...o, preview: '收益：推进本月状态与世界变化' };
   });
 }

@@ -2,7 +2,7 @@
  * test-codex.mjs - 图鉴与新增玩法专项测试
  */
 import { createNewGame, cultivate, performAction, resolveBattle, makeEnemy, useItem, buyItem, equipGear, tameBeast, exploreMysticRealm, joinSect, doSectTask, openAuction, placeBid, calcPower, powerBreakdown } from '../public/js/systems.js';
-import { ensureCodexState, discoverItem, codexEntries, codexStats, activeSetBonuses, setBonusFlags, realmGuide, rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState, achievementView, checkAchievements, claimAchievement, claimAllAchievements } from '../public/js/codex.js';
+import { ensureCodexState, discoverItem, codexEntries, codexStats, activeSetBonuses, setBonusFlags, realmGuide, rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState, achievementView, checkAchievements, claimAchievement, claimAllAchievements, ACHIEVEMENTS } from '../public/js/codex.js';
 import { ensureLifeState, storeItem, ART_RECIPES } from '../public/js/life.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
@@ -169,11 +169,14 @@ ok('丹药使用返回logs', Array.isArray(useLogs) && useLogs.length > 0);
   // 存档往返后 claimed 持久化
   const reS = deserialize(serialize(s));
   ok('领取状态存读档持久化', achievementView(reS).find((a) => a.id === 'start').claimed === true);
-  // 一键领取：reS 中 start 已领取，仅强制解锁「富甲一方」(reward 1000) 可领
+  // 一键领取：reS 中 start 已领取；mainTech（选定主修功法）与富甲一方为未领，合计发放
   reS.achievements.push({ id: 'rich', name: '富甲一方', icon: '💰', time: '测试' });
   const stonesBeforeAll = reS.currencies['下品灵石'];
+  const unclaimedRewards = reS.achievements
+    .filter((a) => !a.claimed)
+    .reduce((sum, a) => sum + (ACHIEVEMENTS.find((x) => x.id === a.id)?.reward?.stones || 0), 0);
   const ra = claimAllAchievements(reS);
-  ok('一键领取发放剩余未领奖励(1000)', ra.ok && ra.total === 1000 && reS.currencies['下品灵石'] === stonesBeforeAll + 1000);
+  ok('一键领取发放剩余未领奖励(含mainTech+富甲一方)', ra.ok && ra.total === unclaimedRewards && reS.currencies['下品灵石'] === stonesBeforeAll + unclaimedRewards);
   ok('一键领取后均标记claimed', achievementView(reS).find((a) => a.id === 'rich').claimed === true);
   const ra2 = claimAllAchievements(reS);
   ok('无未领奖励时一键领取返回ok=false', !ra2.ok);

@@ -236,6 +236,8 @@ export function ensureLifeState(state) {
   state.settings = { animations: true, autoSave: true, textSize: 'normal', ...state.settings };
   // 道基明细归一化：旧档 daoBase 可能缺键，缺失则按默认补齐，避免后续按 '根骨'/'道心'/'气运' 等取值崩溃
   state.player = state.player || {};
+  // 主修功法兼容归一：旧档可能仅存顶层 state.mainTechnique，读取点统一用 player.mainTechnique
+  if (!state.player.mainTechnique && state.mainTechnique) state.player.mainTechnique = state.mainTechnique;
   state.player.daoBase = state.player.daoBase || {};
   for (const b of DAO_BASES) if (!state.player.daoBase[b.name]) state.player.daoBase[b.name] = { level: 1, exp: 0 };
   // 封号系统状态标准化（旧档若无 titles 字段，初始化为空）

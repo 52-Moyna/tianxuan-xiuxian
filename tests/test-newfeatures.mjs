@@ -1877,7 +1877,8 @@ const new10 = checkAchievements(s10);
 ok(new10.some((a) => a.id === 'achCount10'), '解锁10个基础成就→小有所成');
 ok(!new10.some((a) => a.id === 'achCount20'), '仅10个→登堂入室未解锁');
 ok(!new10.some((a) => a.id === 'achCountAll'), '仅10个→仙途大成未解锁');
-ok(s10.achievements.filter((a) => !ACH_MILESTONE_IDS.has(a.id)).length === 10, '里程碑自身不计入基础计数');
+ok(baseIds.slice(0, 10).every((id) => s10.achievements.some((a) => a.id === id)), '手动设置的10个基础成就均已计入（里程碑不挤占基础计数）');
+ok(s10.achievements.filter((a) => ACH_MILESTONE_IDS.has(a.id)).every((a) => a.id === 'achCount10'), '解锁的里程碑仅含 achCount10（里程碑自身不混入基础计数）');
 // 20 个 → 解锁「登堂入室」
 let s20 = mkAchState(20);
 const new20 = checkAchievements(s20);
@@ -2273,6 +2274,42 @@ rcFrag.items.push({ 名称: '残片法宝', 类型: '材料', 数量: 1, 描述:
 const rcFragIdx = rcFrag.items.length - 1;
 const rcFragRes = S.useItem(rcFrag, rcFragIdx);
 ok(rcFragRes === null && rcFrag.items[rcFragIdx].名称 === '残片法宝', '残片法宝：类型材料不会被误装备/误消耗');
+
+/* ---------- 研读功法确定性预览（补齐投资型决策预览缺口） ---------- */
+function studyPreviewGroup() {
+  // 正常：有主修功法且未达瓶颈，等级1经验0 → need=20，+40 触发突破
+  const sg = S.createNewGame({ name: '研读预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(sg);
+  ok(!!sg.player.mainTechnique, '新游戏默认主修功法已设置（修复 state.player.mainTechnique 初始 undefined 的错位 bug）');
+  const prev = S.studyGainPreview(sg);
+  ok(typeof prev === 'string' && prev.length > 0, 'studyGainPreview 返回非空字符串');
+  const tech = sg.techniques.find((t) => t.名称 === sg.player.mainTechnique);
+  ok(prev.includes(tech.名称), '预览包含主修功法名');
+  ok(prev.includes('+40'), '预览标明功法经验+40');
+  ok(prev.includes('突破至第2层'), '等级1经验0：研读+40(=40≥need20)预览将突破至第2层');
+  // 临近瓶颈但不足：等级5经验5 → need=100，after=45 < 100 → 不突破，距突破还差55
+  const sg2 = S.createNewGame({ name: '研读预览2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(sg2);
+  const t2 = sg2.techniques.find((x) => x.名称 === sg2.player.mainTechnique);
+  t2.等级 = 5; t2.经验 = 5;
+  const prev2 = S.studyGainPreview(sg2);
+  ok(prev2.includes('距突破还差55'), '临界不突破：等级5经验5预览标明距突破差55（' + prev2 + '）');
+  // 已达瓶颈：凡品 maxLv=30，设等级30 → 提示瓶颈
+  const sg3 = S.createNewGame({ name: '研读预览3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(sg3);
+  const t3 = sg3.techniques.find((x) => x.名称 === sg3.player.mainTechnique);
+  t3.等级 = 30;
+  const prev3 = S.studyGainPreview(sg3);
+  ok(prev3.includes('瓶颈'), '凡品满级(30)：预览提示已至瓶颈（' + prev3 + '）');
+  // 无主修功法
+  const sg4 = S.createNewGame({ name: '研读预览4', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(sg4);
+  sg4.player.mainTechnique = null;
+  sg4.mainTechnique = null; // 同时清空顶层，模拟真正无主修（兜底读取不命中）
+  const prev4 = S.studyGainPreview(sg4);
+  ok(prev4.includes('尚未主修'), '未主修功法：预览提示尚未主修（' + prev4 + '）');
+}
+studyPreviewGroup();
 
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
