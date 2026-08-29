@@ -2391,6 +2391,17 @@ state.flags.seclusionStreak = 3;
 ok(S.seclusionRiskWarning(state).level === 'danger', 'Lv.30+ 连关3月 danger（必触发走火入魔）');
 state.flags.seclusionStreak = 0;
 
+
+// 战力构成摘要（英雄卡战力悬浮拆解，纯函数、与 powerBreakdown 同口径）
+const ps = S.powerSummary(state);
+ok(typeof ps === 'string' && ps.includes('境界修为') && ps.includes('合计'), '战力构成摘要含各项与合计');
+const _bd = S.powerBreakdown(state);
+ok(ps.includes(`合计 ${_bd.total}`), '战力构成摘要合计与 powerBreakdown 一致');
+state.buffs = { power: 120, expireMonth: state.world.year * 12 + state.world.month + 3 };
+const ps2 = S.powerSummary(state);
+ok(ps2.includes('丹药增益 120'), '战力构成摘要含临时丹药增益');
+state.buffs = { power: 0, expireMonth: 0 };
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

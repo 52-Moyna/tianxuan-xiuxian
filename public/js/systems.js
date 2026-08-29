@@ -143,6 +143,19 @@ export function powerBreakdown(state) {
   return { items, daoBaseMul, milestone: milestone ? milestone.name : null, total };
 }
 
+/**
+ * 战力构成摘要：取 powerBreakdown 逐项拆解，格式化为单行纯文本，
+ * 供英雄卡「战力」数值悬浮展示（信息透明，延续确定性预览主题）。
+ * 例如「境界修为 123｜灵根资质 56｜… ‖ 合计 1234（×1.00）」。
+ */
+export function powerSummary(state) {
+  const bd = powerBreakdown(state);
+  const lines = bd.items.map((it) => `${it.label} ${it.value}`).join('｜');
+  const mul = bd.daoBaseMul !== 1 ? `（×${bd.daoBaseMul.toFixed(2)}）` : '';
+  const ms = bd.milestone ? ` · 道基里程碑「${bd.milestone}」` : '';
+  return `${lines} ‖ 合计 ${bd.total}${mul}${ms}`;
+}
+
 export function refreshDerived(state) {
   ensureLifeState(state);
   state.player.realmName = realmOf(state.player.level).name;

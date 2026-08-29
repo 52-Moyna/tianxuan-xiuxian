@@ -1466,6 +1466,9 @@ button { font-family: inherit; }
   font-size: 1.02rem;
   color: var(--gold);
 }
+/* 战力数值可点击：悬浮看十维拆解、点击直达战力构成面板 */
+#st-power.clickable-stat { cursor: pointer; border-bottom: 1px dotted currentColor; }
+#st-power.clickable-stat:hover { filter: brightness(1.2); }
 
 /* B. 面板标题与内容之间加分隔线，提升面板可读性 */
 .panel-title {

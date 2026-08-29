@@ -883,7 +883,13 @@ export function renderAll() {
   $('#st-realm').textContent = `${S.realmLevelName(p.level)}（Lv.${p.level}）`;
   $('#st-exp-bar').style.width = `${Math.min(100, Math.round(p.exp / need * 100))}%`;
   $('#st-exp-text').textContent = atBottleneck ? `修为满溢，可冲击瓶颈！` : `修为 ${fmtBig(p.exp)} / ${fmtBig(need)}`;
-  $('#st-power').textContent = fmtBig(p.power);
+  const powerEl = $('#st-power');
+  if (powerEl) {
+    powerEl.textContent = fmtBig(p.power);
+    powerEl.title = '战力构成：' + S.powerSummary(st);
+    powerEl.classList.add('clickable-stat');
+    powerEl.onclick = () => { if (typeof setSideTab === 'function') setSideTab('realm'); };
+  }
   $('#st-rating').textContent = S.realmOf(p.level).rating;
   $('#st-root').innerHTML = `
     <span class="root-grade">${p.spiritRoot.grade}</span>
