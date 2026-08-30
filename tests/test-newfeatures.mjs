@@ -2420,6 +2420,32 @@ const ru = S.bagUsage(bagState(100, 100, 20));
 ok(ru.total === 120 && Math.abs(ru.ratio - 100 / 120) < 1e-9, '空间戒 ringBonus 计入 total');
 ok(ru.level === 'warn', '100/120（含戒）→ warn（83% 偏紧，与阈值一致）');
 
+/* ---------- 丹炉炼制进度常驻（跨标签页不可见状态常驻化 + 危机预警） ---------- */
+ok(typeof S.alchemyStatus === 'function', 'alchemyStatus 已导出');
+const mkAlch = (level, items) => ({ world: { year: 100, month: 6 }, cave: { level, alchemy: items } });
+// 无炼制 → ok、count 0、minLeft null
+const a0 = S.alchemyStatus(mkAlch(0, []));
+ok(a0.count === 0 && a0.level === 'ok' && a0.minLeft === null && a0.text === '', '无炼制 → count0/ok/minLeft null');
+// 1 炉、10 月后出炉 → ok、text '10 月后出炉'
+const a10 = S.alchemyStatus(mkAlch(0, [{ dueYear: 101, dueMonth: 4 }]));
+ok(a10.count === 1 && a10.minLeft === 10 && a10.level === 'ok' && a10.text === '10 月后出炉', '1 炉 10 月后 → ok/10月后出炉');
+// 1 炉、本月末出炉（due==当前 100/6）→ ready danger、text '本月末出炉'
+const aNow = S.alchemyStatus(mkAlch(0, [{ dueYear: 100, dueMonth: 6 }]));
+ok(aNow.count === 1 && aNow.ready === true && aNow.level === 'danger' && aNow.text === '本月末出炉', '本月末出炉 → ready/danger/本月末出炉');
+// 1 炉、1 月后（100/7）→ warn、text '1 月后出炉'
+const a1 = S.alchemyStatus(mkAlch(0, [{ dueYear: 100, dueMonth: 7 }]));
+ok(a1.minLeft === 1 && a1.level === 'warn' && a1.text === '1 月后出炉', '1 月后 → warn/1月后出炉');
+// 多炉取最近：一炉 1 月、一炉 5 月 → minLeft 1、warn
+const aMul = S.alchemyStatus(mkAlch(0, [{ dueYear: 100, dueMonth: 7 }, { dueYear: 100, dueMonth: 11 }]));
+ok(aMul.count === 2 && aMul.minLeft === 1 && aMul.level === 'warn', '多炉取最近（1月/5月）→ minLeft1/warn');
+// 并行上限 slots：level0→1；level2→2；level8→3（封顶）
+ok(S.alchemyStatus(mkAlch(0, [])).slots === 1, '并行上限 level0 → 1');
+ok(S.alchemyStatus(mkAlch(2, [])).slots === 2, '并行上限 level2 → 2');
+ok(S.alchemyStatus(mkAlch(8, [])).slots === 3, '并行上限 level8 → 3（封顶）');
+// 兼容：cave 缺失/alchemy 非数组 → 安全降级为 0 炉
+const aSafe = S.alchemyStatus({ world: { year: 1, month: 1 } });
+ok(aSafe.count === 0 && aSafe.level === 'ok', 'cave 缺失安全降级为 0 炉');
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

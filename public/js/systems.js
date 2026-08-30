@@ -657,6 +657,36 @@ export function bagUsage(state) {
   const level = ratio >= 0.9 ? 'danger' : ratio >= 0.7 ? 'warn' : 'ok';
   return { used, capacity, ringBonus, total, ratio, level };
 }
+
+/**
+ * 丹炉炼制进度（纯函数，不修改 state）。
+ * 基于 state.cave.alchemy（「炼制中」队列）计算并行炉数、并行上限、最近一炉的剩余月数与危机等级。
+ * 危机预警口径：本月末即出炉（minLeft<=0）→ danger（吸引注意，即将成丹）；1 月内出炉 → warn；否则 ok。
+ * 此前丹炉炼制进度仅在「洞府·丹炉」面板可见，切走即不可知、易错过出炉时机；
+ * 现供顶栏 chip 与英雄卡行常驻展示，延续「跨标签页不可见状态常驻化」+「危机预警」主题。
+ * 无 RNG：剩余月数由 dueYear/dueMonth 与当前 world 年月确定性推算。
+ */
+export function alchemyStatus(state) {
+  const w = state.world || { year: 1, month: 1 };
+  const queue = (state.cave && Array.isArray(state.cave.alchemy)) ? state.cave.alchemy : [];
+  const count = queue.length;
+  const slots = Math.min(3, 1 + Math.floor((state.cave?.level || 0) / 2));
+  if (count === 0) {
+    return { count: 0, slots, minLeft: null, ready: false, level: 'ok', text: '' };
+  }
+  let minLeft = Infinity;
+  for (const p of queue) {
+    const left = (Number(p.dueYear || w.year) - w.year) * 12 + (Number(p.dueMonth || w.month) - w.month);
+    if (left < minLeft) minLeft = left;
+  }
+  const ready = minLeft <= 0;            // 本月末结算即出炉（或已到期待结算）
+  const level = ready ? 'danger' : (minLeft <= 1 ? 'warn' : 'ok');
+  let text;
+  if (ready) text = '本月末出炉';
+  else if (minLeft === 1) text = '1 月后出炉';
+  else text = `${minLeft} 月后出炉`;
+  return { count, slots, minLeft, ready, level, text };
+}
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
   const db = state.player.daoBase[name];

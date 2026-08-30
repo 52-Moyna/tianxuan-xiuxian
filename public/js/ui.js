@@ -809,6 +809,22 @@ export function renderAll() {
       seclRow.style.display = 'none';
     }
   }
+  // 丹炉进度常驻行：炼制进度此前仅洞府面板可见，现英雄卡常驻、随时可见（延续跨标签页不可见状态常驻化）。
+  // 注：本块位于顶栏 alch 声明之前，故此处自声明局部 alch2，避免 TDZ（const 提升但未初始化）。
+  const alch2 = S.alchemyStatus(st);
+  const alchRow = document.getElementById('st-alchemy-row');
+  const alchB = document.getElementById('st-alchemy');
+  if (alchRow && alchB) {
+    if (alch2.count > 0) {
+      alchRow.style.display = '';
+      alchRow.classList.toggle('danger', alch2.level === 'danger');
+      alchB.textContent = `${alch2.count}炉·${alch2.text}`;
+      alchB.title = `丹炉 ${alch2.count} 炉正在炼制（并行上限 ${alch2.slots} 炉），${alch2.text}。`;
+    } else {
+      alchRow.style.display = 'none';
+    }
+  }
+
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
@@ -884,6 +900,30 @@ export function renderAll() {
       bagChip.title = `储物袋容量 ${bag.used}/${bag.total}（${pct}%）。`;
     }
     bagChip.onclick = () => { if (bag.level !== 'ok' && typeof setSideTab === 'function') setSideTab('items'); };
+  }
+
+  // 丹炉炼制进度常驻提示：丹炉炼制进度此前仅「洞府·丹炉」面板可见，切走即不可知、易错过出炉时机；
+  // 此处做顶栏常驻 chip，显示并行炼制炉数与最近出炉剩余月数，临近出炉变色预警，点击直达洞府丹炉（延续跨标签页常驻化 + 危机预警主题）。
+  const alch = S.alchemyStatus(st);
+  const alchChip = document.getElementById('tb-alchemy');
+  if (alchChip) {
+    if (alch.count > 0) {
+      alchChip.style.display = '';
+      alchChip.classList.remove('tb-alchemy-warn', 'tb-alchemy-danger', 'tb-clickable');
+      alchChip.innerHTML = `${ICO('<path d="M12 3l8 14H4z"/><path d="M8 10h8"/>')}丹炉 ${alch.count}炉·${alch.text}`;
+      if (alch.level === 'danger') {
+        alchChip.classList.add('tb-alchemy-danger', 'tb-clickable');
+        alchChip.title = `丹炉有 ${alch.count} 炉正在炼制，本月末即出炉！点击前往洞府收取。`;
+      } else if (alch.level === 'warn') {
+        alchChip.classList.add('tb-alchemy-warn', 'tb-clickable');
+        alchChip.title = `丹炉有 ${alch.count} 炉正在炼制，约 1 月后出炉。点击前往洞府查看。`;
+      } else {
+        alchChip.title = `丹炉有 ${alch.count} 炉正在炼制（最多并行 ${alch.slots} 炉），${alch.text}。点击前往洞府丹炉。`;
+      }
+      alchChip.onclick = () => { if (typeof setSideTab === 'function') setSideTab('cave'); };
+    } else {
+      alchChip.style.display = 'none';
+    }
   }
 
   // 状态卡
