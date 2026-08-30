@@ -944,6 +944,23 @@ export function renderAll() {
     }
   }
 
+  // 跨域旅行常驻提示：前往新地域途中（world.travel.destination + remaining 月）的剩余时间此前仅在地图面板可见，
+  // 切走即丢失、易错过抵达时点；此处做顶栏常驻 chip，点击直达地图查看（延续跨标签页不可见状态常驻化主题）。
+  const travel = st.world && st.world.travel;
+  const travelChip = document.getElementById('tb-travel');
+  if (travelChip) {
+    if (travel && travel.destination) {
+      const trName = (D.REGIONS.find((r) => r.id === travel.destination) || {}).name || '未知地域';
+      travelChip.style.display = '';
+      travelChip.classList.add('tb-clickable');
+      travelChip.innerHTML = `${ICO('<path d="M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 16.4 15.4 7.6"/>')}前往${trName} · 剩${travel.remaining}月`;
+      travelChip.title = `你正前往${trName}，还需 ${travel.remaining} 个月抵达。点击打开地图查看旅行进度。`;
+      travelChip.onclick = () => { if (typeof setSideTab === 'function') setSideTab('map'); };
+    } else {
+      travelChip.style.display = 'none';
+    }
+  }
+
   // 状态卡
   const need = S.expNeed(p.level);
   const atBottleneck = !!S.checkBottleneck(st);
