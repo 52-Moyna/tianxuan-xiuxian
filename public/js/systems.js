@@ -637,6 +637,26 @@ export function seclusionRiskWarning(state) {
   return { level: 'warn', streak, text: `连续闭关 ${streak} 月` };
 }
 
+
+
+/**
+ * 储物袋容量使用情况（纯函数，不修改 state）。
+ * 与危机预警（寿元/丹毒）同口径：ratio>=0.9 危险（满仓临界、再拾取物品将被静默丢弃）、
+ * >=0.7 警告（容量偏紧）、否则 ok。
+ * 此前储物袋满仓时 storeItem 会静默丢物（canStore 返回 false、return false），玩家仅在行囊面板可见容量、
+ * 切走即不可知，易在满仓时「丢物品而不自知」；现供顶栏 chip 常驻展示，延续
+ * 「跨标签页不可见状态常驻化」+「危机预警」主题。
+ */
+export function bagUsage(state) {
+  const inv = state.inventory || {};
+  const used = Number(inv.used || 0);
+  const capacity = Number(inv.capacity || 100);
+  const ringBonus = Number(inv.ringBonus || 0);
+  const total = capacity + ringBonus;
+  const ratio = total > 0 ? used / total : 0;
+  const level = ratio >= 0.9 ? 'danger' : ratio >= 0.7 ? 'warn' : 'ok';
+  return { used, capacity, ringBonus, total, ratio, level };
+}
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
   const db = state.player.daoBase[name];

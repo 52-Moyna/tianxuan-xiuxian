@@ -365,6 +365,9 @@ button { font-family: inherit; }
 .tb-stones { color: var(--gold); border-color: var(--gold-soft); }
 .tb-code { color: var(--jade); }
 .tb-herb { color: var(--jade); border-color: var(--jade-soft); }
+.tb-bag { color: var(--text-dim); }
+.tb-bag-warn { color: var(--warn); border-color: var(--warn); background: rgba(220,180,70,.1); }
+.tb-bag-danger { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); font-weight: 600; }
 .tb-clickable { cursor: pointer; }
 .tb-clickable:hover { filter: brightness(1.12); }
 

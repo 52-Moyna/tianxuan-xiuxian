@@ -864,6 +864,28 @@ export function renderAll() {
     }
   }
 
+  // 储物袋容量常驻提示：储物袋满仓时 storeItem 会静默丢弃物品（canStore 返回 false、return false），
+  // 此前玩家仅在行囊面板可见容量、切走即不可知，易在满仓时「丢物品而不自知」。
+  // 此处做顶栏常驻 chip，接近满载变色预警，点击直达行囊整理/扩容（延续跨标签页不可见状态常驻化 + 危机预警主题）。
+  const bag = S.bagUsage(st);
+  const bagChip = document.getElementById('tb-bag');
+  if (bagChip) {
+    bagChip.style.display = '';
+    const pct = Math.round(bag.ratio * 100);
+    bagChip.innerHTML = `${ICO('<path d="M6 10h12l-1.2 9H7.2z"/><path d="M9 10V8a3 3 0 0 1 6 0v2"/>')}储物袋 ${bag.used}/${bag.total}（${pct}%）`;
+    bagChip.classList.remove('tb-bag-warn', 'tb-bag-danger', 'tb-clickable');
+    if (bag.level === 'danger') {
+      bagChip.classList.add('tb-bag-danger', 'tb-clickable');
+      bagChip.title = `储物袋即将满载（${bag.used}/${bag.total}），再拾取物品将被丢弃！点击前往行囊整理或扩容。`;
+    } else if (bag.level === 'warn') {
+      bagChip.classList.add('tb-bag-warn', 'tb-clickable');
+      bagChip.title = `储物袋容量偏紧（${bag.used}/${bag.total}，${pct}%），建议整理行囊或扩容。`;
+    } else {
+      bagChip.title = `储物袋容量 ${bag.used}/${bag.total}（${pct}%）。`;
+    }
+    bagChip.onclick = () => { if (bag.level !== 'ok' && typeof setSideTab === 'function') setSideTab('items'); };
+  }
+
   // 状态卡
   const need = S.expNeed(p.level);
   const atBottleneck = !!S.checkBottleneck(st);
