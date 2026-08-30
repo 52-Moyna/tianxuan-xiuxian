@@ -2488,6 +2488,17 @@ ok(aSafe.count === 0 && aSafe.level === 'ok', 'cave 缺失安全降级为 0 炉'
   // 装备/无效果
   ok(S.itemUsePreview(st0, { 名称: '青锋剑', 类型: '法宝', 战力: 30 }).mode === 'equip', '法宝判定为可穿戴');
   ok(S.itemUsePreview(st0, { 名称: '星砂', 类型: '材料' }).mode === 'none', '无 effect 材料无可用操作');
+
+/* ---------- 坊市专属渡劫丹（筑基丹等）须正确标注为瓶颈专属丹（防死字段回归）---------- */
+{
+  const stB = S.createNewGame({ name: '渡劫', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(stB);
+  stB.player.level = 20; // 筑基瓶颈区间（15~25）
+  const pill = S.shopStock(stB).find((x) => x.名称 === '筑基丹');
+  ok(!!pill, '坊市在筑基区间上架筑基丹');
+  ok(pill && pill.breakthrough === true, '坊市筑基丹标注为瓶颈专属丹(breakthrough)');
+  ok(pill && S.itemUsePreview(stB, pill).mode === 'auto', '坊市筑基丹在行囊标注为自动消耗类');
+}
   // 核心回归：所有丹方产出（除瓶颈丹/渡劫丹）必须可主动服用，防止再现「炼出来却不能吃」
   let unusable = [];
   for (const [id, r] of Object.entries(PILL_RECIPES)) {

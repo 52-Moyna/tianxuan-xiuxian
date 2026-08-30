@@ -2178,7 +2178,7 @@ export function shopStock(state) {
     { min: 90, max: 99, 名称: '九转金丹', 描述: '飞升之劫专属，成功率+20%。' },
   ];
   for (const tp of tribPills) {
-    if (lv >= tp.min && lv <= tp.max) stock.push({ 名称: tp.名称, 类型: '丹药', 品阶: 'shang', 价格: 800, 价值: 700, 描述: tp.描述, effect: { item: tp.名称 } });
+    if (lv >= tp.min && lv <= tp.max) stock.push({ 名称: tp.名称, 类型: '丹药', 品阶: 'shang', 价格: 800, 价值: 700, 描述: tp.描述, breakthrough: true, effect: { exp: 150 } });
   }
   // —— 区域特产 ——
   // 区域特产：装备类商品同样锁定生成对象（展示即所得），并保留原风味描述；其余类型原样入列。
