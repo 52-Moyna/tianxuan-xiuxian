@@ -605,23 +605,26 @@ export function lifespanWarning(state) {
     level = 'warn';
     hint = '寿元渐少，留意「延寿丹」（坊市/拍卖/宗门兑换所可得）以备不时之需。';
   }
-  return { level, lifeLeft, hint };
+  const cure = level !== 'ok' ? '延寿丹' : '';
+  return { level, lifeLeft, hint, cure };
 }
 
 /** 丹毒危机预警（纯函数，不修改状态；供状态卡展示）。
  *  level: 'danger' 剧毒攻心(≥85)、'warn' 丹毒累积(≥60)、'ok' 清净。
- *  hint 提醒减服毒性丹药，必要时用「凝血丹」清伤（无毒副作用）。 */
+ *  hint 提醒减服毒性丹药，必要时服「解毒丹」化解丹毒。 */
 export function toxicityWarning(state) {
   const toxic = Number(state.flags?.pillToxicity || 0);
-  let level = 'ok', hint = '';
+  let level = 'ok', hint = '', cure = '';
   if (toxic >= 85) {
     level = 'danger';
-    hint = '丹毒攻心！再服毒丹将重创修为，可服「凝血丹」清伤（无毒）或暂停服丹。';
+    hint = '丹毒攻心！再服毒丹将重创修为，可服「解毒丹」化解丹毒或暂停服丹。';
+    cure = '解毒丹';
   } else if (toxic >= 60) {
     level = 'warn';
-    hint = '丹毒累积偏多，服丹收益下降、风险升高，宜暂缓毒性丹药。';
+    hint = '丹毒累积偏多，服丹收益下降、风险升高，宜暂缓毒性丹药或服「解毒丹」化解。';
+    cure = '解毒丹';
   }
-  return { level, toxic, hint };
+  return { level, toxic, hint, cure };
 }
 
 /** 道基加经验（含升级） */
@@ -629,6 +632,24 @@ export function toxicityWarning(state) {
  *  真实机制：Lv.30+ 连续闭关（state.flags.seclusionStreak）满 3 月必触发走火入魔（qihuo，渡劫大幅衰减、修为倒退）。
  *  此前该风险仅在「修炼」弹窗内可见、切走即丢失；现做常驻预警，让玩家随时知晓连关积累。
  *  level: 'danger' 连关≥2（再闭关即触发）、'warn' 连关≥1（风险积累）、'ok' 安全。 */
+/** 伤势危机预警（纯函数，不修改状态；供危机横幅展示）。
+ *  level: 'danger' 身负重伤(伤势≥3月，历练胜率-9%起、收益大降)、'warn' 带伤(≥1月)、'ok' 无伤。
+ *  hint 指向「凝血丹」(清除全部伤势) 这一已实现途径，与危机横幅「服用」按钮闭环（寿元→延寿丹、丹毒→解毒丹同口径）。 */
+export function woundWarning(state) {
+  const wounds = Number(state.flags?.wounded || 0);
+  let level = 'ok', hint = '', cure = '';
+  if (wounds >= 3) {
+    level = 'danger';
+    hint = `身负重伤（伤势 ${wounds} 月）！历练胜率与收益大降，宜速服「凝血丹」痊愈。`;
+    cure = '凝血丹';
+  } else if (wounds >= 1) {
+    level = 'warn';
+    hint = `身负伤势（${wounds} 月），历练胜率略降，可服「凝血丹」立即痊愈或静养自愈。`;
+    cure = '凝血丹';
+  }
+  return { level, wounds, hint, cure };
+}
+
 export function seclusionRiskWarning(state) {
   const p = state.player;
   const streak = Number(state.flags?.seclusionStreak || 0);

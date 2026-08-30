@@ -2233,7 +2233,7 @@ ok(S.toxicityWarning(mkCrisisState({ toxic: 60 })).level === 'warn', '丹毒预�
 ok(S.toxicityWarning(mkCrisisState({ toxic: 85 })).level === 'danger', '丹毒预警：85→危险');
 ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).level === 'danger', '丹毒预警：90→危险');
 ok(S.toxicityWarning(mkCrisisState({ toxic: 70 })).hint.includes('暂缓毒性丹药'), '丹毒预警：警告提示宜暂缓毒性丹药');
-ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).hint.includes('凝血丹'), '丹毒预警：危险提示含凝血丹');
+ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).hint.includes('解毒丹'), '丹毒预警：危险提示含解毒丹');
 // 纯函数：完全不改动原状态
 const cst = mkCrisisState({ age: 95, lifespan: 100, toxic: 90 });
 S.lifespanWarning(cst); S.toxicityWarning(cst);
@@ -2245,11 +2245,26 @@ scCure.player.age = scCure.player.lifespan - 3; // 触发 danger 预警
 scCure.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 }, toxicity: 15 });
 const li = scCure.items.length - 1;
 ok(S.lifespanWarning(scCure).level === 'danger' && S.useItem(scCure, li) && scCure.player.lifespan > (state.player.lifespan || 0), '寿元将尽+持有延寿丹：服用提升寿元上限');
-const stCure = JSON.parse(JSON.stringify(state));
-stCure.flags = Object.assign({}, stCure.flags, { pillToxicity: 90, wounded: 2 }); // 触发 danger 预警
-stCure.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '清伤', effect: { heal: true }, toxicity: 0 });
-const ti = stCure.items.length - 1;
-ok(S.toxicityWarning(stCure).level === 'danger' && S.useItem(stCure, ti) && (stCure.flags.wounded || 0) === 0, '丹毒攻心+持有凝血丹：服用清除全部伤势');
+// 丹毒危机 → 解毒丹（真实化解丹毒，非凝血丹；对应横幅「服用解毒丹」按钮）
+const toxCure = JSON.parse(JSON.stringify(state));
+toxCure.flags = Object.assign({}, toxCure.flags, { pillToxicity: 90 });
+toxCure.items.push({ 名称: '解毒丹', 类型: '丹药', 数量: 1, 描述: '解丹毒', effect: { detox: 30 }, toxicity: 0 });
+const ti = toxCure.items.length - 1;
+ok(S.toxicityWarning(toxCure).level === 'danger' && S.useItem(toxCure, ti) && toxCure.flags.pillToxicity === 60, '丹毒攻心+持有解毒丹：服用化解丹毒(90→60)');
+// 重伤危机 → 凝血丹（清除全部伤势；对应横幅「服用凝血丹」按钮，与英雄卡伤势行同口径）
+const woundCure = JSON.parse(JSON.stringify(state));
+woundCure.flags = Object.assign({}, woundCure.flags, { wounded: 3 });
+woundCure.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '清伤', effect: { heal: true }, toxicity: 0 });
+const wi = woundCure.items.length - 1;
+ok(S.woundWarning(woundCure).level === 'danger' && S.useItem(woundCure, wi) && (woundCure.flags.wounded || 0) === 0, '身负重伤+持有凝血丹：服用清除全部伤势');
+// 伤势预警阈值：0→安康、1~2月→警告、≥3月→危险（与英雄卡伤势危险行同口径）
+ok(S.woundWarning({ flags: { wounded: 0 } }).level === 'ok', '伤势预警：0伤→安康');
+ok(S.woundWarning({ flags: { wounded: 1 } }).level === 'warn' && S.woundWarning({ flags: { wounded: 2 } }).level === 'warn', '伤势预警：1~2月→警告');
+ok(S.woundWarning({ flags: { wounded: 3 } }).level === 'danger', '伤势预警：3月→危险');
+// 危机横幅「服用」按钮契约：各危险态须暴露 cure 字段（否则横幅无按钮，预警→行动断链）
+ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).cure === '延寿丹', '危机预警契约：寿元危险提供 cure=延寿丹');
+ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).cure === '解毒丹', '危机预警契约：丹毒危险提供 cure=解毒丹');
+ok(S.woundWarning({ flags: { wounded: 3 } }).cure === '凝血丹', '危机预警契约：重伤危险提供 cure=凝血丹');
 
 // —— 残片法宝：死道具→炼器「残片修复」闭环（消除“待修复成长”假承诺）——
 ok(ART_RECIPES.炼器.some((r) => r.id === 'repair_canpian'), '残片修复：炼器配方已登记');

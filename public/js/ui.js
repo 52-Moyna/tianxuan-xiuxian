@@ -731,6 +731,9 @@ export function renderAll() {
   const toxWarn = S.toxicityWarning(st);
   const toxEl = $('#st-toxic'); if (toxEl) toxEl.textContent = `${toxWarn.toxic}`;
   const toxRow = $('#st-toxic-row'); if (toxRow) toxRow.classList.toggle('danger', toxWarn.level !== 'ok');
+  // 伤势危机预警：身负重伤时历练胜率与收益大降，此前仅在英雄卡显示（无横幅指引），
+  // 现接入危机横幅，给出「凝血丹」可点击服用途径（与寿元→延寿丹、丹毒→解毒丹同口径闭环）。
+  const woundWarn = S.woundWarning(st);
   // 天机运势常驻显示：卜算所得的 omen 加成跨月生效，玩家在任意标签页都能看到当前运势（影响修炼/灵草/商道/悟性），弥补仅仙途新闻列表可见的不足
   const omenNow = st.flags?.omen && omenActive(st) ? st.flags.omen : null;
   const omenRow = $('#st-omen-row');
@@ -828,12 +831,12 @@ export function renderAll() {
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
   if (banner) {
-    const warns = [lifeWarn, toxWarn].filter((w) => w.level !== 'ok');
+    const warns = [lifeWarn, toxWarn, woundWarn].filter((w) => w.level !== 'ok');
     if (warns.length) {
       banner.className = `crisis-banner ${warns.some((w) => w.level === 'danger') ? 'danger' : 'warn'}`;
       banner.innerHTML = warns.map((w) => {
-        const cure = w === lifeWarn ? '延寿丹' : '解毒丹';
-        const cidx = findItemIndex(st, cure);
+        const cure = w.cure || '';
+        const cidx = cure ? findItemIndex(st, cure) : -1;
         const btn = cidx >= 0 ? ` <button class="cb-cure" data-cure="${cidx}">服用${cure}</button>` : '';
         return `<div class="cb-item">${w.hint}${btn}</div>`;
       }).join('');
