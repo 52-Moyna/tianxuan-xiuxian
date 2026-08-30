@@ -1245,6 +1245,14 @@ button { font-family: inherit; }
   border: 1px solid rgba(212,175,55,.3); box-shadow: 0 2px 8px rgba(212,175,55,.15); }
 .item-acts { display: flex; gap: 6px; flex: none; }
 .item-acts .btn { border-radius: 999px; padding: 3px 12px; font-size: .74rem; }
+/* 行囊物品·服用效果确定性预览（与 systems.itemUsePreview 同口径）。
+   注意：.item-main span 默认 nowrap+省略号，效果文案需换行显示，故此处覆盖。 */
+.item-main .item-eff { font-size: .7rem; color: var(--jade); line-height: 1.35;
+  white-space: normal; overflow: visible; text-overflow: clip; }
+/* 自动消耗类物品（瓶颈丹/渡劫丹/护身符/驯兽口粮/地火引）：不给按钮，改以标记说明生效时机 */
+.item-auto-note { font-size: .7rem; color: var(--text-dim); align-self: center;
+  padding: 2px 9px; border-radius: 999px; white-space: nowrap; cursor: help;
+  border: 1px dashed var(--line); background: rgba(127, 127, 127, .08); }
 
 /* 日志面板（设置内） */
 .log-tab-bar { display: flex; gap: 0; margin-bottom: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }

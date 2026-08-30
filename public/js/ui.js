@@ -984,7 +984,7 @@ export function renderAll() {
       wardTile.classList.toggle('has-ward', wardCount > 0);
       const hasHigh = wardHeld.some((x) => x.名称 === '护身符');
       wardTile.title = wardCount > 0
-        ? '持有护身道具 ' + wardCount + ' 件' + (hasHigh ? '（含高阶护身符：败北时挡重伤并护住灵石）' : '（败北时自动消耗一件替你挡去重伤）')
+        ? '持有护身道具 ' + wardCount + ' 件' + (hasHigh ? '（含高阶护身符：败北时挡去重伤与修为倒退，并护住灵石）' : '（低阶护符：败北时自动消耗一件护住灵石，重伤仍会承受）')
         : '未持有护身道具：败北将直接承受重伤与损失，可在坊市或结交道友处获取';
     }
   }
@@ -2541,11 +2541,11 @@ function renderCenter() {
       const t = resolveType(it);
       (grouped[t] = grouped[t] || []).push(it);
     }
-    const isDirectlyUsable = (it) => {
-      if (it._equip || it.部位 || it.类型 === '装备' || it.类型 === '法宝') return false;
-      if (!it.effect) return false;
-      return !!(it.effect.exp || it.effect.heal);
-    };
+    // 2026-08-30 修复：按钮可用性改由 S.itemUsePreview 统一判定（与 useItem 能力对齐）。
+    // 旧判定只认 effect.exp / effect.heal，导致凝神丹、洗髓丹、炎玉丹、玉华丹、狂战丹、
+    // 延寿丹、灵兽契约、聚灵阵旗等已实现效果的物品在行囊中无按钮、玩家根本无法服用。
+    const usePreviewOf = (it) => S.itemUsePreview(st, it);
+    const attr = (v) => String(v || '').replace(/"/g, '&quot;');
     const isEquipable = (it) => !!(it._equip || it.部位 || it.类型 === '装备' || it.类型 === '法宝');
     const itemFilter = box.dataset.itemFilter || '全部';
 
@@ -2573,15 +2573,16 @@ function renderCenter() {
             <div class="inv-cat-header">${TYPE_ICONS[t] || '📦'} ${t} <span class="inv-cat-count">${grouped[t].length}种</span></div>
             ${grouped[t].map((it, _) => {
               const i = nonContainerItems.indexOf(it);
-              const usable = isDirectlyUsable(it);
+              const pv = usePreviewOf(it);
               return `
               <div class="item-row">
                 <div class="item-icon">${TYPE_ICONS[t] || '📦'}</div>
-                <div class="item-main"><b>${it.名称}</b><span>${it.描述 || ''}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span></div>
+                <div class="item-main"><b>${it.名称}</b><span>${it.描述 || ''}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span>${pv.mode === 'use' ? `<span class="item-eff">服用效果：${pv.text}</span>` : ''}</div>
                 ${it.数量 > 1 ? `<div class="item-qty">×${it.数量}</div>` : ''}
                 <div class="item-acts">
-                  ${isEquipable(it) ? `<button class="btn btn-sm btn-gold" data-use="${i}">装备</button>` : ''}
-                  ${usable ? `<button class="btn btn-sm btn-gold" data-use="${i}">使用</button>` : ''}
+                  ${pv.mode === 'equip' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">装备</button>` : ''}
+                  ${pv.mode === 'use' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">${pv.label}</button>` : ''}
+                  ${pv.mode === 'auto' ? `<span class="item-auto-note" title="${attr(pv.text)}">⚙ 自动生效</span>` : ''}
                   <button class="btn btn-sm" data-codex="${it.名称}">图鉴</button>
                 </div>
               </div>`;

@@ -106,9 +106,9 @@ export const ART_RECIPES = {
     { id: 'repair_canpian', name: '残片修复', need: { '残片法宝': 1, '星砂': 1 }, output: { name: '灵珠法宝', type: '法宝', quantity: 1, level: 3, desc: '由法宝残片重铸而成的灵珠法宝（法器）。' }, value: 220 },
   ],
   制符: [
-    { id: '护身符', name: '护身符', need: { '冰魄符纸': 1, '海灵珠': 1 }, output: { name: '护身符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '战斗失败时减轻损失。' }, value: 100 },
+    { id: '护身符', name: '护身符', need: { '冰魄符纸': 1, '海灵珠': 1 }, output: { name: '护身符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '高阶护符，战斗败北时自动消耗一件，挡去重伤与修为倒退并护住灵石。' }, value: 100 },
     // 兽材闭环：妖兽皮毛 → 兽皮护符（ward），落实图鉴"可制防具或符箓"
-    { id: 'pelt_talisman', name: '兽皮护符', need: { '妖兽皮毛': 3 }, output: { name: '兽皮护符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '以妖兽皮毛揉制的护符，战斗失败时减轻损失。' }, value: 120 },
+    { id: 'pelt_talisman', name: '兽皮护符', need: { '妖兽皮毛': 3 }, output: { name: '兽皮护符', type: '消耗品', quantity: 2, effect: { ward: true }, desc: '以妖兽皮毛揉制的低阶护符，战斗败北时自动消耗一件，护住灵石分毫未失。' }, value: 120 },
   ],
   阵法: [
     { id: '聚灵阵旗', name: '聚灵阵旗', need: { '冰魄符纸': 2, '星砂': 1 }, output: { name: '聚灵阵旗', type: '消耗品', quantity: 1, effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升（+15%，持续1月）。' }, value: 180 },
