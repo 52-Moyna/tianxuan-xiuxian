@@ -973,7 +973,7 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
   const { rate, sameLevel } = calcWinRate(state, enemy.power, enemy.level);
   // 逐段累计并精确记录「实际施加」的增量（受 5~95 封顶影响，避免明细与总和对不上）
   let cur = rate;
-  const bd = { base: Math.round(rate), ally: 0, beasts: 0, activeBeast: 0, toxic: 0, wound: 0, tactic: 0, blessed: 0 };
+  const bd = { base: Math.round(rate), ally: 0, beasts: 0, activeBeast: 0, toxic: 0, wound: 0, tactic: 0, blessed: 0, buff: 0 };
   const apply = (delta, key) => {
     const next = Math.min(95, Math.max(5, cur + delta));
     bd[key] += next - cur;
@@ -1004,6 +1004,8 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
   if (tactic === 'aggro') apply(8, 'tactic');
   else if (tactic === 'defend') apply(-5, 'tactic');
   if (blessed && totalStones(state) >= 50) apply(10, 'blessed');
+  // 战前增益（法力丹等）：下次战斗胜率提升，预览同口径展示
+  if (state.flags?.nextBattleWin) apply(state.flags.nextBattleWin, 'buff');
   return { rate: Math.round(rate), finalRate: Math.round(cur), sameLevel, breakdown: bd };
 }
 
@@ -1105,6 +1107,12 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     const bCost = 50;
     if (totalStones(state) >= bCost) { spendStones(state, bCost); finalRate = Math.min(95, finalRate + 10); logs.push(`你燃灯焚香，邀得天命加持，胜率 +10%（耗灵石${bCost}）。`); }
     else logs.push('灵石不足，无力邀得天命加持。');
+  }
+  // 战前增益（法力丹等）：下次战斗胜率提升，战后清零（遁走则保留）
+  if (state.flags?.nextBattleWin && !fled) {
+    finalRate = Math.min(95, finalRate + state.flags.nextBattleWin);
+    logs.push(`战前增益生效，胜率 +${state.flags.nextBattleWin}%。`);
+    state.flags.nextBattleWin = 0;
   }
   // 道友援护：心腹/道侣级道友有概率临阵仗义相助（高关系层级方有此情义）
   let allyAided = false;
@@ -2394,6 +2402,18 @@ export function useItem(state, idx) {
     if (state.beasts.maxSlots >= cap) logs.push(`灵兽栏已至上限（${cap} 栏），契约暂存。`);
     else { state.beasts.maxSlots += 1; logs.push(`契约生效，灵兽栏上限提升至 ${state.beasts.maxSlots} 栏。`); }
   }
+  // 解毒丹：服用降低丹毒（与 codex 承诺「丹毒 -30」一致），是丹毒危机唯一主动恢复途径
+  if (it.effect.detox) {
+    const cur = Number(state.flags?.pillToxicity || 0);
+    const after = Math.max(0, cur - it.effect.detox);
+    state.flags.pillToxicity = after;
+    logs.push(`服下「${it.名称}」，丹毒 ${cur} → ${after}（－${cur - after}）。`);
+  }
+  // 法力丹：服用后下次战斗胜率提升（战斗后失效，由 resolveBattle 在战后清零）
+  if (it.effect.battleBuff) {
+    state.flags.nextBattleWin = (Number(state.flags?.nextBattleWin) || 0) + it.effect.battleBuff;
+    logs.push(`服下「${it.名称}」，下次战斗胜率 +${it.effect.battleBuff}%（战斗后失效）。`);
+  }
   // 丹毒累加
   const codexItem = it._codexToxicity !== undefined ? it : null;
   const toxicity = (typeof it.toxicity === 'number') ? it.toxicity : (codexItem?.toxicity || 0);
@@ -2460,6 +2480,8 @@ export function itemUsePreview(state, it) {
     const cur = (state && state.beasts && state.beasts.maxSlots) || 1;
     parts.push(cur >= 6 ? `灵兽栏上限 +1（已达上限 ${cur}/6，服用无效）` : `灵兽栏上限 +1（现 ${cur}/6 栏）`);
   }
+  if (eff.detox) parts.push(`丹毒 -${eff.detox}`);
+  if (eff.battleBuff) parts.push(`下次战斗胜率 +${eff.battleBuff}%`);
   if (!parts.length) return none;
   const tox = (typeof it.toxicity === 'number') ? it.toxicity : 0;
   if (tox > 0) parts.push(`丹毒 +${tox}`);

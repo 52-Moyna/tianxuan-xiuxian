@@ -80,6 +80,10 @@ export const REGION_MARKET = {
     { name: '百越灵草', type: '材料', price: 45, desc: '炼丹主药，灵植师最喜欢的材料。' },
     { name: '百毒囊', type: '装备', price: 240, level: 2, desc: '探索妖兽巢穴时额外获得材料。' },
     { name: '驱虫粉', type: '消耗品', price: 35, desc: '降低雨林探索风险。', effect: { explore: 15 } },
+    { name: '解毒丹', type: '丹药', price: 90, desc: '服用后丹毒 -30；连续嗑药的必备解药。', effect: { detox: 30 } },
+    { name: '神识丹', type: '丹药', price: 90, desc: '服用后悟性经验 +80。', effect: { wuxing: 80 } },
+    { name: '破境丹', type: '丹药', price: 300, desc: '服用后获得大量修为，足以直冲瓶颈。', effect: { exp: 600 } },
+    { name: '法力丹', type: '丹药', price: 80, desc: '服用后下次战斗胜率 +5%（战斗后失效）。', effect: { battleBuff: 5 } },
   ],
   haiwai: [
     { name: '海上遗府残图', type: '线索', price: 260, desc: '集齐线索可开启一次遗府探索。' },
@@ -95,6 +99,14 @@ export const ART_RECIPES = {
     // 兽材闭环：妖兽灵草 → 凝元丹（exp）；妖兽兽骨 → 兽骨续命丹（heal）
     { id: 'ningyuan', name: '凝元丹', need: { '妖兽灵草': 2 }, output: { name: '凝元丹', type: '丹药', quantity: 1, effect: { exp: 100 }, desc: '服用后修为 +100。' }, value: 110 },
     { id: 'shougu_dan', name: '兽骨续命丹', need: { '妖兽兽骨': 2 }, output: { name: '兽骨续命丹', type: '丹药', quantity: 1, effect: { heal: true }, desc: '服用后清除全部伤势。' }, value: 90 },
+    // 落实 codex 幽灵丹药：解毒丹（丹毒 -30，丹毒危机唯一主动恢复途径）
+    { id: 'jiedu_dan', name: '解毒丹', need: { '百年灵芝': 1, '星砂': 1 }, output: { name: '解毒丹', type: '丹药', quantity: 1, effect: { detox: 30 }, desc: '服用后丹毒 -30；是连续嗑药的必备解药。' }, value: 90 },
+    // 神识丹：悟性经验丹（codex 承诺「悟性经验增加」）
+    { id: 'shenshi_dan', name: '神识丹', need: { '凝露草': 1, '妖兽灵草': 1 }, output: { name: '神识丹', type: '丹药', quantity: 1, effect: { wuxing: 80 }, desc: '服用后悟性经验 +80。', toxicity: 10 }, value: 90 },
+    // 破境丹：大量修为经验，足以直冲瓶颈（codex 承诺「大量修为，可能直接突破一级」）
+    { id: 'pojing_dan', name: '破境丹', need: { '玉髓芝': 1, '天材地宝·月华露': 1 }, output: { name: '破境丹', type: '丹药', quantity: 1, effect: { exp: 600 }, desc: '服用后获得大量修为，足以直冲瓶颈。', toxicity: 25 }, value: 300 },
+    // 法力丹：下次战斗胜率 +5%（战斗后失效，由 resolveBattle 战后清零）
+    { id: 'fali_dan', name: '法力丹', need: { '海灵珠': 1, '凝露草': 1 }, output: { name: '法力丹', type: '丹药', quantity: 1, effect: { battleBuff: 5 }, desc: '服用后下次战斗胜率 +5%（战斗后失效）。', toxicity: 6 }, value: 80 },
   ],
   炼器: [
     { id: '护心甲', name: '护心甲', need: { '赤铜精': 2, '铁背苍熊内丹': 1 }, output: { name: '护心甲', type: '装备', quantity: 1, level: 3, desc: '稳定防护装备，战力 +3。' }, value: 260 },

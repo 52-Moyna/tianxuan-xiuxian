@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -2504,6 +2504,65 @@ ok(S.WARD_ITEM_NAMES.includes('兽皮护符'), '兽皮护符已纳入护身道�
   const stW = { items: [{ 名称: '兽皮护符', 类型: '消耗品', 数量: 2, effect: { ward: true } }] };
   ok(S.wardItems(stW).length === 1, '兽皮护符可被 wardItems 统计（英雄卡护身数）');
 }
+
+/* ---------- 落实 codex 四大幽灵丹药（解毒丹/神识丹/破境丹/法力丹）+ 丹毒危机恢复闭环 ---------- */
+// 百艺炼丹新增 4 丹方，effect 真实可结算
+ok(ART_RECIPES.炼丹.some(r => r.id === 'jiedu_dan' && r.output.effect.detox === 30), '百艺炼丹含解毒丹配方(effect.detox)');
+ok(ART_RECIPES.炼丹.some(r => r.id === 'shenshi_dan' && r.output.effect.wuxing === 80), '百艺炼丹含神识丹配方(effect.wuxing)');
+ok(ART_RECIPES.炼丹.some(r => r.id === 'pojing_dan' && r.output.effect.exp === 600), '百艺炼丹含破境丹配方(effect.exp)');
+ok(ART_RECIPES.炼丹.some(r => r.id === 'fali_dan' && r.output.effect.battleBuff === 5), '百艺炼丹含法力丹配方(effect.battleBuff)');
+// 岭南百越坊市可购得 4 丹药（codex 标注来源）
+const lnNames = REGION_MARKET.lingnan.map(g => g.name);
+ok(['解毒丹','神识丹','破境丹','法力丹'].every(n => lnNames.includes(n)), '岭南百越坊市上架四大丹药');
+// 四大丹药在行囊均为可服用（避免重演「炼出却点不到」P0 级 bug）
+const mkPill = (nm, eff) => ({ 名称: nm, 类型: '丹药', 数量: 1, effect: eff, 描述: '测试' });
+ok(S.itemUsePreview(null, mkPill('解毒丹', { detox: 30 })).mode === 'use', '解毒丹行囊可服用');
+ok(S.itemUsePreview(null, mkPill('神识丹', { wuxing: 80 })).mode === 'use', '神识丹行囊可服用');
+ok(S.itemUsePreview(null, mkPill('破境丹', { exp: 600 })).mode === 'use', '破境丹行囊可服用');
+ok(S.itemUsePreview(null, mkPill('法力丹', { battleBuff: 5 })).mode === 'use', '法力丹行囊可服用');
+// 行囊预览文案与 useItem 同口径
+ok(/丹毒 -30/.test(S.itemUsePreview(null, mkPill('解毒丹', { detox: 30 })).text), '解毒丹预览含「丹毒 -30」');
+ok(/下次战斗胜率 \+5%/.test(S.itemUsePreview(null, mkPill('法力丹', { battleBuff: 5 })).text), '法力丹预览含「下次战斗胜率 +5%」');
+// 解毒丹真实降低丹毒（丹毒危机唯一主动恢复途径）
+{
+  const st = S.createNewGame({ name: '解毒', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.flags.pillToxicity = 50;
+  st.items = [mkPill('解毒丹', { detox: 30 })];
+  const logs = S.useItem(st, 0);
+  ok(st.flags.pillToxicity === 20, '解毒丹将丹毒 50 → 20');
+  ok(logs.some(l => /丹毒/.test(l)), '解毒丹服用日志含丹毒变化');
+}
+// 法力丹设置战前增益标志
+{
+  const st = S.createNewGame({ name: '法力', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.items = [mkPill('法力丹', { battleBuff: 5 })];
+  S.useItem(st, 0);
+  ok(st.flags.nextBattleWin === 5, '法力丹写入下次战斗 +5% 增益');
+}
+// previewBattle 同口径反映战前增益
+{
+  const st = S.createNewGame({ name: '预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  const enemy = { name: '妖兽', level: 10, power: 100, beast: true, realm: '筑基', danger: 3, regionId: 'zhongzhou' };
+  const before = S.previewBattle(st, enemy, 'yaoshou').finalRate;
+  st.flags.nextBattleWin = 5;
+  const after = S.previewBattle(st, enemy, 'yaoshou').finalRate;
+  ok(after === Math.min(95, before + 5), 'previewBattle 反映法力丹 +5% 增益');
+}
+// 战斗后战前增益清零（遁走则保留）
+{
+  const st = S.createNewGame({ name: '战斗', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.player.level = 50; st.player.power = 99999;
+  const enemy = { name: '杂兵', level: 1, power: 1, beast: false, realm: '练气' };
+  st.flags.nextBattleWin = 5;
+  S.resolveBattle(st, enemy, 'yaoshou');
+  ok(st.flags.nextBattleWin === 0, '战斗后法力丹增益清零');
+}
+// codex 解毒丹条目存在且丹毒 -30（危机横幅指引的「解毒丹」确有其物）
+ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), 'codex 解毒丹条目存在(丹毒 -30)');
 
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);

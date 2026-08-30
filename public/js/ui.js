@@ -832,7 +832,7 @@ export function renderAll() {
     if (warns.length) {
       banner.className = `crisis-banner ${warns.some((w) => w.level === 'danger') ? 'danger' : 'warn'}`;
       banner.innerHTML = warns.map((w) => {
-        const cure = w === lifeWarn ? '延寿丹' : '凝血丹';
+        const cure = w === lifeWarn ? '延寿丹' : '解毒丹';
         const cidx = findItemIndex(st, cure);
         const btn = cidx >= 0 ? ` <button class="cb-cure" data-cure="${cidx}">服用${cure}</button>` : '';
         return `<div class="cb-item">${w.hint}${btn}</div>`;
