@@ -1517,12 +1517,16 @@ async function flowMarket() {
       const buyHtml = order.filter((t) => groups[t]).map((t) => `
         <div class="shop-cat-group">
           <div class="shop-cat">${catLabel[t]}</div>
-          ${groups[t].map(({ g, i }) => `
+          ${groups[t].map(({ g, i }) => {
+            const cmp = (g.类型 === '装备' || g.类型 === '法宝') ? S.marketCompare(st, g) : null;
+            const cmpHtml = cmp ? `<span class="si-cmp si-cmp-${cmp.cls}" title="与当前同部位已装备对比">${cmp.tag} ${cmp.text}</span>` : '';
+            return `
             <div class="shop-item" data-buy="${i}">
-              <div class="si-body"><b>${g.名称}${g.品阶 ? ` <em class="grade-${g.品阶}">${gradeName(g.品阶)}</em>` : ''}${g.品级 ? ` <em class="grade-tag">${g.品级}</em>` : ''}</b><span>${g.描述}</span></div>
+              <div class="si-body"><b>${g.名称}${g.品阶 ? ` <em class="grade-${g.品阶}">${gradeName(g.品阶)}</em>` : ''}${g.品级 ? ` <em class="grade-tag">${g.品级}</em>` : ''}</b><span>${g.描述}</span>${cmpHtml}</div>
               <div class="si-price">${g.价格} 灵石</div>
               <button class="btn btn-sm btn-gold shop-buy-btn">购买</button>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>`).join('') || '<div class="opt-desc">今日坊市无货。</div>';
 
       // ---- 出售页 HTML（抽成函数，便于批量/单件出售后就地重渲染，避免索引漂移） ----

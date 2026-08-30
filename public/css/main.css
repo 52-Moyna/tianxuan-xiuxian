@@ -1805,3 +1805,10 @@ button { font-family: inherit; }
 .dp-ready { color: var(--jade); border-color: var(--jade); }
 .dp-wait  { color: var(--gold-soft); border-color: var(--gold-soft); }
 .dp-done  { color: var(--gold); border-color: var(--gold); }
+
+/* 坊市货架：装备/法宝「与当前同部位对比」智能徽标 */
+.si-cmp { display: inline-block; margin-top: 2px; padding: 1px 7px; border-radius: 10px; font-size: .68rem; font-weight: 600; line-height: 1.5; border: 1px solid transparent; }
+.si-cmp-up { color: var(--jade); border-color: var(--jade-soft); background: rgba(116,179,156,.12); }
+.si-cmp-down { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); }
+.si-cmp-new { color: var(--gold); border-color: var(--gold-soft); background: rgba(216,177,90,.12); }
+.si-cmp-flat { color: var(--text-dim); border-color: var(--text-dim); background: rgba(128,128,128,.08); }

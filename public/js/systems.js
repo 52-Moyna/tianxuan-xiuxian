@@ -2181,18 +2181,29 @@ export function shopStock(state) {
     if (lv >= tp.min && lv <= tp.max) stock.push({ 名称: tp.名称, 类型: '丹药', 品阶: 'shang', 价格: 800, 价值: 700, 描述: tp.描述, effect: { item: tp.名称 } });
   }
   // —— 区域特产 ——
-  regional.forEach((g) => stock.push({ 名称: g.name, 类型: g.type, 价格: g.price, 价值: Math.round(g.price * 0.7), 等级: g.level, 部位: g.slot, 描述: g.desc, effect: g.effect }));
+  // 区域特产：装备类商品同样锁定生成对象（展示即所得），并保留原风味描述；其余类型原样入列。
+  regional.forEach((g) => {
+    if (g.type === '装备') {
+      const slot = g.slot || guessEquipSlot({ 名称: g.name, 类型: '装备' });
+      const item = generateEquip(state, slot, g.level || 1);
+      stock.push({ 名称: g.name, 类型: '装备', 部位: slot, 等级: g.level || 1, 品阶: item.品阶, 价格: g.price, 价值: Math.round(g.price * 0.7), 描述: g.desc, effect: {}, _equip: item });
+    } else {
+      stock.push({ 名称: g.name, 类型: g.type, 价格: g.price, 价值: Math.round(g.price * 0.7), 等级: g.level, 部位: g.slot, 描述: g.desc, effect: g.effect });
+    }
+  });
   // —— 装备细分（六部位各一件，可于行囊装备）——
+  // 关键修复：此前货架展示的「战力」由随机生成得到，但购买时 buyItem 又重新随机生成一件，
+  // 导致「看到的战力」与「买到的」不一致（买亏却不自知）。现改为生成即锁定：把生成的装备
+  // 对象存入 _equip，购买时直接发放这一件（展示即所得）；并供货架渲染「与当前同部位对比」徽标。
   const gearLv = Math.min(5, Math.max(1, Math.round(lv / 12)));
   const gearGrade = getEquipGradeByLevel(gearLv);
   for (const slot of EQUIP_SLOTS) {
-    const name = makeEquipName(slot.id, gearGrade);
-    const power = calcEquipPower(slot.id, gearLv, gearGrade);
-    stock.push({ 名称: name, 类型: '装备', 部位: slot.id, 等级: gearLv, 品阶: gearGrade.id, 价格: gearLv * gearLv * 130 + 40, 价值: Math.round((gearLv * gearLv * 130 + 40) * 0.7), 描述: `${slot.name}（${gearGrade.name}），战力+${power}。`, effect: {} });
+    const item = generateEquip(state, slot.id, gearLv);
+    stock.push({ 名称: item.名称, 类型: '装备', 部位: slot.id, 等级: gearLv, 品阶: item.品阶, 价格: gearLv * gearLv * 130 + 40, 价值: Math.round((gearLv * gearLv * 130 + 40) * 0.7), 描述: item.描述, effect: {}, _equip: item });
   }
   if (Rng.chance(0.5)) {
     const art = generateEquip(state, 'artifact', gearLv + 1, Rng.pick(ARTIFACT_NAMES));
-    stock.push({ 名称: art.名称, 类型: '法宝', 部位: 'artifact', 等级: gearLv + 1, 品阶: art.品阶, 价格: Math.round(art.战力 * 40), 价值: Math.round(art.战力 * 28), 描述: `法宝（${EQUIP_GRADES.find((g) => g.id === art.品阶)?.name}），战力+${art.战力}。`, effect: {} });
+    stock.push({ 名称: art.名称, 类型: '法宝', 部位: 'artifact', 等级: gearLv + 1, 品阶: art.品阶, 价格: Math.round(art.战力 * 40), 价值: Math.round(art.战力 * 28), 描述: `法宝（${EQUIP_GRADES.find((g) => g.id === art.品阶)?.name}），战力+${art.战力}。`, effect: {}, _equip: art });
   }
   // —— 功法 ——
   const grade = lv < 20 ? 'ling' : lv < 45 ? 'di' : 'tian';
@@ -2221,11 +2232,11 @@ export function buyItem(state, goods) {
     state.inventory.upgrades += 1;
     state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
   } else if (goods.类型 === '装备') {
-    const slot = goods.部位 || guessEquipSlot({ 名称: goods.名称, 类型: '装备' });
-    const item = generateEquip(state, slot, goods.等级 || 1, goods.名称);
+    // 优先发放货架锁定的那一件（展示即所得）；无 _equip 时回退原随机生成（兼容兑换所/其它来源）
+    const item = goods._equip || generateEquip(state, goods.部位 || guessEquipSlot({ 名称: goods.名称, 类型: '装备' }), goods.等级 || 1, goods.名称);
     state.equipment.stash.push(item);
   } else if (goods.类型 === '法宝') {
-    const item = generateEquip(state, 'artifact', goods.等级 || 1, goods.名称);
+    const item = goods._equip || generateEquip(state, 'artifact', goods.等级 || 1, goods.名称);
     state.equipment.stash.push(item);
   } else if (goods.类型 === '功法') {
     // 2026-08-23：功法玉简若声明了 effect.technique，则按声明授予具体功法（如「基础功法玉简」→「基础吐纳术」），
@@ -2243,6 +2254,22 @@ export function buyItem(state, goods) {
   makeChronicle(state, { type: '坊市', title: '坊市交易', text: `在${state.world.region}购入「${goods.名称}」，花费灵石${goods.价格}。` });
   return goods.类型 === '服务' ? `储物袋扩容完成，现有 ${state.inventory.capacity} 格。` : `购得「${goods.名称}」，花费灵石${goods.价格}。`;
 }
+/** 坊市/兑换所购买时，装备/法宝与「当前同部位已装备」的战力对比（纯函数、不改动状态）。
+ *  用于货架渲染智能徽标：🆕 新装备位 / 🟢 更强 / ⚪ 略逊当前 / ➖ 持平，帮助玩家判断是否有效提升，
+ *  避免「随机重roll」导致的买亏而不自知。无 _equip 时回退用货架展示的 战力 字段。 */
+export function marketCompare(state, goods) {
+  if (!goods || (goods.类型 !== '装备' && goods.类型 !== '法宝')) return null;
+  const slot = goods.类型 === '法宝' ? 'artifact' : (goods.部位 || guessEquipSlot({ 名称: goods.名称, 类型: '装备' }));
+  const cur = state.equipment ? state.equipment[slot] : null;
+  const curPow = cur ? (Number(cur.战力) || 0) : 0;
+  const newPow = Number(goods.战力) || (goods._equip ? Number(goods._equip.战力) || 0 : 0);
+  if (!cur) return { cls: 'new', tag: '🆕', text: '新装备位' };
+  const diff = newPow - curPow;
+  if (diff > 0) return { cls: 'up', tag: '🟢', text: `战力+${diff}（更强）` };
+  if (diff < 0) return { cls: 'down', tag: '⚪', text: `战力${-diff}（略逊当前）` };
+  return { cls: 'flat', tag: '➖', text: '持平' };
+}
+
 export function sellItem(state, idx) {
   ensureLifeState(state);
   const it = state.items[idx];
