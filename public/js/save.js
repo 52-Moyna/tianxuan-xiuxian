@@ -66,6 +66,8 @@ export function serialize(state) {
       修为: {
         等级: p.level, 经验: p.exp, 境界: p.realmName,
         战力: p.power, 寿元上限: p.lifespan, 寿元修正: p.lifeBonus || 0,
+        // 珍贵丹药一生服用次数：必须随档持久化，否则存读档即可绕过「延寿丹3颗/洗髓丹2颗」上限
+        延寿丹已服: p.lifespanPillsTaken || 0, 洗髓丹已服: p.marrowPillsTaken || 0,
       },
       道基: Object.fromEntries(
         Object.entries(p.daoBase).map(([k, v]) => [k, `${v.level}级(经验${v.exp})`]),
@@ -236,6 +238,8 @@ export function deserialize(files) {
       power: Number(xiu.战力) || 1,
       lifespan: Number(xiu.寿元上限) || 100,
       lifeBonus: Number(xiu.寿元修正) || 0,
+      lifespanPillsTaken: Number(xiu.延寿丹已服) || 0,
+      marrowPillsTaken: Number(xiu.洗髓丹已服) || 0,
       daoBase: {},
     },
     currencies: { ...get('货币.ini', '灵石') },

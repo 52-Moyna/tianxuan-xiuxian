@@ -252,6 +252,9 @@ export function ensureLifeState(state) {
   if (!state.player.mainTechnique && state.mainTechnique) state.player.mainTechnique = state.mainTechnique;
   state.player.daoBase = state.player.daoBase || {};
   for (const b of DAO_BASES) if (!state.player.daoBase[b.name]) state.player.daoBase[b.name] = { level: 1, exp: 0 };
+  // 珍贵丹药「一生服用次数」计数兜底：旧档缺字段时归零，避免 undefined 参与比较导致上限失效
+  if (typeof state.player.lifespanPillsTaken !== 'number') state.player.lifespanPillsTaken = 0;
+  if (typeof state.player.marrowPillsTaken !== 'number') state.player.marrowPillsTaken = 0;
   // 封号系统状态标准化（旧档若无 titles 字段，初始化为空）
   if (!Array.isArray(state.player.titles)) state.player.titles = [];
   if (state.player.activeTitle === undefined) state.player.activeTitle = '';

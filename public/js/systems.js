@@ -454,6 +454,7 @@ export function createNewGame(opts) {
       level, exp: 0, daoBase,
       lifespan: 100, power: 1, realmName: '凡人境', lifeBonus: ageGroup.mods.寿元修正 || 0,
       lifespanPillsTaken: 0, // 延寿丹：当前轮回一生至多服用 3 颗，超出则经脉难承（转世后随 newGame 归零）
+      marrowPillsTaken: 0,   // 洗髓丹：当前轮回一生至多服用 2 颗（图鉴承诺），同样随转世归零
     },
     currencies: { 下品灵石: pack.stones, 中品灵石: 0, 上品灵石: 0, 极品灵石: 0, 灵晶: 0 },
     techniques: [{ 名称: startTechName, 品级: '凡品', 等级: 1, 经验: 0 }],
@@ -2405,8 +2406,17 @@ export function useItem(state, idx) {
     addDaoBaseExp(state, '悟性', it.effect.wuxing, logs);
     logs.push(`神思清明，悟性经验+${it.effect.wuxing}。`);
   }
-  // 洗髓伐毛：随机提升一项道基（洗髓丹）
+  // 洗髓伐毛：随机提升一项道基（洗髓丹 / 炎玉丹 / 玉华丹）
+  // 图鉴承诺「洗髓丹一生最多服用 2 颗」：仅对洗髓丹按当前轮回计数，满 2 则药力无从着落，
+  // 本次服用失效（不消耗、不加道基），与延寿丹同口径；炎玉丹/玉华丹不受此限。
   if (it.effect.daoBase) {
+    if (it.名称 === '洗髓丹') {
+      const mTaken = state.player.marrowPillsTaken || 0;
+      if (mTaken >= 2) {
+        return [`「洗髓丹」一生至多可服 2 颗，你已服满（${mTaken} 颗），骨髓再难重塑，此丹暂难生效（留于储物袋即可）。`];
+      }
+      state.player.marrowPillsTaken = mTaken + 1;
+    }
     const kb = it.effect.daoBase;
     const key = kb.keys[Rng.int(0, kb.keys.length - 1)];
     const amt = Rng.int(kb.min, kb.max);
@@ -2516,7 +2526,13 @@ export function itemUsePreview(state, it) {
   if (eff.wuxing) parts.push(`悟性经验 +${eff.wuxing}`);
   if (eff.daoBase) {
     const kb = eff.daoBase || {};
-    parts.push(`随机提升「${(kb.keys || []).join('/')}」之一 +${kb.min}~${kb.max} 级`);
+    const base = `随机提升「${(kb.keys || []).join('/')}」之一 +${kb.min}~${kb.max} 级`;
+    if (it.名称 === '洗髓丹') {
+      const mTaken = (state && state.player && state.player.marrowPillsTaken) || 0;
+      parts.push(mTaken >= 2
+        ? `${base}（一生限 2 颗，已服满 ${mTaken}/2，此丹暂难生效）`
+        : `${base}（一生限 2 颗，已服 ${mTaken}/2）`);
+    } else parts.push(base);
   }
   if (eff.cultivateBoostMonths) parts.push(`未来 ${eff.cultivateBoostMonths} 月修炼效率 +15%`);
   if (eff.power) parts.push(`战力临时 +${eff.power}（持续 ${eff.powerMonths || 1} 月）`);
