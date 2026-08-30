@@ -796,6 +796,21 @@ export function renderAll() {
       buffRow.style.display = 'none';
     }
   }
+  // 战前增益常驻显示：服用法力丹后下次战斗胜率提升（state.flags.nextBattleWin），
+  // 此前该状态仅在战斗时于战报短暂出现、切走即不可知；现做英雄卡常驻行，
+  // 延续「跨标签页不可见状态常驻化」主题，让玩家随时知晓临战加成、便于规划出战时机
+  const nextWin = S.activeNextBattleBuff(st);
+  const nbRow = document.getElementById('st-nextbuff-row');
+  const nbB = document.getElementById('st-nextbuff');
+  if (nbRow && nbB) {
+    if (nextWin > 0) {
+      nbRow.style.display = '';
+      nbB.innerHTML = '下次战斗胜率 +' + nextWin + '%';
+      nbB.title = '战前增益生效中：下次战斗胜率 +' + nextWin + '%（服用法力丹获得，战斗后失效）';
+    } else {
+      nbRow.style.display = 'none';
+    }
+  }
   // 闭关走火入魔风险常驻预警：Lv.30+ 连续闭关（flags.seclusionStreak）满 3 月必触发走火入魔，
   // 此前该风险仅在「修炼」弹窗内可见、切走即丢失；现做英雄卡常驻行，延续「跨标签页不可见状态常驻化」+「危机预警」主题，
   // 让玩家随时知晓连关积累，避免误入走火入魔。

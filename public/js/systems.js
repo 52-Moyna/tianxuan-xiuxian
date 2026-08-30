@@ -66,6 +66,10 @@ export function buffMonthsLeft(state) {
   const cur = (state.world.year * 12) + state.world.month;
   return Math.max(0, b.expireMonth - cur);
 }
+/** 当前生效的「战前增益」胜率加成（法力丹：state.flags.nextBattleWin，战斗后清零），供英雄卡常驻显示。 */
+export function activeNextBattleBuff(state) {
+  return Number(state?.flags?.nextBattleWin || 0);
+}
 export function calcPower(state) {
   ensureLifeState(state);
   const p = state.player;

@@ -2632,6 +2632,23 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   ok(S.marketCompare(mk(), { 类型: '丹药' }) === null, 'marketCompare：非装备/法宝返回 null');
 }
 
+/* ---------- 战前增益常驻显示（法力丹） ---------- */
+{
+  // 新增 activeNextBattleBuff 纯函数：读取法力丹写入的 flags.nextBattleWin，供英雄卡常驻显示
+  const st = JSON.parse(JSON.stringify(state));
+  ok(S.activeNextBattleBuff(st) === 0, 'activeNextBattleBuff：默认无战前增益返回 0');
+  storeItem(st, { 名称: '法力丹', 类型: '丹药', 数量: 1, effect: { battleBuff: 5 }, toxicity: 6 });
+  const idx = st.items.findIndex((i) => i.名称 === '法力丹');
+  S.useItem(st, idx);
+  ok(S.activeNextBattleBuff(st) === 5, '服用法力丹后 activeNextBattleBuff=5（英雄卡将常驻显示「下次战斗胜率 +5%」）');
+  // previewBattle 同口径计入（与 resolveBattle 一致），英雄卡所示增益确为真实战前加成；
+  // 用远超玩家战力的强敌使基础胜率落入中低区间，避免 95% 封顶掩盖 +5% 差异
+  const enemy = { power: 999999, level: 1 };
+  const pb = S.previewBattle(st, enemy, 'fight');
+  const pbBase = S.previewBattle(JSON.parse(JSON.stringify(state)), enemy, 'fight');
+  ok(pb.finalRate > pbBase.finalRate, 'previewBattle：战前增益已计入胜率（finalRate 提升）');
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 
