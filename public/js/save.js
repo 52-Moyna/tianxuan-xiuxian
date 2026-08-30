@@ -176,6 +176,12 @@ export function serialize(state) {
         秘境最深: state.flags?.mysticDeepest || 0,
         丹药增益: state.buffs?.power || 0,
         增益到期月: state.buffs?.expireMonth || 0,
+        炼丹总数: state.flags?.refinedPills || 0,
+        曾疗伤: state.flags?.curedWounds || false,
+        曾渡劫: state.flags?.tribulationSuccess || false,
+        聚灵余月: state.flags?.cultivateBoostMonths || 0,
+        战前增益: state.flags?.nextBattleWin || 0,
+        天机运势: state.flags?.omen || null,
       },
     },
     '图鉴.ini': {
@@ -368,6 +374,13 @@ export function deserialize(files) {
     companion: flagsRaw.道侣 || '',
     companionMonths: Number(flagsRaw.同行月数) || 0,
     mysticDeepest: Number(flagsRaw.秘境最深) || 0,
+    refinedPills: Number(flagsRaw.炼丹总数) || 0,
+    curedWounds: flagsRaw.曾疗伤 === true || flagsRaw.曾疗伤 === 'true',
+    tribulationSuccess: flagsRaw.曾渡劫 === true || flagsRaw.曾渡劫 === 'true',
+    cultivateBoostMonths: Number(flagsRaw.聚灵余月) || 0,
+    nextBattleWin: Number(flagsRaw.战前增益) || 0,
+    // 天机运势：随档持久化，否则存读档后有效运势静默消失（修炼/悟性/交易倍率失效）
+    omen: (flagsRaw.天机运势 && typeof flagsRaw.天机运势 === 'object') ? flagsRaw.天机运势 : null,
   };
   ensureLifeState(state);
   return state;

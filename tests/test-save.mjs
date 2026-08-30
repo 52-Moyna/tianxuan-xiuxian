@@ -22,6 +22,14 @@ S.equipItem(st, 0); // 装备玄火鉴到法宝（备用已移位）
 st.flags.wounded = 2;
 st.flags.companion = '云霜仙子';
 st.flags.companionMonths = 3;
+// 运行期计数 / 一次性 flag（旧版存档会丢失）
+st.flags.refinedPills = 17;
+st.flags.curedWounds = true;
+st.flags.tribulationSuccess = true;
+st.flags.cultivateBoostMonths = 4;
+st.flags.nextBattleWin = 5;
+// 天机运势：驱动修炼/悟性/交易倍率，必须随档持久化（否则存读档后有效运势静默消失）
+st.flags.omen = { kind: 'cultivate', icon: '🌟', label: '紫气东来', desc: '近期修炼倍率提升', mul: 1.15, add: 0, expireYear: st.world.year + 1, expireMonth: st.world.month };
 
 // 2. 序列化 -> 反序列化
 const files = serialize(st);
@@ -38,6 +46,15 @@ ok('法宝未串入普通装备栏', rt.equipment.weapon?.名称 !== '玄火鉴'
 ok('伤势保留', rt.flags.wounded === 2);
 ok('同行道友保留', rt.flags.companion === '云霜仙子');
 ok('同行月数保留', rt.flags.companionMonths === 3);
+// 运行期计数 / 一次性 flag 跨存档保留
+ok('炼丹计数保留', rt.flags.refinedPills === 17);
+ok('曾疗伤flag保留', rt.flags.curedWounds === true);
+ok('曾渡劫flag保留', rt.flags.tribulationSuccess === true);
+ok('聚灵加成余月保留', rt.flags.cultivateBoostMonths === 4);
+ok('战前增益保留', rt.flags.nextBattleWin === 5);
+ok('天机运势对象保留', !!rt.flags.omen);
+ok('天机运势类型保留', rt.flags.omen && rt.flags.omen.kind === 'cultivate');
+ok('天机运势倍率保留', rt.flags.omen && Math.abs(rt.flags.omen.mul - 1.15) < 1e-9);
 
 // 5. 断言：基础字段回路一致
 ok('姓名回路', rt.player.name === '回路测试');
@@ -59,6 +76,20 @@ const rt2 = deserialize(serialize(st2));
 ok('仅法宝时普通装备栏为空', rt2.equipment.weapon === null);
 ok('仅法宝时法宝栏数量为1', rt2.equipment.artifact?.名称 === '寒玉佩');
 ok('仅法宝时不串格', rt2.equipment.weapon?.名称 !== '寒玉佩');
+
+// 7. 旧档（不含新增字段）兼容：缺字段不报错且给默认 0/false
+const st3 = S.createNewGame({
+  name: '旧档兼容', gender: '男', raceId: 'human', ageId: 'young',
+  regionId: 'zhongzhou', packId: 1, yunId: 'panshi',
+  spiritRoot: { grade: '上品', gradeId: 'shang', elements: ['金'], speed: 1.2, desc: '测试' },
+});
+const rt3 = deserialize(serialize(st3));
+ok('旧档炼丹计数默认0', rt3.flags.refinedPills === 0);
+ok('旧档曾疗伤默认false', rt3.flags.curedWounds === false);
+ok('旧档曾渡劫默认false', rt3.flags.tribulationSuccess === false);
+ok('旧档聚灵余月默认0', rt3.flags.cultivateBoostMonths === 0);
+ok('旧档战前增益默认0', rt3.flags.nextBattleWin === 0);
+ok('旧档天机运势默认null', rt3.flags.omen === null);
 
 console.log(`\n存读档回路测试：${pass} 通过 / ${fail} 失败`);
 process.exit(fail === 0 ? 0 : 1);
