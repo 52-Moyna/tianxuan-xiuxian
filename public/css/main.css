@@ -1178,6 +1178,17 @@ button { font-family: inherit; }
 .realm-list-item { padding: 10px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-soft); margin-bottom: 8px; }
 .realm-list-item.current { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
 .realm-list-item.past { opacity: .6; }
+/* 仙途目标：长期成长目标卡片（弥补英雄卡仅显示当前层进度的盲区） */
+.realm-goal { padding: 10px 12px; border-radius: 10px; background: linear-gradient(135deg, var(--bg-2), var(--bg-3)); border: 1px solid var(--line-soft); margin: 10px 0 4px; }
+.realm-goal-head { font-weight: 600; color: var(--gold); font-size: .92rem; margin-bottom: 8px; }
+.realm-goal-bn { font-size: .86rem; color: var(--text); line-height: 1.6; }
+.realm-goal-bn b { color: var(--jade); }
+.realm-goal-row { display: flex; justify-content: space-between; align-items: baseline; font-size: .84rem; margin: 3px 0; }
+.realm-goal-row span { color: var(--text-dim); }
+.realm-goal-row b { color: var(--text); }
+.realm-goal-bar { height: 8px; border-radius: 6px; background: var(--bg-3); overflow: hidden; margin: 8px 0 4px; border: 1px solid var(--line-soft); }
+.realm-goal-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--jade), var(--gold)); }
+.realm-goal-note { font-size: .76rem; color: var(--text-dim); text-align: right; }
 .realm-list-name { font-weight: 600; color: var(--text); }
 .realm-list-range { font-size: .78rem; color: var(--text-dim); }
 .realm-list-detail { font-size: .8rem; color: var(--text-dim); margin-top: 4px; }

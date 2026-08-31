@@ -806,6 +806,39 @@ export function checkBottleneck(state) {
   return bn;
 }
 
+/**
+ * 仙途目标：距下一大境界（渡劫瓶颈）还需多少修为、约多少月。
+ * 纯函数、不改动 state；弥补「英雄卡仅显示当前层进度、跨层即清零」的信息盲区，
+ * 给玩家一个长期可感知的成长目标。无 RNG，确定性可测。
+ */
+export function realmProgress(state) {
+  const p = state.player;
+  const lvl = p.level;
+  const r = realmOf(lvl);
+  const curNeed = expNeed(lvl);
+  const expRatio = Math.max(0, Math.min(1, p.exp / curNeed));
+  const atBottleneck = !!BOTTLENECKS[lvl];
+  // 下一个渡劫瓶颈等级（按升序取首个 ≥ 当前等级的瓶颈）
+  const bnLevels = Object.keys(BOTTLENECKS).map(Number).sort((a, b) => a - b);
+  const nextBn = bnLevels.find((L) => L >= lvl);
+  if (nextBn == null) {
+    // 已臻大乘/飞升，再无更高瓶颈
+    return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm: null, expToBottleneck: 0, monthsEstimate: 0 };
+  }
+  const bn = BOTTLENECKS[nextBn];
+  const nextRealm = realmOf(bn.to).name;
+  // 已站在瓶颈层：无需再攒修为，持对应渡劫丹即可冲击（expToBottleneck 计 0）
+  if (atBottleneck) {
+    return { level: lvl, realmName: r.name, atBottleneck: true, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: 0, monthsEstimate: 0 };
+  }
+  // 累计从当前层到瓶颈层（不含瓶颈层）所需修为总量
+  let need = Math.max(0, curNeed - p.exp); // 先填满当前层
+  for (let L = lvl + 1; L < nextBn; L++) need += expNeed(L);
+  const gain = cultivateGainPreview(state, 'normal').gain;
+  const monthsEstimate = gain > 0 ? Math.ceil(need / gain) : 0;
+  return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: need, monthsEstimate };
+}
+
 /** 渡劫突破。返回分波次结果供 UI 播放动画 */
 /**
  * 渡劫战力参考系数：战力达到境界基准则小幅加成（封顶 +10%），明显落后则小幅减成（封底 -8%）。

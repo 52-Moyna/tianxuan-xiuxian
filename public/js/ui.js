@@ -2796,6 +2796,8 @@ function renderCenter() {
     const sideEffect = CX.pillSideEffect(st);
     const bd = S.powerBreakdown(st);
     const btRate = S.breakthroughRate(st);
+    const rp = S.realmProgress(st);
+    const bn = S.checkBottleneck(st);
     const maxItem = Math.max(1, ...bd.items.map((i) => i.value));
     box.innerHTML = `
       <div class="panel">
@@ -2808,6 +2810,16 @@ function renderCenter() {
           <div class="realm-unlock">🔓 已解锁：${cur.unlock}</div>
           <div class="realm-bottleneck">⚡ 瓶颈：${cur.bottleneck}</div>
           ${cur.next ? `<div class="opt-desc" style="margin-top:8px">下一阶段：${cur.next}</div>` : ''}
+        </div>
+        <div class="realm-goal">
+          <div class="realm-goal-head">🎯 仙途目标</div>
+          ${rp.atBottleneck
+            ? `<div class="realm-goal-bn">已至瓶颈「${bn ? bn.name : '境界'}」，可直接冲击 <b>${rp.nextRealm}</b>（持「${bn && bn.item ? bn.item : '对应渡劫丹'}」渡劫）。</div>`
+            : `<div class="realm-goal-row"><span>下一大境界</span><b>${rp.nextRealm}</b></div>
+               <div class="realm-goal-row"><span>距渡劫点还需修为</span><b>${fmtBig(rp.expToBottleneck)}</b></div>
+               <div class="realm-goal-row"><span>按当前修炼速率约</span><b>${rp.monthsEstimate} 月</b></div>
+               <div class="realm-goal-bar"><i style="width:${Math.round(rp.expRatio * 100)}%"></i></div>
+               <div class="realm-goal-note">当前层修为 ${fmtBig(rp.expCur)} / ${fmtBig(rp.expNeed)}</div>`}
         </div>
         ${sideEffect ? `<div class="toxicity-hint ${sideEffect.level}">💊 ${sideEffect.text}</div>` : ''}
         ${toxicityBarHTML(toxic)}

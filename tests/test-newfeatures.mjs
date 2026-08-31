@@ -2840,6 +2840,36 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 贡献字段缺失容错：不抛错、回退 0
   const partial = S.sectContribution({ sect: { name: '散修盟', rank: 0 } });
   ok(partial.has === true && partial.contribution === 0, '宗门缺 contribution 字段 → 容错为 0 不报错');
+
+  /* ---------- 仙途目标：距下一大境界（渡劫瓶颈）进度 ---------- */
+  ok(typeof S.realmProgress === 'function', 'realmProgress 已导出');
+  // 新游戏（凡人境 Lv.1）：下一大境界应为炼气期，且需攒修为、有月数预估
+  const stL1 = S.createNewGame({ name: '新晋', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  const rp1 = S.realmProgress(stL1);
+  ok(rp1.nextRealm === '炼气期', 'Lv.1 → 下一大境界为炼气期');
+  ok(rp1.atBottleneck === false, 'Lv.1 → 不在瓶颈');
+  ok(rp1.expToBottleneck > 0, 'Lv.1 → 距渡劫点需攒修为（>0）');
+  ok(rp1.monthsEstimate > 0, 'Lv.1 → 预计月数 > 0');
+  // 站在瓶颈层（Lv.10，已攒满）：可直接渡劫，expToBottleneck 计 0
+  const stBn = S.createNewGame({ name: '瓶颈', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  stBn.player.level = 10;
+  stBn.player.exp = S.expNeed(10);
+  const rpBn = S.realmProgress(stBn);
+  ok(rpBn.atBottleneck === true, 'Lv.10 满修为 → 在瓶颈');
+  ok(rpBn.nextRealm === '炼气期', 'Lv.10 → 渡劫后达炼气期');
+  ok(rpBn.expToBottleneck === 0, 'Lv.10 瓶颈 → 无需再攒修为（0）');
+  // 炼气期中段（Lv.15）：下一大境界应为筑基期
+  const stMid = S.createNewGame({ name: '中段', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  stMid.player.level = 15;
+  const rpMid = S.realmProgress(stMid);
+  ok(rpMid.nextRealm === '筑基期', 'Lv.15 → 下一大境界为筑基期');
+  ok(rpMid.expToBottleneck > 0 && rpMid.atBottleneck === false, 'Lv.15 → 非瓶颈且需攒修为');
+  // 渡劫/大乘（Lv.96）：再无更高瓶颈
+  const stTop = S.createNewGame({ name: '大乘', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  stTop.player.level = 96;
+  const rpTop = S.realmProgress(stTop);
+  ok(rpTop.nextRealm === null && rpTop.expToBottleneck === 0, 'Lv.96 → 无更高瓶颈（nextRealm=null, exp=0）');
+
 }
 
 console.log(`
