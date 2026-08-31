@@ -294,6 +294,15 @@ export function checkTitles(state) {
   return newly;
 }
 
+/** 佩称号视图（纯函数，不改动状态）：返回当前佩戴封号的展示信息，供英雄卡常驻行使用。 */
+export function activeTitleView(state) {
+  const id = state?.player?.activeTitle;
+  if (!id) return { has: false, name: '', desc: '' };
+  const t = TITLE_MAP[id] || TITLES.find((x) => x.id === id);
+  if (!t) return { has: false, name: '', desc: '' };
+  return { has: true, name: t.name, desc: t.desc };
+}
+
 /* ============================================================
  * 日志系统（操作/战斗/事件/天命/系统，持久化到 日志.ini）
  * ========================================================== */

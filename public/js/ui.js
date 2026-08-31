@@ -856,6 +856,24 @@ export function renderAll() {
       sectRow.style.display = 'none';
     }
   }
+  // 佩称号常驻显示：玩家收集的封号是身份/威名收集型目标，此前仅在「成就·封号」面板可见，
+  // 切走即不可知；现做英雄卡常驻行，延续「跨标签页不可见状态常驻化」主题，让玩家随时看到当前佩戴的封号；点击直达封号面板。
+  const activeTitleObj = S.activeTitleView(st);
+  const titleRow = document.getElementById('st-title-row');
+  const titleB = document.getElementById('st-title');
+  if (titleRow && titleB) {
+    if (activeTitleObj.has) {
+      titleRow.style.display = '';
+      titleB.textContent = '🏅 ' + activeTitleObj.name;
+      titleB.title = '当前佩戴封号「' + activeTitleObj.name + '」：' + activeTitleObj.desc + '（点击切换/查看全部封号）';
+      titleRow.classList.add('clickable-stat');
+      titleRow.onclick = () => { if (typeof setSideTab === 'function') setSideTab('achv'); };
+    } else {
+      titleRow.style.display = 'none';
+      titleRow.classList.remove('clickable-stat');
+      titleRow.onclick = null;
+    }
+  }
 
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');

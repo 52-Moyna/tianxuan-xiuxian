@@ -27,6 +27,13 @@ ok(!S.setActiveTitle(state, 'not_exist').ok, '未拥有封号不可佩戴');
 // 天命封号授予
 S.awardTitle(state, 'xinghui_zhanxian', []);
 ok(state.player.titles.includes('xinghui_zhanxian'), 'awardTitle 授予天命封号');
+// 佩称号视图（英雄卡常驻行使用，纯函数）：解析已佩戴封号，无佩戴返回 has:false
+const tv1 = S.activeTitleView(state);
+ok(tv1.has === true && tv1.name === '初露锋芒', 'activeTitleView 解析已佩戴封号');
+state.player.activeTitle = '';
+const tv2 = S.activeTitleView(state);
+ok(tv2.has === false, 'activeTitleView 无佩戴返回 has:false');
+state.player.activeTitle = 'chuji_fengmang';
 
 /* ---------- 成就进度可视化 ---------- */
 checkAchievements(state);
