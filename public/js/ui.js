@@ -2814,7 +2814,7 @@ function renderCenter() {
         <div class="realm-goal">
           <div class="realm-goal-head">🎯 仙途目标</div>
           ${rp.atBottleneck
-            ? `<div class="realm-goal-bn">已至瓶颈「${bn ? bn.name : '境界'}」，可直接冲击 <b>${rp.nextRealm}</b>（持「${bn && bn.item ? bn.item : '对应渡劫丹'}」渡劫）。</div>`
+            ? `<div class="realm-goal-bn">已至瓶颈「${bn ? bn.name : '境界'}」，可直接冲击 <b>${rp.nextRealm}</b>${rp.pillName ? (rp.pillHave > 0 ? `（已持有 <b>${rp.pillName}</b> ×${rp.pillHave}，可直接渡劫）` : `（尚缺渡劫丹 <b>${rp.pillName}</b>：可于坊市购入或丹炉炼制）`) : '（持对应渡劫丹渡劫）'}。</div>`
             : `<div class="realm-goal-row"><span>下一大境界</span><b>${rp.nextRealm}</b></div>
                <div class="realm-goal-row"><span>距渡劫点还需修为</span><b>${fmtBig(rp.expToBottleneck)}</b></div>
                <div class="realm-goal-row"><span>按当前修炼速率约</span><b>${rp.monthsEstimate} 月</b></div>

@@ -823,20 +823,22 @@ export function realmProgress(state) {
   const nextBn = bnLevels.find((L) => L >= lvl);
   if (nextBn == null) {
     // 已臻大乘/飞升，再无更高瓶颈
-    return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm: null, expToBottleneck: 0, monthsEstimate: 0 };
+    return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm: null, expToBottleneck: 0, monthsEstimate: 0, pillName: null, pillHave: 0 };
   }
   const bn = BOTTLENECKS[nextBn];
   const nextRealm = realmOf(bn.to).name;
+  const pillName = bn.item || null;
+  const pillHave = pillName ? state.items.filter((i) => i.名称 === pillName).reduce((s, i) => s + (i.数量 || 0), 0) : 0;
   // 已站在瓶颈层：无需再攒修为，持对应渡劫丹即可冲击（expToBottleneck 计 0）
   if (atBottleneck) {
-    return { level: lvl, realmName: r.name, atBottleneck: true, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: 0, monthsEstimate: 0 };
+    return { level: lvl, realmName: r.name, atBottleneck: true, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: 0, monthsEstimate: 0, pillName, pillHave };
   }
   // 累计从当前层到瓶颈层（不含瓶颈层）所需修为总量
   let need = Math.max(0, curNeed - p.exp); // 先填满当前层
   for (let L = lvl + 1; L < nextBn; L++) need += expNeed(L);
   const gain = cultivateGainPreview(state, 'normal').gain;
   const monthsEstimate = gain > 0 ? Math.ceil(need / gain) : 0;
-  return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: need, monthsEstimate };
+  return { level: lvl, realmName: r.name, atBottleneck: false, expRatio, expCur: p.exp, expNeed: curNeed, nextRealm, nextBn, expToBottleneck: need, monthsEstimate, pillName, pillHave };
 }
 
 /** 渡劫突破。返回分波次结果供 UI 播放动画 */

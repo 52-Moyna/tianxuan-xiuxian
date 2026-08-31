@@ -2858,6 +2858,18 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   ok(rpBn.atBottleneck === true, 'Lv.10 满修为 → 在瓶颈');
   ok(rpBn.nextRealm === '炼气期', 'Lv.10 → 渡劫后达炼气期');
   ok(rpBn.expToBottleneck === 0, 'Lv.10 瓶颈 → 无需再攒修为（0）');
+  ok(rpBn.pillName === null, 'Lv.10 瓶颈（引气入体）无专属渡劫丹 → pillName=null');
+  ok(rpBn.pillHave === 0, 'Lv.10 瓶颈（未持丹）→ pillHave=0');
+  // 筑基瓶颈（Lv.20 满修为）：所需专属渡劫丹为结丹丹
+  const stBn2 = S.createNewGame({ name: '筑基', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  stBn2.player.level = 20;
+  stBn2.player.exp = S.expNeed(20);
+  const rpBn20 = S.realmProgress(stBn2);
+  ok(rpBn20.atBottleneck === true && rpBn20.pillName === '筑基丹', 'Lv.20 瓶颈（筑基）→ 所需渡劫丹为筑基丹');
+  ok(rpBn20.pillHave === 0, 'Lv.20 瓶颈（未持丹）→ pillHave=0');
+  storeItem(stBn2, { 名称: '筑基丹', 类型: '丹药', 数量: 2, 描述: '渡劫专属丹', effect: { breakthrough: true }, 品阶: 'fan' });
+  const rpBn20b = S.realmProgress(stBn2);
+  ok(rpBn20b.pillHave === 2, 'Lv.20 瓶颈（持筑基丹×2）→ pillHave=2');
   // 炼气期中段（Lv.15）：下一大境界应为筑基期
   const stMid = S.createNewGame({ name: '中段', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   stMid.player.level = 15;
