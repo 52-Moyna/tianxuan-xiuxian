@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -1686,7 +1686,11 @@ async function flowMap() {
     const m = openModal(`
       <div class="choice-intro">你现在位于「${st.world.region}」。旅行会消耗灵石和月份，抵达后将改变坊市库存、野外材料和天机简报。</div>
       <div class="map-current"><b>当前地域</b><span>${st.world.region}</span><em>${current.specialty} · ${current.flavor}</em></div>
-      <div class="route-list">${routes.map((r) => `<button class="route-row" data-region="${r.id}"><span>${names[r.id]}</span><small>${r.specialty} · 路费约${r.cost}灵石 · ${r.months}个月</small></button>`).join('')}</div>
+      <div class="route-list">${routes.map((r) => {
+        const q = travelCost(st, r.id);
+        const off = q.cost < q.base ? `<em class="route-off">原价${q.base}</em>` : '';
+        return `<button class="route-row" data-region="${r.id}"><span>${names[r.id]}</span><small>${r.specialty} · 路费${q.cost}灵石${off ? ' ' : ''}${off} · ${r.months}个月</small></button>`;
+      }).join('')}</div>
       <div class="modal-actions"><button class="btn" id="btn-back-map">返回本月选择</button></div>`,
       { title: '天玄地图', lock: true, cls: 'modal-lg' });
     m.querySelectorAll('[data-region]').forEach((b) => b.addEventListener('click', () => { closeModal(); resolve(b.dataset.region); }));
@@ -3052,7 +3056,7 @@ function renderCenter() {
             ${isCur
               ? '<span class="region-here">你正身处此地</span>'
               : canGo
-                ? `<button class="btn btn-sm btn-gold" data-go="${r.id}">前往（${t.cost}灵石·${t.months}月）</button>`
+                ? `<button class="btn btn-sm btn-gold" data-go="${r.id}" title="${(() => { const q = travelCost(st, r.id); return q.cost < q.base ? `原价 ${q.base} 灵石，已享减免 → ${q.cost}` : `路费 ${q.cost} 灵石`; })()}">前往（${travelCost(st, r.id).cost}灵石·${t.months}月）</button>`
                 : traveling
                   ? '<span class="region-here">旅途中…</span>'
                   : '<span class="region-here">需先抵相邻地域</span>'}

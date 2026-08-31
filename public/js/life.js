@@ -59,6 +59,8 @@ export const REGION_MARKET = {
   donghuang: [
     { name: '青风狼内丹', type: '材料', price: 45, desc: '妖兽内丹，炼丹主药。' },
     { name: '妖纹护腕', type: '装备', price: 220, level: 2, desc: '以妖纹强化筋骨，战力 +2。' },
+    { name: '青风靴', type: '装备', price: 200, level: 2, desc: '轻捷步战，战力 +2，妖纹套装组件。' },
+    { name: '妖纹战铠', type: '装备', price: 300, level: 3, desc: '妖纹铭刻甲片，战力 +3，妖纹套装组件。' },
     { name: '驭兽香', type: '消耗品', price: 70, desc: '提高下一次收服灵兽的成功率。', effect: { tame: 20 } },
   ],
   nanming: [
@@ -438,6 +440,21 @@ export function travelOptions(state) {
   return current.neighbors.map((id) => ({ id, ...REGION_TRAVEL[id] })).filter(Boolean);
 }
 
+/**
+ * 跨域旅行路费口径（纯函数，唯一真源）——供 startTravel 结算与地图面板预览共用。
+ * 结算顺序：地域基准路费 → 海行套装折扣（travelDiscount，持久生效、不消耗）→ 旅行凭证减免（消耗一张）。
+ * @returns {{base:number, setDiscount:number, voucher:object|null, cost:number}}
+ */
+export function travelCost(state, regionId) {
+  const target = REGION_TRAVEL[regionId];
+  if (!target) return { base: 0, setDiscount: 0, voucher: null, cost: 0 };
+  const setDiscount = Number(setBonusFlags(state).travelDiscount || 0);
+  let cost = Math.max(0, Math.round(target.cost * (1 - setDiscount)));
+  const voucher = (state.items || []).find((i) => i.effect && i.effect.travel) || null;
+  if (voucher) cost = Math.max(0, Math.round(cost * (1 - (voucher.effect.travel || 0) / 100)));
+  return { base: target.cost, setDiscount, voucher, cost };
+}
+
 export function startTravel(state, regionId) {
   ensureLifeState(state);
   const target = REGION_TRAVEL[regionId];
@@ -445,14 +462,10 @@ export function startTravel(state, regionId) {
   const current = REGION_TRAVEL[state.world.regionId] || REGION_TRAVEL.zhongzhou;
   if (!current.neighbors.includes(regionId)) return { ok: false, text: '此地暂无直达路线，需先到相邻地域。' };
   if (state.world.travel?.destination) return { ok: false, text: '你已在旅途中，不能重复规划路线。' };
-  // 跨域旅行凭证：持有时本次路费减半（单张消耗），使「远航凭证/旅行凭证」成为真实可用道具
-  let cost = target.cost;
-  const voucher = state.items.find((i) => i.effect && i.effect.travel);
-  let usedVoucher = null;
-  if (voucher) {
-    cost = Math.max(0, Math.round(target.cost * (1 - (voucher.effect.travel || 0) / 100)));
-    usedVoucher = voucher;
-  }
+  // 路费统一走 travelCost（海行套装折扣 + 旅行凭证减免），避免结算与预览两套口径漂移
+  const quote = travelCost(state, regionId);
+  const cost = quote.cost;
+  const usedVoucher = quote.voucher;
   if (!spendStoneLike(state, cost)) return { ok: false, text: `路费不足，需要下品灵石${cost}。` };
   if (usedVoucher) {
     usedVoucher.数量 -= 1;
@@ -460,7 +473,10 @@ export function startTravel(state, regionId) {
   }
   state.world.travel = { destination: regionId, remaining: target.months };
   const name = REGION_NAMES[regionId] || regionId;
-  const tail = usedVoucher ? `（使用「${usedVoucher.名称}」，路费减半）` : '';
+  const tailParts = [];
+  if (quote.setDiscount > 0) tailParts.push(`海行套装省${Math.round(quote.setDiscount * 100)}%`);
+  if (usedVoucher) tailParts.push(`使用「${usedVoucher.名称}」路费减半`);
+  const tail = tailParts.length ? `（${tailParts.join('，')}：路费 ${quote.base}→${cost}）` : '';
   return { ok: true, text: `你踏上前往${name}的路途，预计${target.months}个月抵达。${tail}`, months: target.months };
 }
 

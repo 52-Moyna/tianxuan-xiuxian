@@ -1816,3 +1816,12 @@ button { font-family: inherit; }
 .si-cmp-down { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); }
 .si-cmp-new { color: var(--gold); border-color: var(--gold-soft); background: rgba(216,177,90,.12); }
 .si-cmp-flat { color: var(--text-dim); border-color: var(--text-dim); background: rgba(128,128,128,.08); }
+
+/* 地图路线：套装/凭证减免后显示原价划线（海行套装 travelDiscount 可感知） */
+.route-off {
+  font-style: normal;
+  color: var(--muted, #8a8f98);
+  text-decoration: line-through;
+  opacity: .72;
+  margin-left: 2px;
+}

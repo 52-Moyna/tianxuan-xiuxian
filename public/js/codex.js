@@ -165,6 +165,8 @@ const EQUIP_GRID = [
   ['armor', 'fan', 'gear_iron_armor', '制式护心甲', '普通', '中州坊市、宗门配发', '稳定防护，性价比高'],
   ['armor', 'fan', 'gear_cloud_robe', '云纹道袍', '普通', '坊市、战利品', '轻便舒适，炼气期常备'],
   ['accessory', 'fabao', 'gear_yao_wrist', '妖纹护腕', '稀有', '东荒妖域坊市、妖兽材料炼制', '以妖纹强化筋骨'],
+  ['boots', 'fabao', 'gear_qingfeng_boots', '青风靴', '稀有', '东荒妖域坊市', '轻捷步战，妖纹套装组件'],
+  ['armor', 'fabao', 'gear_yaowen_armor', '妖纹战铠', '稀有', '东荒妖域坊市、妖兽材料炼制', '妖纹铭刻甲片，妖纹套装组件'],
   ['armor', 'fabao', 'gear_fire_vest', '火纹战衣', '稀有', '南明离火域坊市、炼器', '耐火护具'],
   ['armor', 'fabao', 'gear_star_armor', '星辉战甲', '稀有', '天命、炼器、宗门大比', '金丹期后可精炼，星辉套装组件'],
   ['armor', 'fabao', 'gear_sea_leather', '海兽皮甲', '稀有', '北冥瀚海坊市', '轻便耐久，海行套装组件'],
@@ -380,29 +382,29 @@ export const CODEX_ITEMS = [
 export const SET_BONUSES = {
   星辉: {
     tokens: ['星辉', '星纹', '星砂'],
-    text2: '星辉共鸣（2件）：战力 +8，法宝战力额外 +2，秘境发现率提高 15%。',
-    text3: '星辉圆满（3件）：战力再 +12，渡劫成功率 +10%，化神期后可触发星辉领域。',
+    text2: '星辉共鸣（2件）：战力 +8，法宝战力额外 +2（需佩戴本命法宝），秘境发现率提高 15%。',
+    text3: '星辉圆满（3件）：战力再 +12，渡劫成功率 +10%（预览与结算同步计入）。',
     bonus2: { power: 8, artifactPower: 2, mysticFind: 0.15 },
     bonus3: { power: 12, breakthrough: 10 },
   },
   地火: {
     tokens: ['火纹', '赤铜', '地火'],
     text2: '地火相生（2件）：战力 +6，炼器额外品质加成，百艺经验 +30%。',
-    text3: '地火圆满（3件）：战力再 +10，炼丹成功率提高，丹毒产生减半。',
+    text3: '地火圆满（3件）：战力再 +10，丹药出高品阶概率 +15%，丹毒产生减半。',
     bonus2: { power: 6, craftQuality: 1, craftExp: 0.3 },
     bonus3: { power: 10, pillToxicityHalf: true },
   },
   海行: {
     tokens: ['海兽', '海灵', '远航'],
-    text2: '海行无阻（2件）：战力 +6，旅行费用降低 20%，海外事件收益 +30%。',
-    text3: '海行圆满（3件）：战力再 +10，可触发海上奇遇，有概率发现遗府入口。',
+    text2: '海行无阻（2件）：战力 +6，跨域路费降低 20%，海域（海外仙岛/北冥瀚海）游历灵石收益 +30%。',
+    text3: '海行圆满（3件）：战力再 +10，海域游历时「风化洞府（遗府残图）」与「仙缘使者」奇遇概率翻倍。',
     bonus2: { power: 6, travelDiscount: 0.2, seaBonus: 0.3 },
     bonus3: { power: 10, seaChance: true },
   },
   妖纹: {
     tokens: ['妖纹', '青风'],
     text2: '妖纹护体（2件）：战力 +5，历练妖兽类战利品数量 +20%。',
-    text3: '妖纹大成（2件）：在妖域探索时更容易发现珍稀材料。',
+    text3: '妖纹大成（3件）：战力再 +5，妖域探索更易寻得珍稀「仙缘」（掉落上限 15%→30%）。',
     bonus2: { power: 5, beastLoot: 0.2 },
     bonus3: { power: 5, beastFind: true },
   },
@@ -910,17 +912,21 @@ export function activeSetBonuses(state) {
   ];
   const items = owned.filter((it) => it?.名称);
   return Object.entries(SET_BONUSES).map(([name, set]) => {
-    const matched = (set.tokens || []).filter((t) =>
-      items.some((it) => {
-        const isMaterial = it?.类型 === '材料';
-        return isMaterial ? (it.名称 === t) : (it.名称 && it.名称.includes(t));
-      })
-    );
-    const count = matched.length;
+    // 计件口径：命中任一套装 token 的「不同物品」数（而非不同 token 数），
+    // 这样集齐 3 件实体套装部件即激活 3 件效果（妖纹仅 2 个 token，按原口径永远到不了 3 件）。
+    // 材料仍须名称精确等于 token，否则「青风狼内丹」会因 token '青风' 为其子串而误触妖纹套装。
+    const matchedItems = items.filter((it) => {
+      const isMaterial = it?.类型 === '材料';
+      return (set.tokens || []).some((t) => (isMaterial ? (it.名称 === t) : (it.名称 && it.名称.includes(t))));
+    });
+    const count = matchedItems.length;
     if (count < 2) return null; // 集齐 2 件才激活
     const bonus = { ...(set.bonus2 || {}), ...(count >= 3 ? (set.bonus3 || {}) : {}) };
     const text = count >= 3 ? set.text3 : set.text2;
-    return { name, count, text, tokens: matched, bonus };
+    return { name, count, text, tokens: [...new Set(matchedItems.flatMap((it) => {
+      const isMaterial = it?.类型 === '材料';
+      return (set.tokens || []).filter((t) => (isMaterial ? (it.名称 === t) : (it.名称 && it.名称.includes(t))));
+    }))], bonus };
   }).filter(Boolean);
 }
 
