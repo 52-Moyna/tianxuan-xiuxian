@@ -111,7 +111,7 @@ export function serialize(state) {
       ),
     },
     '洞府.ini': {
-      洞府: { 等级: state.cave.level, 名称: state.cave.name, 修炼加成: state.cave.bonus },
+      洞府: { 等级: state.cave.level, 名称: state.cave.name, 修炼加成: state.cave.bonus, 引泉重数: state.cave.springLevel || 0, 聚灵阵重数: state.cave.arrayLevel || 0 },
       灵草园: Object.fromEntries((state.cave.garden || []).map((h, i) => [`灵草${i + 1}`, h])),
     },
     '道缘.ini': {
@@ -273,6 +273,8 @@ export function deserialize(files) {
       level: Number(caveRaw.等级) || 0,
       name: caveRaw.名称 || '凡人客栈',
       bonus: Number(caveRaw.修炼加成) || 0,
+      springLevel: Number(caveRaw.引泉重数) || 0,
+      arrayLevel: Number(caveRaw.聚灵阵重数) || 0,
       garden: Object.values(get('洞府.ini', '灵草园')).filter(Boolean),
     },
     npcs: [],

@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2971,7 +2971,7 @@ function alchemyCatalystBlock(st) {
       </div>`;
     box.innerHTML = `
       <div class="panel">
-        <div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12H3zM9 21v-6h6v6"/></svg><span class="pt-text">洞府 · ${cave.name || curCave.name}</span><span class="panel-hint">Lv.${cave.level || 0} ｜ 修炼加成 +${Math.round((cave.bonus || 0) * 100)}%</span></div>
+        <div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12H3zM9 21v-6h6v6"/></svg><span class="pt-text">洞府 · ${cave.name || curCave.name}</span><span class="panel-hint">Lv.${cave.level || 0} ｜ 修炼加成 +${Math.round((cave.bonus || 0) * 100)}%${((st.cave?.arrayLevel || 0) > 0) ? ` ｜ 聚灵阵 +${Math.round((st.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL * 100)}%` : ''}</span></div>
         <div class="opt-desc">洞府是修行根基。此处可经营灵草园，于灵田播种灵草、按月生长、成熟后收入储物袋炼丹。洞府升级（修炼加成）仍于决策罗盘的「经营」行动进行。<b>灵田随洞府等级进阶</b>：Lv.2 起灵草品质渐升、收获产量更高，Lv.1 起灵草园容量逐步扩展（最高 8 株）。</div>
         <div class="side-subtitle">灵草园 · ${garden.length}/${gardenCapacity(st)} 株${herbSpringBonus(st) > 0 ? ` · 💧灵泉涌动（引泉 ${st.cave?.springLevel || 0} 重）` : ''}</div>
         <div class="opt-desc" style="margin:6px 0 10px">💧 灵泉涌动分「洞府基础（Lv.5+ 自动 +1）」与「引泉重数」两部分，可在决策罗盘「经营」中耗灵石引泉升级，每重令灵草月生长额外 +1 月。</div>

@@ -2649,7 +2649,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
 
 // ===== 坊市货架锁定（展示即所得）+ marketCompare 对比徽标 =====
 {
-  const g = S.createNewGame({ name: '坊市', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2 });
+  const g = S.createNewGame({ name: '坊市', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(g);
   g.inventory.capacity = 999; g.inventory.used = 0;
   S.addStones(g, 100000);
@@ -2664,7 +2664,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
 }
 {
   // 法宝路径：合成带 _equip 的货架项，购买后战力须一致
-  const g = S.createNewGame({ name: '坊市宝', gender: '女', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2 });
+  const g = S.createNewGame({ name: '坊市宝', gender: '女', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(g);
   g.inventory.capacity = 999; g.inventory.used = 0; S.addStones(g, 100000);
   const artGoods = { 名称: '试炼法宝', 类型: '法宝', 部位: 'artifact', 等级: 4, 品阶: '法器', 价格: 100, 价值: 80, 描述: '测试', effect: {}, _equip: { 名称: '试炼法宝', 类型: '法宝', 部位: 'artifact', 品阶: '法器', 等级: 4, 战力: 42, 描述: '测试', 效果: {} } };
@@ -2674,7 +2674,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
 }
 {
   // marketCompare 四态：新装备位 / 更强 / 略逊 / 持平（含法宝槽）
-  const mk = () => S.createNewGame({ name: '对比', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2 });
+  const mk = () => S.createNewGame({ name: '对比', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   let st = mk(); // 无任何装备
   ok(S.marketCompare(st, { 类型: '装备', 部位: 'weapon', 战力: 10 }).cls === 'new', 'marketCompare：无当前装备→新装备位');
   st = mk(); st.equipment.weapon = { 战力: 5 };
@@ -2933,7 +2933,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
 /* ---------- 顶栏「本月行动状态」常驻 chip（monthActionStatus 纯函数） ---------- */
 {
   // 新游戏尚未行动：actedThisMonth 初始化为空对象
-  const st = S.createNewGame({ name: '本月', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2 });
+  const st = S.createNewGame({ name: '本月', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(st);
   const m0 = S.monthActionStatus(st);
   ok(m0.count === 0 && m0.done === false && Array.isArray(m0.acted) && m0.acted.length === 0, 'monthActionStatus：新游戏未行动→count=0/done=false');
@@ -2945,6 +2945,67 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const bare = { player: {} };
   const m2 = S.monthActionStatus(bare);
   ok(m2.count === 0 && m2.done === false, 'monthActionStatus：极端旧档(无flags)不报错→count=0');
+}
+
+
+/* ---------- 聚灵阵：洞府持久修炼加成设施（确定性，无 RNG） ---------- */
+{
+  const st = S.createNewGame({ name: '聚灵阵', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  // 初始化：新游戏 arrayLevel=0，预览乘区=1
+  ok(st.cave.arrayLevel === 0, '聚灵阵：新游戏 arrayLevel 初始化为 0');
+  const pv0 = S.cultivateGainPreview(st, 'normal');
+  ok(pv0.arrayMul === 1, '聚灵阵：0 重时预览乘区 arrayMul=1');
+
+  // 升级：灵石充裕时布设第 1 重，扣费且 arrayLevel 递增
+  st.currencies = st.currencies || {};
+  st.currencies['下品灵石'] = 100000;
+  const before = S.totalStones(st);
+  const rep = S.performAction(st, { title: '布设聚灵阵', action: { type: 'upgradeArray' } });
+  ok(st.cave.arrayLevel === 1, '聚灵阵：升级后 arrayLevel=1');
+  ok(rep.logs.some((l) => l.includes('聚灵阵')), '聚灵阵：升级日志出现');
+  ok(before - S.totalStones(st) === 300, '聚灵阵：第 1 重扣费 300 灵石');
+
+  // 乘区随重数线性增长（每重 +8%）
+  const pv1 = S.cultivateGainPreview(st, 'normal');
+  ok(Math.abs(pv1.arrayMul - 1.08) < 1e-9, '聚灵阵：1 重时预览乘区=1.08');
+  // 预览收益随阵重提升（同一状态，0 重 vs 3 重）
+  st.cave.arrayLevel = 3;
+  const pv3 = S.cultivateGainPreview(st, 'normal');
+  ok(Math.abs(pv3.arrayMul - 1.24) < 1e-9, '聚灵阵：3 重时预览乘区=1.24');
+  ok(pv3.gain > pv0.gain, `聚灵阵：3 重预览收益高于 0 重（${pv3.gain} > ${pv0.gain}）`);
+
+  // 真实结算也吃到加成（cultivate 同口径乘入 arrayMul）：克隆同一状态，仅 arrayLevel 不同（排除灵根速度随机差异）
+  const a = S.createNewGame({ name: '阵A', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(a);
+  const b = JSON.parse(JSON.stringify(a));
+  b.cave.arrayLevel = 3;
+  let sumA = 0, sumB = 0;
+  for (let i = 0; i < 40; i++) { sumA += S.cultivate(a, 'normal').gain; sumB += S.cultivate(b, 'normal').gain; }
+  ok(sumB > sumA, `聚灵阵：3 重真实修炼累计收益高于 0 重（${sumB} > ${sumA}）`);
+
+  // 封顶：已达最高 5 重不再升级、不扣费
+  st.cave.arrayLevel = 5;
+  const stoneBeforeCap = S.totalStones(st);
+  const repCap = S.performAction(st, { title: '布设聚灵阵', action: { type: 'upgradeArray' } });
+  ok(st.cave.arrayLevel === 5, '聚灵阵：达 5 重上限后不再提升');
+  ok(S.totalStones(st) === stoneBeforeCap, '聚灵阵：达上限升级不扣费');
+  ok(repCap.logs.some((l) => l.includes('最高重数')), '聚灵阵：达上限升级日志提示');
+
+  // 旧档兼容：缺 arrayLevel 字段时预览乘区=1 且不报错
+  const bare = S.createNewGame({ name: '旧档', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(bare);
+  delete bare.cave.arrayLevel;
+  const pvBare = S.cultivateGainPreview(bare, 'normal');
+  ok(pvBare.arrayMul === 1, '聚灵阵：旧档缺 arrayLevel 字段时乘区=1（不报错）');
+
+  // 罗盘经营选项：灵石充裕且未达上限时出现聚灵阵选项（用全新未达上限 state）
+  const optState = S.createNewGame({ name: '阵选项', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(optState);
+  optState.currencies = optState.currencies || {};
+  optState.currencies['下品灵石'] = 100000;
+  const opt = S.generateCompass(optState);
+  ok(opt.some((o) => o.action.type === 'upgradeArray'), '聚灵阵：罗盘经营出现布设选项');
 }
 
 console.log(`

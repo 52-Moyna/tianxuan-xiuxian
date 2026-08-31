@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -482,7 +482,7 @@ export function createNewGame(opts) {
     mainTechnique: startTechName,
     arts: Object.fromEntries(ARTS.map((a) => [a, { level: 0, exp: 0 }])),
     items: pack.items.map((n) => ({ 名称: n, 类型: String(n).includes('储物袋') ? '容器' : '杂物', 数量: 1, 描述: String(n).includes('储物袋') ? '决定行囊容量，可在坊市或百艺中扩容。' : '开局资产' })),
-    cave: { level: 0, name: CAVE_LEVELS[0].name, bonus: 0 },
+    cave: { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, arrayLevel: 0 },
     // 道缘：开局仅 2~3 位故交已结识，其余随修行机缘逐步解锁（#65）
     npcs: generateNpcs(region.name),
     destiny: {
@@ -527,6 +527,12 @@ export function createNewGame(opts) {
 /* ============================================================
  * 四、修炼与突破
  * ========================================================== */
+/** 聚灵阵修炼效率乘区（纯函数，不修改 state）。每重 +8%，最高 5 重。供 cultivate 与 cultivateGainPreview 共用同一事实来源。 */
+export function arrayMul(state) {
+  const lv = state?.cave?.arrayLevel || 0;
+  return 1 + lv * ARRAY_BONUS_PER_LEVEL;
+}
+
 /** 修炼获得修为经验。返回 {gain, logs} */
 export function cultivate(state, mode = 'normal') {
   const p = state.player;
@@ -540,7 +546,7 @@ export function cultivate(state, mode = 'normal') {
   const toxicMul = toxic >= 85 ? 0.55 : toxic >= 60 ? 0.75 : toxic >= 35 ? 0.9 : 1;
   // 聚灵丹药力：未来若干月修炼效率提升（由 useItem 写入 flags.cultivateBoostMonths）
   const boostMul = (state.flags?.cultivateBoostMonths || 0) > 0 ? 1.15 : 1;
-  const gain = Math.round(base * p.spiritRoot.speed * (1 + (state.cave.bonus || 0) + sectBonus) * grade.expMul * (1 + p.daoBase['根骨'].level / 200) * toxicMul * boostMul * omenMul(state, 'cultivate'));
+  const gain = Math.round(base * p.spiritRoot.speed * (1 + (state.cave.bonus || 0) + sectBonus) * grade.expMul * (1 + p.daoBase['根骨'].level / 200) * toxicMul * boostMul * arrayMul(state) * omenMul(state, 'cultivate'));
   p.exp += gain;
   // 闭关连续次数（走火入魔触发条件）
   if (mode === 'seclusion') state.flags.seclusionStreak = (state.flags.seclusionStreak || 0) + 1;
@@ -578,12 +584,13 @@ export function cultivateGainPreview(state, mode = 'normal') {
   const toxic = Number(state.flags?.pillToxicity || 0);
   const toxicMul = toxic >= 85 ? 0.55 : toxic >= 60 ? 0.75 : toxic >= 35 ? 0.9 : 1;
   const boostMul = (state.flags?.cultivateBoostMonths || 0) > 0 ? 1.15 : 1;
+  const arrayMul = 1 + (state.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL;
   const rootMul = p.spiritRoot.speed;
   const caveMul = 1 + (state.cave.bonus || 0) + sectBonus;
   const gradeMul = grade.expMul;
   const boneMul = 1 + p.daoBase['根骨'].level / 200;
   const omen = omenMul(state, 'cultivate');
-  const gain = Math.round(base * rootMul * caveMul * gradeMul * boneMul * toxicMul * boostMul * omen);
+  const gain = Math.round(base * rootMul * caveMul * arrayMul * gradeMul * boneMul * toxicMul * boostMul * omen);
   // 闭关走火入魔提示：真实机制为「连续闭关>=3月触发 qihuo 事件」（需 Lv.30+）；
   // 让累积风险对玩家可感知，且低等级不再虚报风险。
   let note;
@@ -596,7 +603,7 @@ export function cultivateGainPreview(state, mode = 'normal') {
       : '闭关·走火入魔风险（连续闭关积累）';
   }
   return {
-    mode, base, rootMul, caveMul, sectBonus, gradeMul, boneMul, toxicMul, boostMul, omen, gain,
+    mode, base, rootMul, caveMul, sectBonus, gradeMul, boneMul, toxicMul, boostMul, omen, arrayMul, gain,
     note,
   };
 }
@@ -1558,6 +1565,14 @@ export function generateCompass(state) {
     }
   }
 
+  // —— 聚灵阵（灵石充裕且未达上限时出现） ——
+  {
+    const cur = state.cave?.arrayLevel || 0;
+    if (cur < ARRAY_MAX_LEVEL && canAfford(state, ARRAY_UPGRADE_BASE * (cur + 1))) {
+      opts.push({ icon: '🔯', tag: '经营', title: `布设聚灵阵（${cur}→${cur + 1} 重）`, desc: `花费灵石${ARRAY_UPGRADE_BASE * (cur + 1)}，修炼效率永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%（与洞府加成、聚灵阵旗叠加）。`, action: { type: 'upgradeArray' } });
+    }
+  }
+
   // 新增玩法选项（秘境/拍卖/灵兽/宗门/机缘）
   opts.push(...extraCompassOptions(state));
 
@@ -1571,6 +1586,7 @@ export function generateCompass(state) {
       const parts = [`基础${pv.base}`, `灵根×${pv.rootMul}`, `洞府/宗门+${cavePct}%`, `功法×${pv.gradeMul}`, `根骨+${bonePct}%`];
       if (pv.toxicMul !== 1) parts.push(`丹毒×${pv.toxicMul}`);
       if (pv.boostMul !== 1) parts.push(`聚灵×${pv.boostMul}`);
+      if (pv.arrayMul !== 1) parts.push(`聚灵阵×${pv.arrayMul}`);
       parts.push(`运势×${pv.omen}`);
       return { ...o, preview: `预计修为 +${pv.gain}（${pv.note}）`, previewTitle: `修炼收益拆解：${parts.join(' ｜ ')} ≈ ${pv.gain}` };
     }
@@ -2009,6 +2025,18 @@ export function performAction(state, option, extra = {}) {
     case 'upgradeHerbSpring': {
       const r = upgradeHerbSpring(state);
       logs.push(...r.logs);
+      break;
+    }
+    case 'upgradeArray': {
+      const cur = state.cave?.arrayLevel || 0;
+      if (cur >= ARRAY_MAX_LEVEL) logs.push('聚灵阵已布设至最高重数，无需再升。');
+      else {
+        const cost = ARRAY_UPGRADE_BASE * (cur + 1);
+        if (spendStones(state, cost)) {
+          state.cave.arrayLevel = cur + 1;
+          logs.push(`聚灵阵布设至第 ${state.cave.arrayLevel} 重！修炼效率永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%（现合计 +${Math.round(state.cave.arrayLevel * ARRAY_BONUS_PER_LEVEL * 100)}%）。`);
+        } else logs.push('灵石不足，布阵作罢。');
+      }
       break;
     }
     case 'social': {

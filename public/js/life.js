@@ -232,7 +232,7 @@ export function totalEquipPower(state) {
 
 export function ensureLifeState(state) {
   if (!state.world) state.world = { year: 1000, month: 1, turns: 0, region: '中州圣城', regionId: 'zhongzhou', news: [] };
-  if (!state.cave) state.cave = { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0 };
+  if (!state.cave) state.cave = { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0, arrayLevel: 0 };
   state.cave.garden = Array.isArray(state.cave.garden) ? state.cave.garden : [];
   const regionName = String(state.world.region || '中州圣城');
   const found = Object.entries(REGION_NAMES).find(([id, name]) => id === state.world.regionId || name === regionName || regionName.includes(name));
@@ -605,6 +605,11 @@ export const HERB_SPRING_LEVEL = 5;
 export const HERB_SPRING_MAX = 3;
 /** 引泉升级费用基数：第 k 重费用 = HERB_SPRING_COST_BASE × k（k 从 1 起） */
 export const HERB_SPRING_COST_BASE = 400;
+
+// 聚灵阵：洞府内可布设/升级的持久性修炼灵气增幅设施（独立于洞府等级加成）。
+export const ARRAY_BONUS_PER_LEVEL = 0.08; // 每重修炼效率 +8%
+export const ARRAY_MAX_LEVEL = 5;          // 最高 5 重（修炼效率 +40%）
+export const ARRAY_UPGRADE_BASE = 300;     // 布设第 k 重费用 = ARRAY_UPGRADE_BASE × k（k 从 1 起）
 /** 单株累计浸润可转化为收获产量加成的上限：防止付费无限堆产，保留平衡 */
 export const HERB_IRRIGATE_YIELD_CAP = 3;
 /** 炼丹催化材料：开炉时若持有，自动消耗 1 份以提升成丹率（确定性、无 RNG）。
@@ -762,7 +767,7 @@ function alchemyAddStones(state, amt) {
 
 /** 初始化丹炉状态（丹炉并行炼制队列 + 统计） */
 export function ensureAlchemyState(state) {
-  state.cave = state.cave || { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0 };
+  state.cave = state.cave || { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0, arrayLevel: 0 };
   state.cave.alchemy = Array.isArray(state.cave.alchemy) ? state.cave.alchemy : [];
   state.flags = state.flags || {};
   if (typeof state.flags.refinedPills !== 'number') state.flags.refinedPills = 0;

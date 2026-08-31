@@ -91,5 +91,17 @@ ok('旧档聚灵余月默认0', rt3.flags.cultivateBoostMonths === 0);
 ok('旧档战前增益默认0', rt3.flags.nextBattleWin === 0);
 ok('旧档天机运势默认null', rt3.flags.omen === null);
 
-console.log(`\n存读档回路测试：${pass} 通过 / ${fail} 失败`);
+// 8. 聚灵阵 / 引泉 持久化回路（防存读档丢失洞府进度）
+st.cave.springLevel = 2;
+st.cave.arrayLevel = 4;
+const rt4 = deserialize(serialize(st));
+ok('聚灵阵重数随档持久化', rt4.cave.arrayLevel === 4);
+ok('引泉重数随档持久化', rt4.cave.springLevel === 2);
+// 旧档（序列化不含新字段）兼容：默认 0
+const rt5 = deserialize(serialize(st3));
+ok('旧档聚灵阵重数默认0', rt5.cave.arrayLevel === 0);
+ok('旧档引泉重数默认0', rt5.cave.springLevel === 0);
+
+console.log(`
+存读档回路测试：${pass} 通过 / ${fail} 失败`);
 process.exit(fail === 0 ? 0 : 1);
