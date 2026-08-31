@@ -373,6 +373,8 @@ button { font-family: inherit; }
 .tb-alchemy-danger { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); font-weight: 600; }
 .tb-travel { color: var(--cat-lilian); border-color: var(--cat-lilian); }
 .tb-sect { color: #b48ad6; border-color: #b48ad6; }
+.tb-acted { color: var(--jade); border-color: var(--jade-soft); background: rgba(111,191,143,.10); }
+.tb-acted-done { color: var(--warn); border-color: var(--warn); background: rgba(220,180,70,.12); font-weight: 600; }
 .tb-clickable { cursor: pointer; }
 .tb-clickable:hover { filter: brightness(1.12); }
 
