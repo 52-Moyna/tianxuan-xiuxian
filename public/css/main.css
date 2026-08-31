@@ -372,6 +372,7 @@ button { font-family: inherit; }
 .tb-alchemy-warn { color: var(--warn); border-color: var(--warn); background: rgba(220,180,70,.1); }
 .tb-alchemy-danger { color: var(--danger); border-color: var(--danger); background: rgba(224,138,106,.12); font-weight: 600; }
 .tb-travel { color: var(--cat-lilian); border-color: var(--cat-lilian); }
+.tb-sect { color: #b48ad6; border-color: #b48ad6; }
 .tb-clickable { cursor: pointer; }
 .tb-clickable:hover { filter: brightness(1.12); }
 
@@ -487,6 +488,9 @@ button { font-family: inherit; }
 .alchemy-row { background: linear-gradient(90deg, rgba(224,138,106,.12), rgba(224,138,106,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
 .alchemy-row .vital-label { color: #e08a6a; }
 .alchemy-row b { color: #e08a6a; font-weight: 600; }
+.sect-row { background: linear-gradient(90deg, rgba(180,138,214,.14), rgba(180,138,214,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
+.sect-row .vital-label { color: #b48ad6; }
+.sect-row b { color: #b48ad6; font-weight: 600; }
 .buff-row { background: linear-gradient(90deg, rgba(224,138,74,.16), rgba(224,138,74,.02)); border-radius: 8px; padding: 2px 6px; margin: 0 -6px; }
 .buff-row .vital-label { color: #e08a4a; }
 .buff-row b { color: #e08a4a; font-weight: 600; }

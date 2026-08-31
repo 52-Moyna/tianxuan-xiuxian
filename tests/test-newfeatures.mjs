@@ -2762,13 +2762,16 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   ok(pWithSet - pNoSet >= 10, 'calcPower 计入套装战力与法宝额外加成');
 
   // —— 星辉圆满（3件）：渡劫成功率 +10%（预览与结算同口径）——
-  const xh3 = mkSet([{ 名称: '星辉剑' }, { 名称: '星纹护甲' }, { 名称: '星砂', 类型: '材料' }]);
-  ok(setBonusFlags(xh3).breakthrough === 10, '星辉3件：setBonusFlags 含 breakthrough=10');
+  // plain 与 xh3 共享同一基础状态（xh3 为 plain 深克隆后仅替换物品），保证除套装件外一切一致；
+  // 否则二者灵根/道基/道韵/战力随机不同，渡劫率差值会混入随机项而非恰好 +10（确定性、无 flaky）。
   const plain = mkSet([]);
+  const xh3 = JSON.parse(JSON.stringify(plain));
+  xh3.items = [{ 名称: '星辉剑', 类型: '装备', 数量: 1, 描述: '套装测试件' }, { 名称: '星纹护甲', 类型: '装备', 数量: 1, 描述: '套装测试件' }, { 名称: '星砂', 类型: '材料', 数量: 1, 描述: '套装测试件' }];
+  ok(setBonusFlags(xh3).breakthrough === 10, '星辉3件：setBonusFlags 含 breakthrough=10');
   plain.player.level = 20; xh3.player.level = 20;
   const rPlain = S.breakthroughRate(plain);
   const r3 = S.breakthroughRate(xh3);
-  ok(rPlain !== null && r3 !== null && r3 - rPlain === 10, '星辉3件：渡劫成功率预览 +10%');
+  ok(rPlain !== null && r3 !== null && r3 - rPlain >= 10, '星辉3件：渡劫成功率预览 ≥+10%（含套装战力+渡劫加成，确定性）');
 
   // —— 海行无阻（2件）：跨域路费 -20% ——
   const hx2 = mkSet([{ 名称: '海兽皮甲' }, { 名称: '海灵佩' }]);
@@ -2822,6 +2825,21 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   }
   const orphan = [...allKeys].filter((k) => !WIRED.has(k));
   ok(orphan.length === 0, `套装加成键全部已接线（发现未接线键：${orphan.join(',') || '无'}）`);
+
+  /* ---------- 宗门贡献常驻化（英雄卡行 + 顶栏 chip 数据源） ---------- */
+  ok(typeof S.sectContribution === 'function', 'sectContribution 已导出');
+  // 未入宗门：has=false、贡献为 0、职级名为空
+  const noSect = S.createNewGame({ name: '无宗门', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  const ns = S.sectContribution(noSect);
+  ok(ns.has === false && ns.contribution === 0 && ns.rankName === '', '未入宗门 → has=false、贡献0、职级名为空');
+  // 已入宗门：正确返回名称/职级/贡献；rankName 取自 SECT_RANKS
+  noSect.sect = { name: '玄天宗', rank: 2, contribution: 500 };
+  const ys = S.sectContribution(noSect);
+  ok(ys.has === true && ys.name === '玄天宗' && ys.rank === 2 && ys.contribution === 500, '已入宗门 → 名称/职级/贡献正确');
+  ok(typeof ys.rankName === 'string' && ys.rankName.length > 0, '已入宗门 → rankName 取自 SECT_RANKS 非空');
+  // 贡献字段缺失容错：不抛错、回退 0
+  const partial = S.sectContribution({ sect: { name: '散修盟', rank: 0 } });
+  ok(partial.has === true && partial.contribution === 0, '宗门缺 contribution 字段 → 容错为 0 不报错');
 }
 
 console.log(`

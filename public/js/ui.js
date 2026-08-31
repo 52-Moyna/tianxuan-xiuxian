@@ -842,6 +842,20 @@ export function renderAll() {
       alchRow.style.display = 'none';
     }
   }
+  // 宗门贡献度常驻行：宗门贡献是真实进度资源（宗门秘境/任务累积、兑换所消费），此前仅在「宗门」面板可见，
+  // 切走即不可知；现做英雄卡常驻行，延续「跨标签页不可见状态常驻化」主题，让玩家随时知晓贡献与职级。
+  const sc = S.sectContribution(st);
+  const sectRow = document.getElementById('st-sect-row');
+  const sectB = document.getElementById('st-sect');
+  if (sectRow && sectB) {
+    if (sc.has) {
+      sectRow.style.display = '';
+      sectB.innerHTML = `${sc.contribution} ｜ ${sc.rankName}`;
+      sectB.title = `已入宗门「${sc.name}」，职级：${sc.rankName}，宗门贡献 ${sc.contribution}（宗门秘境/任务累积，兑换所消费）。`;
+    } else {
+      sectRow.style.display = 'none';
+    }
+  }
 
   // 危机提示横幅：汇总寿元/丹毒预警，给出可行的延寿/解毒途径；若行囊正好有对应解药，渲染可点击「服用」按钮（预警→行动闭环）
   const banner = $('#crisis-banner');
@@ -958,6 +972,22 @@ export function renderAll() {
       travelChip.onclick = () => { if (typeof setSideTab === 'function') setSideTab('map'); };
     } else {
       travelChip.style.display = 'none';
+    }
+  }
+
+  // 宗门贡献常驻提示：宗门贡献此前仅在「宗门」面板可见，切走即不可知；
+  // 此处做顶栏常驻 chip，显示当前职级与贡献，点击直达宗门面板（延续跨标签页不可见状态常驻化主题）。
+  const sectInfo = S.sectContribution(st);
+  const sectChip = document.getElementById('tb-sect');
+  if (sectChip) {
+    if (sectInfo.has) {
+      sectChip.style.display = '';
+      sectChip.classList.add('tb-clickable');
+      sectChip.innerHTML = `${ICO('<path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/>')}宗门 ${sectInfo.rankName} · ${sectInfo.contribution}`;
+      sectChip.title = `已入宗门「${sectInfo.name}」，职级：${sectInfo.rankName}，贡献 ${sectInfo.contribution}。点击打开宗门面板。`;
+      sectChip.onclick = () => { if (typeof flowSectTask === 'function') flowSectTask(); };
+    } else {
+      sectChip.style.display = 'none';
     }
   }
 

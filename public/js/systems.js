@@ -736,6 +736,17 @@ export function catalystStatus(state) {
   });
 }
 
+/** 宗门贡献度状态：供英雄卡常驻行与顶栏 chip 展示（延续「跨标签页不可见状态常驻化」主题）。
+ *  宗门贡献是真实进度资源（宗门秘境/宗门任务累积，宗门兑换所消费），此前仅在「宗门」面板可见，
+ *  切走即不可知；现做可被英雄卡/顶栏常驻读取的纯函数（不改动状态、确定性、无 RNG）。
+ *  @returns {{has:boolean, name:string, rank:number, rankName:string, contribution:number}} */
+export function sectContribution(state) {
+  const sect = state.sect;
+  if (!sect || !sect.name) return { has: false, name: '', rank: 0, rankName: '', contribution: 0 };
+  const rankName = (SECT_RANKS[sect.rank] && SECT_RANKS[sect.rank].name) || '';
+  return { has: true, name: sect.name, rank: sect.rank || 0, rankName, contribution: sect.contribution || 0 };
+}
+
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
   const db = state.player.daoBase[name];
