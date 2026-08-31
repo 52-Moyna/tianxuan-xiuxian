@@ -2156,6 +2156,24 @@ export function commissionInfo(state, npc) {
   return { task, available, have, need: task.need, cdRemaining: onCd ? (npc.commissionCd - state.world.turns) : 0 };
 }
 
+/**
+ * 道友委托回赠奖励的确定性预览文案（与 applyCommissionReward 同口径，无 RNG）。
+ * 委托是「投资型决策」，玩家此前只见所需材料、不知回赠内容，属信息盲区；
+ * 现补确定性预览，延续「信息透明·确定性预览」主题。
+ */
+export function commissionRewardPreview(task) {
+  const r = task && task.reward;
+  if (!r) return '无';
+  if (r.type === 'stones') return `灵石 +${r.amount}`;
+  if (r.type === 'item') return `${r.名称} ×${r.数量 || 1}`;
+  if (r.type === 'equip') {
+    const slotName = EQUIP_SLOTS.find((s) => s.id === r.slot)?.name || '装备';
+    return `随机${slotName}（Lv.${r.level}）`;
+  }
+  if (r.type === 'exp') return `${r.base} 道基经验 +${r.amount}`;
+  return '未知回赠';
+}
+
 function applyCommissionReward(state, task, npc, logs) {
   const r = task.reward;
   if (r.type === 'stones') {

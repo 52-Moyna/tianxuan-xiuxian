@@ -1676,6 +1676,26 @@ beastHabitatReachableGroup();
   ok(S.totalStones(gs) === stonesBefore + 120, '灵石实际到账+120');
 }
 
+/* ---------- 道友委托·回赠奖励确定性预览（信息透明·确定性预览） ---------- */
+{
+  const buildCi = (job) => { const g = S.createNewGame({ name: '委托预览', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() }); ensureLifeState(g); g.npcs = [{ name: '甲', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job, trait: 'x', level: 10 }]; return S.commissionInfo(g, g.npcs[0]); };
+  ok(S.commissionRewardPreview(buildCi('散修').task) === '灵石 +120', '散修委托预览：灵石 +120');
+  ok(S.commissionRewardPreview(buildCi('坊市商贩').task) === '灵石 +100', '坊市商贩委托预览：灵石 +100');
+  ok(S.commissionRewardPreview(buildCi('炼丹师').task) === '悟性 道基经验 +30', '炼丹师委托预览：悟性 道基经验 +30');
+  ok(S.commissionRewardPreview(buildCi('炼器师').task) === '随机武器（Lv.8）', '炼器师委托预览：随机武器（Lv.8）');
+  ok(S.commissionRewardPreview(buildCi('符师').task) === '低阶符箓 ×2', '符师委托预览：低阶符箓 ×2');
+  ok(S.commissionRewardPreview(buildCi('灵植师').task) === '年份灵草 ×2', '灵植师委托预览：年份灵草 ×2');
+  ok(S.commissionRewardPreview(buildCi('剑修').task) === '悟性 道基经验 +30', '剑修委托预览：悟性 道基经验 +30');
+  ok(S.commissionRewardPreview(buildCi('体修').task) === '根骨 道基经验 +30', '体修委托预览：根骨 道基经验 +30');
+  // 预览文案与真实回赠一致（散修委托交付实际到账灵石+120）
+  const gP = S.createNewGame({ name: '委托预览一致', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() }); ensureLifeState(gP);
+  gP.npcs = [{ name: '散人', relation: 3, relationName: '道友', favor: 70, met: true, gender: '男', race: '人', realm: '练气', job: '散修', trait: 'x', level: 10 }];
+  storeItem(gP, { 名称: '矿石', 类型: '材料', 数量: 2, 描述: 't', 价值: 5 });
+  const beforeP = S.totalStones(gP);
+  S.interactNpc(gP, gP.npcs[0], 'commission');
+  ok(S.totalStones(gP) === beforeP + 120, '预览文案与真实回赠一致（散修灵石+120）');
+}
+
 /* ---------- 拍卖拍品不再是死道具（effect 真实落地） ---------- */
 const poolXM = AUCTION_ITEMS_POOL.find((x) => x.name === '洗髓丹');
 const poolYS = AUCTION_ITEMS_POOL.find((x) => x.name === '延寿丹');

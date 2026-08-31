@@ -1855,3 +1855,6 @@ button { font-family: inherit; }
   opacity: .72;
   margin-left: 2px;
 }
+
+/* 道友委托回赠预览提示（信息透明·确定性预览） */
+.commission-hint { font-size: 12px; line-height: 1.4; color: var(--jade); margin: 4px 8px 2px; text-align: center; }
