@@ -2023,6 +2023,17 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(pr.caveBonus === 24, 'refineRate·洞府bonus0.8→丹炉加成24');
   ok(pr.rate === 98, 'refineRate·超出部分封顶98');
   ok(pr.rate === Math.min(98, recB.baseRate + 24 + 23), 'refineRate·与结算公式等价(封顶)');
+
+  // 5) 催化材料持有状态（丹炉面板可视化数据源，catalystStatus）
+  const cs = S.catalystStatus(ar);
+  const csYear = cs.find((c) => c.name === '年份灵草');
+  const csDf = cs.find((c) => c.name === '私藏丹方·残卷');
+  ok(csYear && csYear.have === 1 && csYear.held, 'catalystStatus·年份灵草持有数=1 且 held');
+  ok(csYear.bonus === 8, 'catalystStatus·年份灵草加成=8');
+  ok(csDf && csDf.have === 1 && csDf.held, 'catalystStatus·私藏丹方·残卷持有数=1 且 held');
+  ok(csDf.bonus === 15, 'catalystStatus·私藏丹方·残卷加成=15');
+  const csEmpty = S.catalystStatus(S.createNewGame({ name: '无催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() }));
+  ok(csEmpty.length === 2 && csEmpty.every((c) => c.have === 0 && !c.held), 'catalystStatus·无催化材料时全部 have=0');
 }
 
 /* ---------- 疆域图·地域典型遭遇胜率预估（确定性预览） ---------- */

@@ -1801,6 +1801,14 @@ button { font-family: inherit; }
 .ar-rate { color: var(--jade); font-weight: 700; }
 .ar-bonus { color: var(--text-dim); font-size: .68rem; margin-left: 2px; }
 
+.alchemy-catalysts { margin: 4px 0 2px; padding: 8px 10px; border-radius: 10px; background: rgba(224,138,106,.08); border: 1px solid var(--gold-soft); }
+.ar-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.ar-cat { font-size: .7rem; color: #e08a6a; border: 1px solid var(--gold-soft); border-radius: 999px; padding: 2px 9px; background: rgba(224,138,106,.1); }
+.ar-cat i { font-style: normal; color: var(--text-faint); margin-left: 5px; }
+.ar-cat-empty { color: var(--text-faint); border-color: var(--line-soft); background: transparent; }
+.ar-cat-ready { font-size: .66rem; color: #e08a6a; margin-left: 6px; }
+
+
 
 /* 天命进度卡（主页常驻） */
 .panel-destiny-progress { }

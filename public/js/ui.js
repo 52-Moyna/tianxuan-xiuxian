@@ -2826,6 +2826,17 @@ function renderCenter() {
     return;
   }
 
+
+/** 丹炉面板催化材料常驻块：开炉前透明展示催化材料持有与自动消耗，落实信息透明。 */
+function alchemyCatalystBlock(st) {
+  const cats = S.catalystStatus(st);
+  const held = cats.filter((c) => c.have > 0);
+  const rows = held.length
+    ? held.map((c) => `<span class="ar-cat">${c.name} ×${c.have}<i>开炉自动消耗1份 · 成丹率 +${c.bonus}%</i></span>`).join('')
+    : `<span class="ar-cat ar-cat-empty">未持有催化材料：道友深谈 / 委托可得「年份灵草」「私藏丹方·残卷」，开炉自动催化提升成丹率</span>`;
+  return `<div class="alchemy-catalysts"><div class="side-subsubtitle">催化材料（开炉自动消耗）</div><div class="ar-cats">${rows}</div></div>`;
+}
+
   if (sideTab === 'cave') {
     const cave = (st.cave = st.cave || {});
     cave.garden = Array.isArray(cave.garden) ? cave.garden : [];
@@ -2863,7 +2874,7 @@ function renderCenter() {
             return `
             <div class="alchemy-recipe ${cls}">
               <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span></div>
-              <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}）</span></div>
+              <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}）</span>${pr.catalystBonus ? `<span class="ar-cat-ready">🔥催化就绪</span>` : ""}</div>
               <div class="ar-need">
                 ${Object.entries(r.need).map(([n, c]) => {
                   const have = st.items.find((x) => x.名称 === n)?.数量 || 0;
@@ -2876,6 +2887,7 @@ function renderCenter() {
             </div>`;
           }).join('')}
         </div>
+        ${alchemyCatalystBlock(st)}
       </div>`;
     box.innerHTML = `
       <div class="panel">

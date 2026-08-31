@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -725,6 +725,17 @@ export function alchemyStatus(state) {
   else text = `${minLeft} 月后出炉`;
   return { count, slots, minLeft, ready, level, text };
 }
+
+/** 炼丹催化材料持有状态：供丹炉面板在开炉前透明展示「持有数量 / 开炉自动消耗 / 提升成丹率」。
+ *  此前玩家只在成丹率里看到「＋催化X」，无从得知自己持有多少、开炉会被自动消耗，
+ *  现把催化材料可见化，落实「信息透明·确定性预览」主题（确定性、无 RNG）。 */
+export function catalystStatus(state) {
+  return Object.entries(ALCHEMY_CATALYSTS).map(([name, cfg]) => {
+    const have = state.items.find((x) => x.名称 === name)?.数量 || 0;
+    return { name, have, bonus: cfg.bonus, label: cfg.label, held: have >= 1 };
+  });
+}
+
 export function addDaoBaseExp(state, name, amount, logs) {
   if (name === '悟性') amount = Math.round(amount * omenMul(state, 'insight'));
   const db = state.player.daoBase[name];
