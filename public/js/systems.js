@@ -2396,6 +2396,8 @@ export function shopStock(state) {
     const gradeHint = nextGrade.id !== curGrade.id ? `（进阶为${nextGrade.name}）` : '';
     stock.push({ 名称: '储物袋扩容契', 类型: '服务', 价格: BAG_UPGRADE_BASE + (state.inventory.upgrades || 0) * BAG_UPGRADE_STEP, 价值: 0, 描述: `购买后行囊容量+20格，${nextCap}格。${gradeHint}`, effect: { bagUpgrade: 20 } });
   })();
+  // 扩容储物袋：可购回行囊、服用即拓展容量 +20 格（与「储物袋扩容契」服务同效，便于囤积备用）
+  stock.push({ 名称: '扩容储物袋', 类型: '道具', 价格: BAG_UPGRADE_BASE + (state.inventory.upgrades || 0) * BAG_UPGRADE_STEP, 价值: Math.round(BAG_UPGRADE_BASE * 0.6), 描述: '服用后行囊容量 +20 格（与坊市扩容契同效，可囤积备用）。', effect: { bag: 20 } });
   state.world.market = { stock, refreshTurn: state.world.turns };
   return stock;
 }
@@ -2617,6 +2619,14 @@ export function useItem(state, idx) {
     if (state.beasts.maxSlots >= cap) logs.push(`灵兽栏已至上限（${cap} 栏），契约暂存。`);
     else { state.beasts.maxSlots += 1; logs.push(`契约生效，灵兽栏上限提升至 ${state.beasts.maxSlots} 栏。`); }
   }
+  // 扩容储物袋：服用直接拓展行囊容量（容量 +N 格），与坊市「储物袋扩容契」服务并行的另一种扩容途径
+  if (it.effect.bag) {
+    const add = Number(it.effect.bag) || 20;
+    state.inventory.capacity += add;
+    state.inventory.upgrades = (state.inventory.upgrades || 0) + 1;
+    state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
+    logs.push(`施法展开「${it.名称}」，行囊容量 +${add} 格（现 ${state.inventory.capacity} 格）。`);
+  }
   // 解毒丹：服用降低丹毒（与 codex 承诺「丹毒 -30」一致），是丹毒危机唯一主动恢复途径
   if (it.effect.detox) {
     const cur = Number(state.flags?.pillToxicity || 0);
@@ -2701,6 +2711,7 @@ export function itemUsePreview(state, it) {
     const cur = (state && state.beasts && state.beasts.maxSlots) || 1;
     parts.push(cur >= 6 ? `灵兽栏上限 +1（已达上限 ${cur}/6，服用无效）` : `灵兽栏上限 +1（现 ${cur}/6 栏）`);
   }
+  if (eff.bag) parts.push(`行囊容量 +${eff.bag} 格`);
   if (eff.detox) parts.push(`丹毒 -${eff.detox}`);
   if (eff.battleBuff) parts.push(`下次战斗胜率 +${eff.battleBuff}%`);
   if (!parts.length) return none;

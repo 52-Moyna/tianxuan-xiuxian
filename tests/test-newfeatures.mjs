@@ -2542,6 +2542,25 @@ ok(aSafe.count === 0 && aSafe.level === 'ok', 'cave 缺失安全降级为 0 炉'
   ok(S.itemUsePreview(st0, { 名称: '青锋剑', 类型: '法宝', 战力: 30 }).mode === 'equip', '法宝判定为可穿戴');
   ok(S.itemUsePreview(st0, { 名称: '星砂', 类型: '材料' }).mode === 'none', '无 effect 材料无可用操作');
 
+  // 扩容储物袋：幽灵条目→真实可用道具（可购、可服用扩容）
+  const bagPrev = S.itemUsePreview(st0, { 名称: '扩容储物袋', 类型: '道具', effect: { bag: 20 } });
+  ok(bagPrev.mode === 'use' && bagPrev.label === '使用' && bagPrev.text.includes('行囊容量 +20 格'), '扩容储物袋可主动使用且预览含扩容 +20');
+  // 服用真实拓展容量
+  const stBag = S.createNewGame({ name: '扩容', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(stBag);
+  const capBefore = stBag.inventory.capacity;
+  stBag.items.push({ 名称: '扩容储物袋', 类型: '道具', 数量: 1, 描述: '服用后行囊容量 +20 格。', effect: { bag: 20 } });
+  const useLog = S.useItem(stBag, stBag.items.length - 1) || [];
+  ok(stBag.inventory.capacity === capBefore + 20, '服用扩容储物袋后行囊容量 +20');
+  ok(!stBag.items.some((x) => x.名称 === '扩容储物袋'), '服用后扩容储物袋被消耗');
+  ok(useLog.some((l) => l.includes('容量')), '服用扩容储物袋产出扩容日志');
+  // 坊市可购得（获取途径真实存在）
+  const bagShop = S.shopStock(stBag).find((x) => x.名称 === '扩容储物袋');
+  ok(!!bagShop && bagShop.effect && bagShop.effect.bag === 20, '坊市上架可购的扩容储物袋（effect.bag=20）');
+  // 购买后进入行囊、可再服用
+  const buyRes = S.buyItem(stBag, { 名称: '扩容储物袋', 类型: '道具', 价格: 0, 描述: '', effect: { bag: 20 } });
+  ok(!!buyRes && stBag.items.some((x) => x.名称 === '扩容储物袋'), '购买扩容储物袋进入行囊');
+
 /* ---------- 坊市专属渡劫丹（筑基丹等）须正确标注为瓶颈专属丹（防死字段回归）---------- */
 {
   const stB = S.createNewGame({ name: '渡劫', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
