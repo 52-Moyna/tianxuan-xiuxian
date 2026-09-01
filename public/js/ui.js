@@ -1974,9 +1974,14 @@ async function flowSectTask() {
     <div class="choice-intro">宗门兑换所（消耗贡献）：</div>
     ${CX.SECT_EXCHANGE.map((e) => {
       const get = e.type === 'stones' ? `下品灵石 +${e.amount}` : `丹药：${e.item} ×${e.qty || 1}`;
+      // 满仓校验与 sectExchange 共用 sectExchangeBlockReason，UI 与结算口径一致：
+      // 丹药占行囊格位，储物袋满时直接禁用按钮，避免玩家点了才发现贡献白扣。
+      const block = S.sectExchangeBlockReason(st, e.id);
+      const ok = st.sect.contribution >= e.cost && !block;
+      const warn = block ? `<div class="bag-block-warn">⚠ ${block}</div>` : '';
       return `<div class="sect-task">
-        <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div><div class="codex-effect">可得：${get}</div></div>
-        <button class="btn btn-sm ${st.sect.contribution >= e.cost ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${st.sect.contribution >= e.cost ? '' : 'disabled'}>兑换</button>
+        <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div><div class="codex-effect">可得：${get}</div>${warn}</div>
+        <button class="btn btn-sm ${ok ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${ok ? '' : 'disabled'}>兑换</button>
       </div>`;
     }).join('')}
     <div class="modal-actions"><button class="btn" id="btn-back-sect">返回本月选择</button></div>`,

@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -2355,7 +2355,7 @@ export function interactNpc(state, npc, kind) {
   }
   if (npc.relation >= 3 && kind !== 'qiecuo' && Rng.chance(0.25)) {
     const gift = { 名称: `${npc.name}的回礼`, 类型: '材料', 数量: 1, 描述: `${npc.job}赠予的地域材料。` };
-    if (storeItem(state, gift)) logs.push(`「${npc.name}」回赠一份材料，已收入储物袋。`);
+    if (storeItemOrNote(state, gift, logs, `储物袋已满，「${npc.name}」的回礼未能带走。`)) logs.push(`「${npc.name}」回赠一份材料，已收入储物袋。`);
   }
   addLog(state, '操作', `与「${npc.name}」往来（${kind === 'chat' ? '叙旧' : kind === 'gift' ? '送礼' : '论道'}），好感${npc.favor}。`);
   makeChronicle(state, { type: '道缘', title: `与${npc.name}往来`, text: logs.join('') });
@@ -3165,6 +3165,16 @@ export function claimSectStipend(state) {
 /* ============================================================
  * 十四、转世轮回（文档第十八章）
  * ========================================================== */
+/** 宗门兑换容量校验：作为「结算与 UI」唯一事实来源，杜绝口径漂移。
+ *  灵石直接入账、不占行囊格位，故只对丹药类兑换做容量校验。返回 null 表示可兑换。 */
+export function sectExchangeBlockReason(state, itemId) {
+  const ex = SECT_EXCHANGE.find((e) => e.id === itemId);
+  if (!ex || ex.type !== 'pill') return null;
+  const probe = { 名称: ex.item, 类型: '丹药', 数量: ex.qty || 1 };
+  if (canStore(state, probe)) return null;
+  return `储物袋空间不足，「${ex.item}」无处安放，请先出售杂物或扩容储物袋再行兑换。`;
+}
+
 /** 宗门兑换所：以宗门贡献兑换资源（确定性，无 RNG）。 */
 export function sectExchange(state, itemId) {
   ensureLifeState(state);
@@ -3175,6 +3185,11 @@ export function sectExchange(state, itemId) {
   if (state.sect.contribution < ex.cost) {
     return { ok: false, logs: [`宗门贡献不足，需 ${ex.cost}（当前 ${state.sect.contribution}）。`] };
   }
+  // 满仓保护：丹药要占行囊格位，必须先确认有处安放，再扣贡献。
+  // 旧写法先扣贡献再 storeItem，储物袋满时玩家白付 100~240 点贡献却一无所获，
+  // 返回却是 ok:true、日志仍写「兑换成功」——典型的付费后静默丢失。
+  const block = sectExchangeBlockReason(state, itemId);
+  if (block) return { ok: false, logs: [`⚠ ${block}（贡献未扣除）`] };
   state.sect.contribution -= ex.cost;
   const logs = [`🏯 你于宗门兑换所换取「${ex.name}」，消耗贡献 ${ex.cost}。`];
   if (ex.type === 'stones') {
@@ -3183,6 +3198,7 @@ export function sectExchange(state, itemId) {
   } else if (ex.type === 'pill') {
     const it = { 名称: ex.item, 类型: '丹药', 数量: ex.qty || 1, 描述: ex.desc, effect: ex.effect, toxicity: ex.toxicity };
     if (storeItem(state, it)) logs.push(`获得丹药：${ex.item} ×${ex.qty || 1}。`);
+    else logs.push(`⚠ 储物袋已满，「${ex.item}」未能带走。`);
   }
   addLog(state, '操作', `宗门兑换所兑换「${ex.name}」，贡献-${ex.cost}。`);
   refreshDerived(state);
@@ -3257,16 +3273,22 @@ export function tameBeast(state, beastTemplate, useIncense = false) {
     state.beasts.tamedCount += 1;
     if (state.beasts.activeIdx < 0) state.beasts.activeIdx = state.beasts.slots.length - 1;
     // 收服成功赠予「灵兽契约」作为驯兽凭证（见证羁绊）；仅在缺失时补发，避免重复累积。
+    // 本函数是「直接 return { ok, logs }」风格，函数体内没有 logs 变量，
+    // 故用局部 extra 收集满仓提示，再在返回时并入，避免 ReferenceError。
+    const extra = [];
     if (!state.items.some((i) => i.名称 === '灵兽契约')) {
       const contract = { 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '驯兽凭证；服用可拓宽灵兽栏（上限 +1，至多 6 栏）。', 价值: 0, effect: { beastSlot: 1 } };
-      storeItem(state, contract);
-      discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
+      // 满仓提示：旧写法无条件 storeItem + discoverItem，储物袋满时图鉴解锁了「灵兽契约」、
+      // 行囊里却没有实物，玩家翻遍行囊找不着，以为是 bug。
+      if (storeItemOrNote(state, contract, extra, '⚠ 储物袋已满，「灵兽契约」未能带走（灵兽已收服，可腾出格子后再次收服补领）。')) {
+        discoverItem(state, { 名称: '灵兽契约', 类型: '道具' });
+      }
     }
     discoverItem(state, { 名称: beast.name, 类型: '灵兽' });
     addLog(state, '事件', `成功收服灵兽「${beast.name}」，战力加成 +${beast.power}。`);
     makeChronicle(state, { type: '灵兽', title: `收服${beast.name}`, text: `你收服了${beast.name}，它将协助你战斗与采集。` });
     refreshDerived(state);
-    return { ok: true, logs: [`你成功收服「${beast.name}」！${beast.desc} 战力 +${beast.power}。${foodNote}`] };
+    return { ok: true, logs: [`你成功收服「${beast.name}」！${beast.desc} 战力 +${beast.power}。${foodNote}`, ...extra] };
   }
   return { ok: false, logs: [`收服失败，「${beast.name}」挣脱了你的束缚，扬长而去。${foodNote}`] };
 }

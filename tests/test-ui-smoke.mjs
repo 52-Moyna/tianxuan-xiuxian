@@ -129,6 +129,36 @@ try {
     ok(!!$('.herb-seed-acts'), '补种按钮以独立容器布局，不与播种按钮挤在一列');
   } catch (e) { ok(false, `洞府灵草园预估渲染: ${e.message}`); }
 
+  // 宗门兑换所：满仓时禁用丹药兑换（UI 与 sectExchange 同口径，防止贡献白扣）
+  try {
+    const L2 = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const s2 = GameState.data;
+    L2.ensureLifeState(s2);
+    s2.sect = s2.sect || {};
+    s2.sect.name = '测试宗门'; s2.sect.rank = 1; s2.sect.contribution = 5000;
+    UI.renderAll(); await sleep(150);
+    const chip = $('#tb-sect');
+    ok(!!chip && chip.style.display !== 'none', '入宗后顶栏宗门 chip 可见');
+    chip.click(); await sleep(200);
+    ok($$('[data-exchange]').length === 4, `宗门面板渲染兑换项（${$$('[data-exchange]').length} 个）`);
+    ok($$('[data-exchange]').every((b) => !b.disabled), '空间充足时兑换按钮全部可用');
+    // 构造满载：容量 = 当前已用
+    s2.inventory.capacity = Math.max(1, L2.inventoryUsed(s2));
+    s2.inventory.ringBonus = 0;
+    UI.renderAll(); await sleep(120);
+    $('#tb-sect').click(); await sleep(200);
+    const qiBtn = $$('[data-exchange]').find((b) => b.dataset.exchange === 'ex_qi');
+    const stBtn = $$('[data-exchange]').find((b) => b.dataset.exchange === 'ex_stones');
+    ok(!!qiBtn && qiBtn.disabled, '满仓时丹药兑换按钮被禁用（防止贡献白扣）');
+    ok(!!stBtn && !stBtn.disabled, '满仓时灵石兑换仍可用（灵石不占行囊格位）');
+    const mHtml = $('.modal') ? $('.modal').innerHTML : '';
+    ok(mHtml.includes('储物袋空间不足'), '满仓兑换项给出明确警示文案');
+    ok(!!$('.bag-block-warn'), '满仓警示使用 .bag-block-warn 红条样式');
+    $('#btn-back-sect').click(); await sleep(150);
+    s2.inventory.capacity = 200; s2.sect.contribution = 0;
+    UI.renderAll(); await sleep(120);
+  } catch (e) { ok(false, `宗门兑换所满仓渲染: ${e.message}`); }
+
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
   const setBtn = $$('.side-tab').find((b) => b.dataset.tab === 'settings');
   setBtn.click(); await sleep(100);

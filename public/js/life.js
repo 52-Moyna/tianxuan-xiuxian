@@ -330,6 +330,16 @@ export function storeItem(state, item) {
   return true;
 }
 
+/** 入袋并记录满仓：成功返回 true；储物袋满时向 logs 追加一行 ⚠ 提示并返回 false。
+ *  用途：免费奖励（赠送 / 拾取 / 退还）类入袋，杜绝「物品静默消失、玩家一头雾水」。
+ *  注意：若属「先付代价再得产出」的场合，仍应先 canStore 校验、再扣代价（见 harvestHerb）。 */
+export function storeItemOrNote(state, item, logs, note) {
+  if (storeItem(state, item)) return true;
+  const name = (item && item.名称) || '物品';
+  if (Array.isArray(logs)) logs.push(note || `⚠ 储物袋已满，「${name}」未能带走。`);
+  return false;
+}
+
 /** 整理行囊：按类型稳定排序，并合并非装备/法宝的同类堆叠（storeItem 已即时合并，
  *  此处作为安全兜底 + 排序，使同类物品聚拢、装备/法宝保持独立）。返回整理后物品件数。 */
 export function organizeBag(state) {
@@ -1010,7 +1020,9 @@ export function settleRefine(state, logs = [], force) {
       logs.push(`💨 「${r.name}」炼制失败，化为废丹。`);
       for (const [name, count] of Object.entries(r.need)) {
         const refund = Math.floor(count / 2);
-        if (refund > 0) storeItem(state, { 名称: name, 类型: '材料', 数量: refund, 描述: '废丹回收的残余材料。', 价值: 10 });
+        // 满仓提示：退还材料入袋失败时明确告知，否则玩家只看到「炼制失败」，
+        // 却不知道本该退回的半份材料也没了（静默双重损失）。
+        if (refund > 0) storeItemOrNote(state, { 名称: name, 类型: '材料', 数量: refund, 描述: '废丹回收的残余材料。', 价值: 10 }, logs);
       }
       if (r.stoneCost) alchemyAddStones(state, Math.floor(r.stoneCost * 0.3));
     }
