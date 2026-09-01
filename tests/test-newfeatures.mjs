@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -3036,6 +3036,72 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   optState.currencies['下品灵石'] = 100000;
   const opt = S.generateCompass(optState);
   ok(opt.some((o) => o.action.type === 'upgradeArray'), '聚灵阵：罗盘经营出现布设选项');
+}
+
+/* ---------- 聚灵阵联动灵草园（本轮新增） ---------- */
+{
+  // 基线：无洞府等级、无引泉、无聚灵阵、无运势 → 每月自然生长 1 月
+  const g = S.createNewGame({ name: '阵草', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(g);
+  g.cave.level = 0;
+  g.cave.springLevel = 0;
+  g.cave.arrayLevel = 0;
+  delete g.flags.omen;
+  ok(herbArrayGrowth(g) === 0, '聚灵阵·灵草：0 重阵额外生长 +0 月');
+  ok(herbMonthlyGrowth(g) === 1, '聚灵阵·灵草：基线每月自然生长 = 1 月');
+
+  // 每 ARRAY_GROWTH_EVERY 重 +1 月，封顶 ARRAY_GROWTH_MAX
+  g.cave.arrayLevel = 1;
+  ok(herbArrayGrowth(g) === 0, '聚灵阵·灵草：1 重阵尚未跨过 2 重阈值（+0 月）');
+  g.cave.arrayLevel = 2;
+  ok(herbArrayGrowth(g) === 1, '聚灵阵·灵草：2 重阵额外生长 +1 月');
+  g.cave.arrayLevel = 3;
+  ok(herbArrayGrowth(g) === 1, '聚灵阵·灵草：3 重阵仍为 +1 月');
+  g.cave.arrayLevel = 4;
+  ok(herbArrayGrowth(g) === 2, '聚灵阵·灵草：4 重阵额外生长 +2 月');
+  g.cave.arrayLevel = 5;
+  ok(herbArrayGrowth(g) === ARRAY_GROWTH_MAX, `聚灵阵·灵草：5 重阵封顶 +${ARRAY_GROWTH_MAX} 月`);
+
+  // 与灵泉涌动、洞府基础涌动叠加：洞府 Lv.5(基础+1) + 引泉2重(+2) + 阵4重(+2) = 6 月/月
+  g.cave.level = 5;
+  g.cave.springLevel = 2;
+  g.cave.arrayLevel = 4;
+  ok(herbSpringBonus(g) === 3, '聚灵阵·灵草：洞府 Lv.5 基础涌动+引泉2重 = +3');
+  ok(herbMonthlyGrowth(g) === 6, '聚灵阵·灵草：洞府基础1+灵泉3+阵2 → 合计 6 月/月');
+
+  // 真实月度结算：growHerbs 按 herbMonthlyGrowth 推进（唯一事实来源，无口径漂移）
+  g.cave.level = 0;
+  g.cave.springLevel = 0;
+  g.cave.arrayLevel = 4; // step = 3
+  g.cave.garden = [{ id: 'herb_lingcao', name: '凝露灵草', progress: 0, grow: 10, planted: '1年1月', irrigatedThisMonth: 0, irrigated: 0 }];
+  growHerbs(g);
+  ok(g.cave.garden[0].progress === 3, `聚灵阵·灵草：4 重阵下 growHerbs 单月推进 3 月（实得 ${g.cave.garden[0].progress}）`);
+  g.cave.arrayLevel = 0;
+  growHerbs(g);
+  ok(g.cave.garden[0].progress === 4, '聚灵阵·灵草：撤去阵法后单月仅推进 1 月');
+
+  // 旧档兼容：缺 arrayLevel 字段不报错、额外生长为 0
+  const bare = S.createNewGame({ name: '阵草旧档', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(bare);
+  delete bare.cave.arrayLevel;
+  ok(herbArrayGrowth(bare) === 0, '聚灵阵·灵草：旧档缺 arrayLevel 时额外生长=0（不报错）');
+  ok(herbMonthlyGrowth(bare) >= 1, '聚灵阵·灵草：旧档月度生长仍 >= 1');
+
+  // 升级日志：跨过 2 重阈值时明确提示灵草收益
+  const lg = S.createNewGame({ name: '阵草日志', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(lg);
+  lg.currencies['下品灵石'] = 100000;
+  lg.cave.arrayLevel = 1;
+  const rep2 = S.performAction(lg, { title: '布设聚灵阵', action: { type: 'upgradeArray' } });
+  ok(lg.cave.arrayLevel === 2, '聚灵阵·灵草：布设至 2 重成功');
+  ok(rep2.logs.some((l) => l.includes('灵草每月自然生长 +1 月')), '聚灵阵·灵草：升级日志提示灵草生长收益');
+
+  // 罗盘经营选项描述同步标注灵草增益（信息一致，不做隐藏加成）
+  const ds = S.createNewGame({ name: '阵草描述', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(ds);
+  ds.currencies['下品灵石'] = 100000;
+  const arrOpt = S.generateCompass(ds).find((o) => o.action.type === 'upgradeArray');
+  ok(!!arrOpt && arrOpt.desc.includes('灵草月生长'), '聚灵阵·灵草：罗盘选项描述标注灵草增益');
 }
 
 console.log(`

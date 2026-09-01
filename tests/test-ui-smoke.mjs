@@ -95,6 +95,20 @@ try {
   const itemJump = $$('.item-acts [data-codex]').length + $$('.item-acts [data-use]').length;
   ok(true, `行囊道具动作按钮数: ${itemJump}`);
 
+  // 洞府面板：灵草园展示「每月生长」与每株「约 N 月后熟」（成熟预估，消除心算盲区）
+  try {
+    const LIFE = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const st = GameState.data;
+    LIFE.ensureLifeState(st);
+    st.cave.garden.push({ id: 'herb_lingcao', name: '凝露灵草', progress: 1, grow: 5, planted: '1年1月', irrigatedThisMonth: 0, irrigated: 0 });
+    st.cave.arrayLevel = 4; // 阵 4 重 → 月生长 +2 → 每月 3 月 → 剩余 4 月 → 约 2 月后熟
+    UI.setSideTab('cave'); await sleep(120);
+    const caveHtml = $('#center-body') ? $('#center-body').innerHTML : '';
+    ok(caveHtml.includes('每月生长'), '洞府面板显示灵草园每月生长');
+    ok(caveHtml.includes('聚灵阵 +2'), '每月生长标注聚灵阵贡献 +2');
+    ok(caveHtml.includes('约 2 月后熟'), '灵草行按聚灵阵月生长给出成熟预估（约 2 月后熟）');
+  } catch (e) { ok(false, `洞府灵草园预估渲染: ${e.message}`); }
+
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
   const setBtn = $$('.side-tab').find((b) => b.dataset.tab === 'settings');
   setBtn.click(); await sleep(100);

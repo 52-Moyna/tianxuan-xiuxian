@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2973,7 +2973,7 @@ function alchemyCatalystBlock(st) {
       <div class="panel">
         <div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12H3zM9 21v-6h6v6"/></svg><span class="pt-text">洞府 · ${cave.name || curCave.name}</span><span class="panel-hint">Lv.${cave.level || 0} ｜ 修炼加成 +${Math.round((cave.bonus || 0) * 100)}%${((st.cave?.arrayLevel || 0) > 0) ? ` ｜ 聚灵阵 +${Math.round((st.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL * 100)}%` : ''}</span></div>
         <div class="opt-desc">洞府是修行根基。此处可经营灵草园，于灵田播种灵草、按月生长、成熟后收入储物袋炼丹。洞府升级（修炼加成）仍于决策罗盘的「经营」行动进行。<b>灵田随洞府等级进阶</b>：Lv.2 起灵草品质渐升、收获产量更高，Lv.1 起灵草园容量逐步扩展（最高 8 株）。</div>
-        <div class="side-subtitle">灵草园 · ${garden.length}/${gardenCapacity(st)} 株${herbSpringBonus(st) > 0 ? ` · 💧灵泉涌动（引泉 ${st.cave?.springLevel || 0} 重）` : ''}</div>
+        <div class="side-subtitle">灵草园 · ${garden.length}/${gardenCapacity(st)} 株${herbSpringBonus(st) > 0 ? ` · 💧灵泉涌动（引泉 ${st.cave?.springLevel || 0} 重）` : ''} · 每月生长 ${herbMonthlyGrowth(st)} 月${herbArrayGrowth(st) > 0 ? `（含🔯聚灵阵 +${herbArrayGrowth(st)}）` : ''}</div>
         <div class="opt-desc" style="margin:6px 0 10px">💧 灵泉涌动分「洞府基础（Lv.5+ 自动 +1）」与「引泉重数」两部分，可在决策罗盘「经营」中耗灵石引泉升级，每重令灵草月生长额外 +1 月。</div>
         ${garden.length ? garden.map((h, i) => {
           const mature = h.progress >= h.grow;
@@ -2981,7 +2981,7 @@ function alchemyCatalystBlock(st) {
           return `
           <div class="herb-row ${mature ? 'mature' : ''}">
             <div class="herb-info"><b>${h.name}</b><span>播种于 ${h.planted || '?'}</span><span class="herb-q">${herbQuality(st).label}灵田${herbSpringBonus(st) > 0 ? ' · 💧灵泉' : ''}${(h.irrigated||0) > 0 ? ` · 💧浸润${h.irrigated}（收获+${Math.min(h.irrigated, HERB_IRRIGATE_YIELD_CAP)}）` : ''}</span></div>
-            <div class="herb-grow"><i style="width:${Math.min(100, Math.round(h.progress / h.grow * 100))}%"></i><span>${h.progress}/${h.grow} 月${mature ? ' · 可收获' : (atCap ? ' · 本月浇灌已满' : '')}</span></div>
+            <div class="herb-grow"><i style="width:${Math.min(100, Math.round(h.progress / h.grow * 100))}%"></i><span>${h.progress}/${h.grow} 月${mature ? ' · 可收获' : ` · 约 ${Math.max(1, Math.ceil((h.grow - h.progress) / Math.max(1, herbMonthlyGrowth(st))))} 月后熟`}${(atCap && !mature) ? ' · 本月浇灌已满' : ''}</span></div>
             <button class="btn btn-sm btn-gold" data-harvest="${i}" ${mature ? '' : 'disabled'}>${mature ? '收获' : '未熟'}</button>
             <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
           </div>`;

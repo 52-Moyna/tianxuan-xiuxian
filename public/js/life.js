@@ -585,12 +585,28 @@ export function harvestAllHerbs(state) {
   return { ok: count > 0, count, logs };
 }
 
-/** 月度生长：所有灵草进度 +1（于 settleMonth 调用）；同时重置本月浇灌额度 */
+/**
+ * 灵草园「每月自然生长月数」的唯一事实来源：基础 1 月 + 天机运势 + 灵泉涌动 + 聚灵阵灵气。
+ * growHerbs（真实结算）与洞府面板的成熟预估（UI）共用此函数，避免口径漂移。确定性、无 RNG。
+ */
+export function herbMonthlyGrowth(state) {
+  return 1 + omenAdd(state, 'garden') + herbSpringBonus(state) + herbArrayGrowth(state);
+}
+/**
+ * 聚灵阵带来的灵草额外月生长：每 ARRAY_GROWTH_EVERY 重 +1 月，封顶 ARRAY_GROWTH_MAX 月。
+ * 与引泉（每重 +1 月）互补：聚灵阵主收益仍是修炼与丹炉，灵草只是其复合增益的一翼。
+ */
+export function herbArrayGrowth(state) {
+  const lv = state?.cave?.arrayLevel || 0;
+  return Math.min(Math.floor(lv / ARRAY_GROWTH_EVERY), ARRAY_GROWTH_MAX);
+}
+
+/** 月度生长：所有灵草进度按 herbMonthlyGrowth 推进（于 settleMonth 调用）；同时重置本月浇灌额度 */
 export function growHerbs(state) {
   ensureLifeState(state);
-  const spring = herbSpringBonus(state);
+  const step = herbMonthlyGrowth(state);
   for (const h of state.cave.garden) {
-    if (h.progress < h.grow) h.progress += 1 + omenAdd(state, 'garden') + spring;
+    if (h.progress < h.grow) h.progress += step;
     h.irrigatedThisMonth = 0;
   }
 }
@@ -610,6 +626,9 @@ export const HERB_SPRING_COST_BASE = 400;
 export const ARRAY_BONUS_PER_LEVEL = 0.08; // 每重修炼效率 +8%
 export const ARRAY_MAX_LEVEL = 5;          // 最高 5 重（修炼效率 +40%）
 export const ARRAY_UPGRADE_BASE = 300;     // 布设第 k 重费用 = ARRAY_UPGRADE_BASE × k（k 从 1 起）
+/** 聚灵阵对灵草园的灵气增益：每 ARRAY_GROWTH_EVERY 重令灵草月度自然生长额外 +1 月（确定性，无 RNG） */
+export const ARRAY_GROWTH_EVERY = 2;   // 每 2 重 +1 月生长
+export const ARRAY_GROWTH_MAX = 2;     // 最高 +2 月生长（5 重阵可达）
 /** 单株累计浸润可转化为收获产量加成的上限：防止付费无限堆产，保留平衡 */
 export const HERB_IRRIGATE_YIELD_CAP = 3;
 /** 炼丹催化材料：开炉时若持有，自动消耗 1 份以提升成丹率（确定性、无 RNG）。
