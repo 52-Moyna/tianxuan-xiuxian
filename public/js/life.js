@@ -816,8 +816,9 @@ export function refineRate(state, recipeId) {
     const it = state.items.find((x) => x.名称 === cname);
     if (it && it.数量 >= 1) catalystBonus += cfg.bonus;
   }
-  const rate = Math.min(98, baseRate + caveBonus + catalystBonus);
-  return { baseRate, caveBonus, catalystBonus, rate };
+  const arrayBonus = Math.round((state.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL * 100);
+  const rate = Math.min(98, baseRate + caveBonus + catalystBonus + arrayBonus);
+  return { baseRate, caveBonus, catalystBonus, arrayBonus, rate };
 }
 
 /** 开炉炼制：校验解锁/材料/灵石 → 扣材料与灵石 → 写入「炼制中」队列 */
@@ -894,7 +895,8 @@ export function settleRefine(state, logs = [], force) {
     if (!due && !force) continue; // 未到出炉月且非强制
     state.flags.refinedPills = (state.flags.refinedPills || 0) + 1;
     const caveBonus = Math.round((state.cave?.bonus || 0) * 30); // 洞府丹炉加成（最高约 +24）
-    const rate = Math.min(98, r.baseRate + caveBonus + (p.catalystBonus || 0));
+    const arrayBonus = Math.round((state.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL * 100); // 聚灵阵灵气助丹（每重 +8%，最高 +40%）
+    const rate = Math.min(98, r.baseRate + caveBonus + (p.catalystBonus || 0) + arrayBonus);
     let success;
     if (force === 'success') success = true;
     else if (force === 'fail') success = false;

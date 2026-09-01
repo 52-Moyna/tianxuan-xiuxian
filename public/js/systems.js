@@ -1569,7 +1569,7 @@ export function generateCompass(state) {
   {
     const cur = state.cave?.arrayLevel || 0;
     if (cur < ARRAY_MAX_LEVEL && canAfford(state, ARRAY_UPGRADE_BASE * (cur + 1))) {
-      opts.push({ icon: '🔯', tag: '经营', title: `布设聚灵阵（${cur}→${cur + 1} 重）`, desc: `花费灵石${ARRAY_UPGRADE_BASE * (cur + 1)}，修炼效率永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%（与洞府加成、聚灵阵旗叠加）。`, action: { type: 'upgradeArray' } });
+      opts.push({ icon: '🔯', tag: '经营', title: `布设聚灵阵（${cur}→${cur + 1} 重）`, desc: `花费灵石${ARRAY_UPGRADE_BASE * (cur + 1)}，修炼效率与丹炉成丹率各永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%/重（最高 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100 * ARRAY_MAX_LEVEL)}%，与洞府加成、聚灵阵旗叠加）。`, action: { type: 'upgradeArray' } });
     }
   }
 
@@ -2034,7 +2034,7 @@ export function performAction(state, option, extra = {}) {
         const cost = ARRAY_UPGRADE_BASE * (cur + 1);
         if (spendStones(state, cost)) {
           state.cave.arrayLevel = cur + 1;
-          logs.push(`聚灵阵布设至第 ${state.cave.arrayLevel} 重！修炼效率永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%（现合计 +${Math.round(state.cave.arrayLevel * ARRAY_BONUS_PER_LEVEL * 100)}%）。`);
+          logs.push(`聚灵阵布设至第 ${state.cave.arrayLevel} 重！修炼效率与丹炉成丹率各永久 +${Math.round(ARRAY_BONUS_PER_LEVEL * 100)}%/重（现各合计 +${Math.round(state.cave.arrayLevel * ARRAY_BONUS_PER_LEVEL * 100)}%）。`);
         } else logs.push('灵石不足，布阵作罢。');
       }
       break;

@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -2061,7 +2061,37 @@ ok(S.guessEquipSlot({ 名称: '踏风靴', 类型: '装备' }) === 'boots', 'gue
   ok(csDf.bonus === 15, 'catalystStatus·私藏丹方·残卷加成=15');
   const csEmpty = S.catalystStatus(S.createNewGame({ name: '无催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() }));
   ok(csEmpty.length === 2 && csEmpty.every((c) => c.have === 0 && !c.held), 'catalystStatus·无催化材料时全部 have=0');
-}
+}  // 关闭 block5（催化材料持有状态）
+
+  // 6) 聚灵阵联动丹炉成丹率（独立 fresh state，避免作用域依赖；每重 +8%，与修炼加成同源于 ARRAY_BONUS_PER_LEVEL）
+  {
+    const al = S.createNewGame({ name: '聚灵丹炉', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(al);
+    al.cave.bonus = 0; al.cave.arrayLevel = 0;
+    let pr = refineRate(al, '聚气丹');
+    ok(pr.arrayBonus === 0, 'refineRate·聚灵阵 0 重无成丹率加成');
+    al.cave.arrayLevel = 1;
+    pr = refineRate(al, '聚气丹');
+    ok(pr.arrayBonus === 8, 'refineRate·聚灵阵 1 重成丹率 +8');
+    ok(pr.rate === Math.min(98, pr.baseRate + 8), 'refineRate·聚灵阵 1 重期望率=基础+8');
+    al.cave.arrayLevel = ARRAY_MAX_LEVEL;
+    pr = refineRate(al, '聚气丹');
+    ok(pr.arrayBonus === 40, `refineRate·聚灵阵 ${ARRAY_MAX_LEVEL} 重成丹率 +40`);
+    ok(pr.rate === Math.min(98, pr.baseRate + 40), 'refineRate·聚灵阵 5 重期望率=基础+40(封顶)');
+    // 三源叠加：洞府丹炉 + 催化 + 聚灵阵 与结算公式等价
+    al.cave.bonus = 0.8;
+    storeItem(al, { 名称: '年份灵草', 类型: '材料', 数量: 1, 描述: '催化材料' });
+    pr = refineRate(al, '筑基丹');
+    ok(pr.rate === Math.min(98, pr.baseRate + 24 + 8 + 40), 'refineRate·洞府+催化+聚灵阵三源叠加与结算等价');
+    // 结算路径同样消费聚灵阵加成（与 refineRate 同源，force 消解 RNG 验证代码路径无异常）
+    const stArr = S.createNewGame({ name: '聚灵结算', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(stArr);
+    stArr.cave.arrayLevel = 3;
+    stArr.cave.alchemy.push({ recipeId: '聚气丹', name: '聚气丹', dueYear: stArr.world.year - 1, dueMonth: 1, startedYear: stArr.world.year, startedMonth: 1, catalystBonus: 0, usedCatalysts: [] });
+    const beforeP = stArr.items.filter((x) => x.名称 === '聚气丹').length;
+    settleRefine(stArr, [], 'success');
+    ok(stArr.items.filter((x) => x.名称 === '聚气丹').length === beforeP + 1, '聚灵阵结算·force 成功出丹(含聚灵阵加成路径)');
+  }
 
 /* ---------- 疆域图·地域典型遭遇胜率预估（确定性预览） ---------- */
 {

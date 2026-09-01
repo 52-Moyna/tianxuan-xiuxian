@@ -2954,7 +2954,7 @@ function alchemyCatalystBlock(st) {
             return `
             <div class="alchemy-recipe ${cls}">
               <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span></div>
-              <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}）</span>${pr.catalystBonus ? `<span class="ar-cat-ready">🔥催化就绪</span>` : ""}</div>
+              <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}${pr.arrayBonus ? `＋聚灵阵${pr.arrayBonus}` : ""}）</span>${pr.catalystBonus ? `<span class="ar-cat-ready">🔥催化就绪</span>` : ""}</div>
               <div class="ar-need">
                 ${Object.entries(r.need).map(([n, c]) => {
                   const have = st.items.find((x) => x.名称 === n)?.数量 || 0;
