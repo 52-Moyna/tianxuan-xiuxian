@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, itemSpace, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, regionSellBonus, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, itemSpace, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -2486,7 +2486,7 @@ export function marketCompare(state, goods) {
  *  另含 ±8% 随机浮动（withFluct=false 时不消耗 RNG，供 UI 预估价展示，避免渲染污染随机序列）。
  *  sellItem / sellItems / sellItemsByIndex 三处共用，杜绝「同一件物品不同入口报价不一致」。 */
 export function itemSellPrice(state, item, withFluct = true) {
-  const regionalBonus = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(item.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
+  const regionalBonus = regionSellBonus(state, item);
   const newsMul = newsPriceMul(state, item);
   const base = item.价值 || (item.类型 === '材料' ? 35 : 15);
   const fluct = withFluct ? Rng.float(0.92, 1.08) : 1;
@@ -2582,7 +2582,7 @@ export function lowValueSuggestions(state, n = 5) {
  *  与 itemSellPrice 同源，不消耗随机数，可在渲染期安全调用。 */
 export function sellPriceFactors(state, item) {
   ensureLifeState(state);
-  const regional = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(item.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
+  const regional = regionSellBonus(state, item);
   const news = newsPriceMul(state, item);
   const omen = omenMul(state, 'trade');
   return { regional, news, omen, base: item.价值 || (item.类型 === '材料' ? 35 : 15), est: itemSellPrice(state, item, false) };

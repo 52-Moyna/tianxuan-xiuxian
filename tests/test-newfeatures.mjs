@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
@@ -3479,6 +3479,38 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 海外特产「遗府与奇珍」→ 非材料 1.25x
   sp.world.regionId = 'haiwai';
   ok(S.sellPriceFactors(sp, pill).regional === 1.25, '海外奇珍类售价 1.25x 特产加成');
+
+  // 1b) 复合词特产回归防线：此前判定靠 specialty 文案 includes('材料')，
+  //     而「炼器火材 / 灵植与毒材 / 海产灵材 / 符箓与阵材」都不含「材料」二字，
+  //     导致 5/7 地域的 1.25x 溢价从未兑现。现改为读 REGION_TRAVEL.bonusTypes 显式字段，
+  //     文案改词不再影响结算。以下逐地域锁定「应当生效」与「不应生效」两端。
+  const talis = { 名称: '测试符箓', 类型: '道具', 数量: 1, 价值: 100, 描述: '西极特产校验。' };
+  for (const [rid, item, want, label] of [
+    ['nanming', mat, 1.25, '南冥「炼器火材」加成材料'],
+    ['lingnan', mat, 1.25, '岭南「灵植与毒材」加成材料'],
+    ['beiming', mat, 1.25, '北冥「海产灵材」加成材料'],
+    ['xiji', mat, 1.25, '西极「符箓与阵材」加成材料'],
+    ['xiji', talis, 1.25, '西极加成道具（符箓）'],
+    ['nanming', pill, 1, '南冥不加成丹药（非本地特产）'],
+    ['haiwai', mat, 1, '海外不加成材料（* = 除材料外全部）'],
+    ['zhongzhou', mat, 1, '中州「消息与功法」不加成材料'],
+  ]) {
+    sp.world.regionId = rid;
+    const got = S.sellPriceFactors(sp, item).regional;
+    ok(got === want, `${label} → ${got}（期望 ${want}）`);
+  }
+  // 结构校验：每个地域都必须显式声明 bonusTypes，否则新增地域会静默失去溢价
+  for (const [rid, cfg] of Object.entries(REGION_TRAVEL)) {
+    ok(Array.isArray(cfg.bonusTypes), `REGION_TRAVEL.${rid} 声明了 bonusTypes（防溢价静默失效）`);
+  }
+  // regionSellBonus 与 sellPriceFactors 同口径（避免两处判定再次漂移）
+  sp.world.regionId = 'lingnan';
+  ok(regionSellBonus(sp, mat) === S.sellPriceFactors(sp, mat).regional, 'regionSellBonus 与 sellPriceFactors 同口径');
+  // 端到端：岭南卖同一件材料，结算价较中州实测溢价约 25%（不只看因子字段）
+  const lnPrice = S.itemSellPrice(sp, mat, false);
+  sp.world.regionId = 'zhongzhou';
+  const zzPrice = S.itemSellPrice(sp, mat, false);
+  ok(Math.abs(lnPrice / zzPrice - 1.25) < 0.02, `岭南卖材料较中州实测溢价 25%（中州 ${zzPrice} → 岭南 ${lnPrice}）`);
   sp.world.regionId = 'zhongzhou';
 
   // 2) 交易运势倍率进入售价（此前 UI 预估完全无视此项）

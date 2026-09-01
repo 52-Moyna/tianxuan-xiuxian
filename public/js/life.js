@@ -11,14 +11,29 @@ export { HERB_HYBRID_COST, HERB_HYBRIDS };
  */
 
 export const REGION_TRAVEL = {
-  zhongzhou: { neighbors: ['nanming', 'xiji', 'beiming'], cost: 80, months: 1, specialty: '消息与功法', flavor: '宗门车队与商旅往来不绝。', danger: 2, realmReq: 1 },
-  donghuang: { neighbors: ['lingnan', 'haiwai'], cost: 120, months: 1, specialty: '妖兽材料', flavor: '荒野灵脉中常有妖兽出没。', danger: 4, realmReq: 3 },
-  nanming: { neighbors: ['zhongzhou', 'lingnan'], cost: 100, months: 1, specialty: '炼器火材', flavor: '地火映红半边天，炼器师昼夜不息。', danger: 3, realmReq: 2 },
-  xiji: { neighbors: ['zhongzhou', 'beiming'], cost: 100, months: 1, specialty: '符箓与阵材', flavor: '冰原遗迹露出古阵残痕。', danger: 3, realmReq: 3 },
-  beiming: { neighbors: ['zhongzhou', 'xiji', 'haiwai'], cost: 140, months: 1, specialty: '海产灵材', flavor: '巨舟载着各地修士驶向外海。', danger: 3, realmReq: 4 },
-  lingnan: { neighbors: ['donghuang', 'nanming'], cost: 90, months: 1, specialty: '灵植与毒材', flavor: '百越雨林里，灵植商人背着竹篓穿行。', danger: 4, realmReq: 2 },
-  haiwai: { neighbors: ['donghuang', 'beiming'], cost: 180, months: 2, specialty: '遗府与奇珍', flavor: '海雾深处偶尔显出上古仙岛的轮廓。', danger: 5, realmReq: 5 },
+  zhongzhou: { neighbors: ['nanming', 'xiji', 'beiming'], cost: 80, months: 1, specialty: '消息与功法', flavor: '宗门车队与商旅往来不绝。', danger: 2, realmReq: 1, bonusTypes: [] },
+  donghuang: { neighbors: ['lingnan', 'haiwai'], cost: 120, months: 1, specialty: '妖兽材料', flavor: '荒野灵脉中常有妖兽出没。', danger: 4, realmReq: 3, bonusTypes: ['材料'] },
+  nanming: { neighbors: ['zhongzhou', 'lingnan'], cost: 100, months: 1, specialty: '炼器火材', flavor: '地火映红半边天，炼器师昼夜不息。', danger: 3, realmReq: 2, bonusTypes: ['材料'] },
+  xiji: { neighbors: ['zhongzhou', 'beiming'], cost: 100, months: 1, specialty: '符箓与阵材', flavor: '冰原遗迹露出古阵残痕。', danger: 3, realmReq: 3, bonusTypes: ['材料', '道具'] },
+  beiming: { neighbors: ['zhongzhou', 'xiji', 'haiwai'], cost: 140, months: 1, specialty: '海产灵材', flavor: '巨舟载着各地修士驶向外海。', danger: 3, realmReq: 4, bonusTypes: ['材料'] },
+  lingnan: { neighbors: ['donghuang', 'nanming'], cost: 90, months: 1, specialty: '灵植与毒材', flavor: '百越雨林里，灵植商人背着竹篓穿行。', danger: 4, realmReq: 2, bonusTypes: ['材料'] },
+  haiwai: { neighbors: ['donghuang', 'beiming'], cost: 180, months: 2, specialty: '遗府与奇珍', flavor: '海雾深处偶尔显出上古仙岛的轮廓。', danger: 5, realmReq: 5, bonusTypes: ['*'] },
 };
+
+/**
+ * 地域特产售价加成倍率（唯一口径）。
+ * 读取 REGION_TRAVEL[id].bonusTypes 显式声明的可溢价物品类型；'*' 表示「除材料外全部」。
+ * 历史坑：此前靠 specialty 文案做 includes('材料') 模糊匹配，而特产值多为「炼器火材」
+ * 「灵植与毒材」「海产灵材」这类复合词，不含「材料」二字 → 7 个地域里 5 个的溢价承诺
+ * 从未兑现。改为显式字段后，文案改词不再影响结算。
+ * @returns {number} 1.25 或 1
+ */
+export function regionSellBonus(state, item) {
+  const types = REGION_TRAVEL[state?.world?.regionId]?.bonusTypes;
+  if (!Array.isArray(types) || !types.length || !item) return 1;
+  if (types.includes('*')) return item.类型 === '材料' ? 1 : 1.25;
+  return types.includes(item.类型) ? 1.25 : 1;
+}
 
 /**
  * 地域危险度 → 妖兽等级区间（与玩家战力脱钩）。
