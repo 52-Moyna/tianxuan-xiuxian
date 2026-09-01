@@ -163,6 +163,8 @@ export function serialize(state) {
         textSize: state.settings.textSize || 'normal',
         windowSize: state.settings.windowSize || 'normal',
         avatarPreset: state.settings.avatarPreset || '',
+        // 自定义头像时间戳（0=未使用）；不写入则刷新页面后自定义头像消失
+        customAvatarTs: Number(state.settings.customAvatarTs) || 0,
       },
       标记状态: {
         丹毒: state.flags?.pillToxicity || 0,

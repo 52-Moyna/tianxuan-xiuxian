@@ -1,7 +1,7 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, canTameBeast, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -171,6 +171,51 @@ state.beasts.slots.push({ name: '穷灵兽', element: '水', power: 50, skill: '
 state.currencies['下品灵石'] = 0;
 const upPoor = S.upgradeBeast(state, state.beasts.slots.length - 1);
 ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '灵石不足时拒绝升星');
+
+/* ---------- 灵兽放归（UI 入口接线，消除「栏满即死锁」） ---------- */
+{
+  const bs = ensureBeastState(state);
+  // 造一个「栏位 = 2、已占满」的局面：满栏时 canTameBeast 为假，罗盘不再出现灵兽栖息地
+  bs.maxSlots = 2;
+  bs.slots = [
+    { name: '青风狼', element: '风', power: 30, skill: '风刃突袭', desc: '弱', star: 1, tamed: true },
+    { name: '赤焰狐', element: '火', power: 90, skill: '吐息', desc: '强', star: 2, tamed: true },
+  ];
+  bs.activeIdx = 1;
+  ok(bs.slots.length === 2 && !canTameBeast(state), '灵兽栏占满时不可再收服（死锁前提）');
+
+  // 放归出战中的那一只：栏位腾出、不可再收服状态解除、出战索引不越界
+  const msg = S.releaseBeast(state, 1);
+  ok(bs.slots.length === 1 && bs.slots[0].name === '青风狼', '放归指定灵兽，剩余栏位正确');
+  ok(typeof msg === 'string' && msg.includes('赤焰狐'), '放归返回可读提示（含灵兽名）');
+  ok(bs.activeIdx === 0, '放归出战灵兽后出战索引回落到 0（不越界）');
+  ok(canTameBeast(state), '放归后恢复可收服，死锁解除');
+
+  // 放归中间索引时，出战索引正确前移（避免「出战对象错位」类事故）
+  bs.maxSlots = 3;
+  bs.slots = [
+    { name: 'A兽', element: '水', power: 10, skill: 'x', desc: '', star: 1, tamed: true },
+    { name: 'B兽', element: '土', power: 10, skill: 'x', desc: '', star: 1, tamed: true },
+    { name: 'C兽', element: '雷', power: 10, skill: 'x', desc: '', star: 1, tamed: true },
+  ];
+  bs.activeIdx = 2;
+  S.releaseBeast(state, 0);
+  ok(bs.activeIdx === 1 && bs.slots[1].name === 'C兽', '放归前方灵兽后出战索引前移，仍指向同一只');
+
+  // 越界 / 空位：返回提示而非抛错，UI 可安全调用
+  ok(typeof S.releaseBeast(state, 99) === 'string', '放归越界索引返回提示而不抛错');
+  S.releaseBeast(state, 0); S.releaseBeast(state, 0);
+  ok(bs.slots.length === 0 && bs.activeIdx === -1, '放空全部灵兽后出战索引为 -1');
+
+  // 存档往返：放归结果必须能落盘（不可逆操作）
+  bs.maxSlots = 2;
+  bs.slots = [{ name: '存档兽', element: '幻', power: 12, skill: 'x', desc: '', star: 1, tamed: true }];
+  bs.activeIdx = 0;
+  S.releaseBeast(state, 0);
+  const back = deserialize(serialize(state));
+  ensureBeastState(back);
+  ok((back.beasts.slots || []).length === 0, '放归结果存读档往返后保持（不会「复活」）');
+}
 
 /* ---------- 宗门俸禄系统（修复 monthlyStipend 死字段） ---------- */
 {
@@ -3646,6 +3691,22 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   ensureLifeState(back);
   ok(back.world.regionId === 'lingnan', `存读档往返后 regionId 保持（${back.world.regionId}）`);
   ok(back.world.region === '岭南百越', '存读档往返后地域显示名保持');
+}
+
+/* ---------- 自定义头像时间戳持久化（设置白名单） ---------- */
+{
+  const s3 = S.createNewGame({ name: '头像测试', gender: '女', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(s3);
+  ok((Number(s3.settings.customAvatarTs) || 0) === 0, '新建档默认未使用自定义头像（ts=0）');
+  s3.settings.customAvatarTs = 1712345678901;
+  const files = serialize(s3);
+  ok(Number(files['设置.ini']?.游戏设置?.customAvatarTs) === 1712345678901, 'customAvatarTs 已进入设置存档白名单');
+  const back3 = deserialize(files);
+  ok(Number(back3.settings?.customAvatarTs) === 1712345678901, 'customAvatarTs 存读档往返保持（自定义头像不会刷新即失效）');
+  // 旧档无该字段：必须回落 0，而不是 undefined 引发渲染异常
+  const legacy = { ...files, '设置.ini': { 游戏设置: { avatarPreset: 'x' } } };
+  const back4 = deserialize(legacy);
+  ok((Number(back4.settings?.customAvatarTs) || 0) === 0, '旧档缺 customAvatarTs 时回落为 0');
 }
 
 console.log(`

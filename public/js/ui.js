@@ -17,7 +17,7 @@ import * as D from './data.js';
 import * as S from './systems.js';
 import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
-import { saveGame, serialize } from './save.js';
+import { saveGame, serialize, uploadAvatar, removeAvatar, avatarUrl } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
 import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
@@ -2265,7 +2265,12 @@ function toxicityBarHTML(toxic) {
 /* 头像：标题页/仙籍卡显示当前存档头像（内置预设） */
 function resolveAvatarUrl() {
   const st = GameState.data;
-  // 只用内置头像预设（本地 data URL，无需联网，绝不会 404/报错）
+  // 自定义上传头像优先：图片存于 存档/<槽>/头像.png，由 /api/avatar 提供。
+  // customAvatarTs 为上传时刻时间戳（仅在成功上传后写入），既保证换图后立即刷新，
+  // 又避免每次渲染都带新时间戳造成重复请求。未上传过时 ts 为 0，不产生任何请求。
+  const ts = Number(st?.settings?.customAvatarTs) || 0;
+  if (ts) return avatarUrl(currentSaveSlot(), ts);
+  // 内置头像预设（本地 data URL，无需联网，绝不会 404/报错）
   // 兼容旧档中文键「头像预设」
   const preset = st?.settings?.avatarPreset || st?.settings?.['头像预设'];
   if (preset) {
@@ -2275,11 +2280,20 @@ function resolveAvatarUrl() {
   return null;
 }
 
+/** 当前存档槽（与设置面板同口径），取不到时回落 '1' */
+function currentSaveSlot() {
+  return (window.__save?.getSaveSlot) ? window.__save.getSaveSlot() : '1';
+}
+
 function renderHeroAvatar() {
   const box = $('#hero-avatar');
   if (!box) return;
   const url = resolveAvatarUrl();
-  box.innerHTML = url ? `<img class="hero-avatar-img" src="${url}" alt="头像">` : defaultAvatarSvg();
+  // onerror 兜底：自定义头像文件被手动删除时会 404，此时隐藏破图、露出头像框底色，
+  // 玩家可在设置页点「移除自定义头像」彻底回落。
+  box.innerHTML = url
+    ? `<img class="hero-avatar-img" src="${url}" alt="头像" onerror="this.style.display='none'">`
+    : defaultAvatarSvg();
 }
 
 /* 备用装备相对已穿戴同部位的战力差值徽标（一眼看出该换谁） */
@@ -3389,6 +3403,13 @@ function renderBeastsPanel(box) {
   const slots = beasts.slots || [];
   const maxSlots = beasts.maxSlots || 1;
   const totalPower = CX.beastPowerBonus(st);
+  // 满栏指引：灵兽栏默认仅 1 格，占满后 canTameBeast 为假、决策罗盘不再出现「前往灵兽栖息地」，
+  // 玩家既换不掉弱灵兽也拿不到「灵兽契约」扩栏，形同死锁。此处显式说明两条出路。
+  const isFull = slots.length >= maxSlots;
+  const hasContract = (st.items || []).some((i) => i.名称 === '灵兽契约');
+  const fullNote = isFull
+    ? `<div class="opt-desc" style="margin-top:6px">⚠ <b>灵兽栏已满</b>，决策罗盘将不再出现「前往灵兽栖息地」。想收服更强的灵兽，可先<b>放归山野</b>腾出栏位${hasContract ? '，或服用行囊中的「灵兽契约」拓宽栏位（上限 6 栏）' : '；服用「灵兽契约」可拓宽栏位，成功收服新灵兽时会获赠'}。</div>`
+    : '';
   const elemIcon = (e) => ({ 风: '🌪️', 土: '🪨', 幻: '👻', 雷: '⚡', 水: '💧', 火: '🔥' }[e] || '✨');
   box.innerHTML = `
     <div class="panel">
@@ -3412,9 +3433,11 @@ function renderBeastsPanel(box) {
             <div class="beast-acts">
               ${isActive ? `<button class="btn btn-xs text-btn" data-unbeast="${i}">收回出战</button>` : `<button class="btn btn-xs btn-gold" data-setbeast="${i}">设为出战</button>`}
               <button class="btn btn-xs ${maxed ? 'btn-dim' : 'btn-gold'}" data-starup="${i}" ${maxed || !canAfford ? 'disabled' : ''}>${maxed ? '已满星' : `升星 · ${starCost}灵石`}</button>
+              <button class="btn btn-xs btn-unequip" data-release="${i}" title="解除契约、放回山野，腾出 1 个灵兽栏位（不可撤销）">放归山野</button>
             </div>
           </div>`;
         }).join('')}</div>
+        ${fullNote}
         <div class="opt-desc" style="margin-top:8px">灵兽总战力加成：<b style="color:var(--jade)">+${totalPower}</b>（计入战斗胜率与采集收益）。指定一只「出战」灵兽可在战斗中额外护主，胜率再 +${S.activeBeastBonus(st)}%（星级越高加成越大，1★+2% → 5★+10%）。</div>
       ` : `
         <div class="opt-desc">你尚未收服任何灵兽。</div>
@@ -3438,6 +3461,19 @@ function renderBeastsPanel(box) {
     (r.logs || []).forEach((l) => toast(l, r.ok ? 'gold' : 'warn'));
     renderAll();
   }));
+  // 放归山野：不可逆操作，先二次确认；确认后立即落盘，避免刷新页面后灵兽「复活」
+  box.querySelectorAll('[data-release]').forEach((b) => b.addEventListener('click', async () => {
+    const idx = Number(b.dataset.release);
+    const target = (CX.ensureBeastState(st).slots || [])[idx];
+    if (!target) return;
+    const detail = `${target.element}系 · ★${target.star || 1} · 战力 +${target.power}`;
+    const yes = await confirmModal(`确定放归「${target.name}」？\n\n${detail}\n解除契约后它不会再回来，灵兽栏腾出 1 个空位（不可撤销）。`, '放归山野', '再想想');
+    if (!yes) return;
+    const msg = S.releaseBeast(st, idx);
+    toast(typeof msg === 'string' ? msg : '已解除契约。', 'info');
+    renderAll();
+    saveNow();
+  }));
   renderSidePanel();
 }
 
@@ -3446,6 +3482,7 @@ function renderSettingsPanel(box) {
   const st = GameState.data;
   const settings = st.settings || {};
   const slot = (window.__save?.getSaveSlot) ? window.__save.getSaveSlot() : '1';
+  const hasCustomAvatar = (Number(settings.customAvatarTs) || 0) > 0;
   box.innerHTML = `
     <div class="panel">
       <div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="pt-text">游戏设置</span></div>
@@ -3471,6 +3508,13 @@ function renderSettingsPanel(box) {
         <div class="opt-desc">选择一款仙侠风格的内置头像，立即生效并自动存档。</div>
       </div>
       ${builtInAvatarGridHTML(settings.avatarPreset)}
+
+      <div class="modal-actions col">
+        <button class="btn" id="btn-upload-avatar">上传自定义头像（PNG / JPG，≤2MB）</button>
+        <button class="btn ${hasCustomAvatar ? 'btn-unequip' : 'btn-dim'}" id="btn-remove-avatar" ${hasCustomAvatar ? '' : 'disabled'}>${hasCustomAvatar ? '移除自定义头像' : '未使用自定义头像'}</button>
+      </div>
+      <input type="file" id="avatar-file-input" accept="image/png,image/jpeg" hidden>
+      <div class="opt-desc">自定义头像保存在 存档 / ${slot} / 头像.png，随存档目录整体迁移；上传后优先于内置头像显示，移除后自动回落。</div>
 
       <div class="side-subtitle">存档备份（导出 / 导入）</div>
       <div class="modal-actions col">
@@ -3502,6 +3546,36 @@ function renderSettingsPanel(box) {
     box.querySelectorAll('.avatar-preset').forEach((b) => b.classList.toggle('on', b.dataset.preset === pid));
   };
   box.querySelectorAll('#setting-autosave,#setting-animations,#setting-clickfx,#setting-text-size,#setting-window-size').forEach((el) => el.addEventListener('change', saveSettings));
+  // 自定义头像：上传前做类型/体积校验（与服务端限制一致），成功后写入时间戳并落盘
+  const avatarInput = box.querySelector('#avatar-file-input');
+  box.querySelector('#btn-upload-avatar').addEventListener('click', () => avatarInput?.click());
+  avatarInput?.addEventListener('change', async () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    if (!file) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) { toast('仅支持 PNG / JPG 图片。', 'warn'); avatarInput.value = ''; return; }
+    if (file.size > 2 * 1024 * 1024) { toast('图片需小于 2MB。', 'warn'); avatarInput.value = ''; return; }
+    try {
+      await uploadAvatar(file, slot);
+      st.settings.customAvatarTs = Date.now();
+      toast('自定义头像已更新。', 'gold');
+      renderAll();
+      renderSidePanel();
+      saveNow();
+    } catch (e) {
+      toast(`头像上传失败：${e && e.message ? e.message : e}`, 'warn');
+    }
+    avatarInput.value = '';
+  });
+  box.querySelector('#btn-remove-avatar').addEventListener('click', async () => {
+    if (!hasCustomAvatar) return;
+    if (!(await confirmModal('确定移除自定义头像？将回落到所选内置头像。', '移除', '取消'))) return;
+    try { await removeAvatar(slot); } catch {}
+    st.settings.customAvatarTs = 0;
+    toast('已移除自定义头像。', 'info');
+    renderAll();
+    renderSidePanel();
+    saveNow();
+  });
   box.querySelector('#btn-manual-save').addEventListener('click', () => saveNow());
   box.querySelector('#btn-export-save').addEventListener('click', exportSave);
   box.querySelector('#btn-import-save').addEventListener('click', () => importSaveModal(box));

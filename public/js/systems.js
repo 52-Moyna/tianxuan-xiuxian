@@ -3603,8 +3603,10 @@ function awardAuctionItem(state, item, amount) {
     const it = { 名称: item.name, 类型: item.type, 数量: 1, 描述: item.desc };
     if (item.effect) it.effect = item.effect;
     if (typeof item.toxicity === 'number') it.toxicity = item.toxicity;
-    storeItem(state, it);
-    discoverItem(state, item);
+    // 调用方已在扣灵石前用 auctionBagBlockReason 拦截满仓；此处再兜一层：
+    // 严守「入袋成功才解锁图鉴」，杜绝图鉴显示已解锁、行囊里却找不着实物的幽灵状态。
+    if (storeItem(state, it)) discoverItem(state, item);
+    else addLog(state, '事件', `⚠ 储物袋已满，拍得之物「${item.name}」未能带走（灵石已付，请腾出格子后再竞拍）。`);
   }
   addLog(state, '操作', `拍卖会购得「${item.name}」，花费${amount}灵石。`);
 }
