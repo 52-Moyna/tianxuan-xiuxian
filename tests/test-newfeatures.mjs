@@ -1,6 +1,6 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth } from '../public/js/life.js';
-import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES } from '../public/js/data.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth } from '../public/js/life.js';
+import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
@@ -3217,6 +3217,128 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const rp = irrigateAllHerbs(p);
   ok(rp.ok && rp.count === 1, '一键浇灌：灵石不足时只浇能负担的株数');
   ok(p.currencies['下品灵石'] === 5, '一键浇灌：不会透支灵石');
+}
+
+/* ---------- 秘境满仓前置校验：付费（残图 + 护阵灵石）后不得静默丢失灵材 ---------- */
+{
+  const mkYifu = () => {
+    const g = S.createNewGame({ name: '遗府满仓测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g);
+    g.player.level = 55;
+    g.currencies['下品灵石'] = 1000;
+    for (let k = 0; k < 3; k++) g.items.push({ 名称: '海上遗府残图', 类型: '线索', 数量: 1, 描述: '残图' });
+    return g;
+  };
+  // 构造「储物袋满载」：容量 = 当前已用（不能用 capacity=0，会被 ensureLifeState 归一为 100）
+  const fillBag = (g) => {
+    const used = inventoryUsed(g);
+    g.inventory.ringBonus = 0;
+    g.inventory.capacity = Math.max(1, used);
+    g.inventory.used = used;
+  };
+  const mapCount = (g) => g.items.filter((i) => i.名称 === '海上遗府残图').reduce((s, i) => s + (i.数量 || 1), 0);
+  const realmWithMat = { rewards: { materials: ['测试灵材'] } };
+  const realmNoMat = { rewards: { materials: [] } };
+
+  // 有空位：放行
+  const a = mkYifu();
+  ok(S.mysticBagBlockReason(a, realmWithMat) === null, '有空位时秘境容量校验放行');
+  // 满仓：给出原因，且进入前拦截、不扣残图与护阵灵石
+  fillBag(a);
+  const reason = S.mysticBagBlockReason(a, realmWithMat);
+  ok(typeof reason === 'string' && reason.includes('储物袋已满'), '满仓时秘境容量校验给出中文原因');
+  ok(S.mysticBagBlockReason(a, realmNoMat) === null, '无材料产出的秘境不做容量校验');
+  const stonesA = S.totalStones(a);
+  const ra = S.exploreMysticRealm(a, 'yifu', 1);
+  ok(ra.logs.some((l) => l.includes('储物袋已满')), '满仓时拒绝进入秘境并明确提示');
+  ok(mapCount(a) === 3, '满仓时残图不被消耗（3 张仍在）');
+  ok(S.totalStones(a) === stonesA, '满仓时护阵灵石不被扣除');
+
+  // 腾出空间后可正常进入：残图与灵石照常消耗、材料入袋
+  const b = mkYifu();
+  b.inventory.capacity = inventoryUsed(b) + 8;
+  b.inventory.ringBonus = 0;
+  const itemsB = b.items.length;
+  const rb = S.exploreMysticRealm(b, 'yifu', 1);
+  ok(!rb.logs.some((l) => l.includes('储物袋已满')), '留出空间后可正常进入秘境');
+  ok(mapCount(b) === 0, '正常进入时消耗 3 张残图');
+  ok(rb.logs.some((l) => l.includes('缴纳遗府护阵灵石')), '正常进入时缴纳护阵灵石');
+  ok(b.items.length > itemsB - 3 || b.items.some((i) => i.类型 === '材料'), '正常进入时材料已入袋');
+
+  // 宗门秘境：满仓不拦截（贡献与灵石照常入账），但产出无法带走时必须明确提示、不得静默
+  const mkSect = () => {
+    const g = S.createNewGame({ name: '宗门满仓测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(g); S.joinSect(g, '测试仙宗');
+    g.sect.rank = 3; g.sect.contribution = 0;
+    return g;
+  };
+  const c = mkSect();
+  fillBag(c);
+  const beforeC = S.totalStones(c);
+  const rc = S.exploreSectRealm(c, 2);
+  ok(rc.ok && c.sect.contribution === 48, '宗门秘境满仓仍可进入、贡献照常入账');
+  ok(S.totalStones(c) === beforeC + 128, '宗门秘境满仓时灵石照常入账');
+  ok(rc.logs.some((l) => l.includes('储物袋已满')), '宗门秘境满仓时给出明确警示');
+  ok(!c.items.some((i) => i.名称 === '宗门灵脉晶'), '宗门秘境满仓时灵脉晶未入袋');
+  ok(rc.logs.some((l) => l.includes('未能带走')), '宗门秘境满仓时产出丢失有明确日志（不再静默）');
+  // 空间充足时正常带走灵脉晶与深处丹药
+  const d = mkSect();
+  d.inventory.capacity = inventoryUsed(d) + 10;
+  const rd = S.exploreSectRealm(d, 2);
+  ok(rd.ok && d.items.some((i) => i.名称 === '宗门灵脉晶' && i.数量 === 3), '宗门秘境有空间时灵脉晶正常入袋');
+  ok(!rd.logs.some((l) => l.includes('未能带走')), '宗门秘境有空间时无丢失日志');
+}
+
+/* ---------- 灵草园：一键补种 ---------- */
+{
+  const mk = () => {
+    const s = S.createNewGame({ name: '一键补种', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(s);
+    s.currencies['下品灵石'] = 100000;
+    return s;
+  };
+  const seedCost = (id) => HERB_TYPES.find((h) => h.id === id).seedCost;
+
+  // 空园：一次性补满所有空位
+  const a = mk();
+  const capA = gardenCapacity(a);
+  const beforeA = a.currencies['下品灵石'];
+  const ra = plantHerbFill(a, 'lingcao');
+  ok(ra.ok && ra.count === capA, `一键补种：空园补满 ${capA} 株（实得 ${ra.count}）`);
+  ok(a.cave.garden.length === capA && a.cave.garden.every((h) => h.id === 'lingcao'), '一键补种：全部播上所选灵草');
+  ok(ra.spent === capA * seedCost('lingcao'), '一键补种：花费 = 株数 × 种子价');
+  ok(a.currencies['下品灵石'] === beforeA - ra.spent, '一键补种：灵石如实扣除');
+
+  // 满园：拒绝补种
+  const rb = plantHerbFill(a, 'huoqing');
+  ok(!rb.ok && rb.count === 0 && a.cave.garden.length === capA, '一键补种：灵田已满时拒绝且不扣费');
+
+  // 部分空位：只补剩余空位
+  const c = mk();
+  plantHerb(c, 'lingcao');
+  const capC = gardenCapacity(c);
+  const rc = plantHerbFill(c, 'huoqing');
+  ok(rc.ok && rc.count === capC - 1, `一键补种：只补剩余 ${capC - 1} 个空位（实得 ${rc.count}）`);
+  ok(c.cave.garden.length === capC, '一键补种：补种后灵田填满');
+
+  // 灵石不足：种到负担不起为止，不透支
+  const d = mk();
+  const capD = gardenCapacity(d);
+  d.currencies['下品灵石'] = seedCost('lingcao') * 2 + 3;
+  const rd = plantHerbFill(d, 'lingcao');
+  ok(rd.ok && rd.count === 2, `一键补种：灵石不足时只种负担得起的 2 株（实得 ${rd.count}）`);
+  ok(d.currencies['下品灵石'] === 3, '一键补种：不会透支灵石');
+  ok(d.cave.garden.length === 2 && capD > 2, '一键补种：灵田未填满但已尽力');
+
+  // 一株都种不起：明确失败且不扣费
+  const e = mk();
+  e.currencies['下品灵石'] = 0;
+  const re = plantHerbFill(e, 'lingcao');
+  ok(!re.ok && re.count === 0 && e.cave.garden.length === 0, '一键补种：一株都种不起时失败且不扣费');
+  ok(re.logs.some((l) => l.includes('灵石不足')), '一键补种：灵石不足给出明确提示');
+
+  // 未知灵草：安全失败
+  ok(!plantHerbFill(mk(), 'not_exist').ok, '一键补种：未知灵草返回失败');
 }
 
 console.log(`

@@ -531,6 +531,28 @@ export function plantHerb(state, herbId) {
   return { ok: true, logs: [`你在洞府灵田播下「${def.name}」，约 ${def.grow} 个月后可收获。`, `耗灵石 ${def.seedCost}。`] };
 }
 
+/**
+ * 一键补种：把灵田空位全部播上同一种灵草。
+ * 收获后灵田常整片空置，逐株点击播种纯属重复劳动，故提供批量补种入口。
+ * 灵石不足时种到负担不起为止（不透支、不半途报错）。
+ * @returns {{ok:boolean, count:number, spent:number, logs:string[]}}
+ */
+export function plantHerbFill(state, herbId) {
+  ensureLifeState(state);
+  const def = HERB_TYPES.find((h) => h.id === herbId);
+  if (!def) return { ok: false, count: 0, spent: 0, logs: ['未知灵草。'] };
+  const room = gardenCapacity(state) - state.cave.garden.length;
+  if (room <= 0) return { ok: false, count: 0, spent: 0, logs: [`灵草园已满（最多 ${gardenCapacity(state)} 株），请先收获。`] };
+  let count = 0;
+  for (let i = 0; i < room; i++) {
+    const r = plantHerb(state, herbId);
+    if (!r.ok) break;
+    count += 1;
+  }
+  if (!count) return { ok: false, count: 0, spent: 0, logs: [`灵石不足（补种 1 株需 ${def.seedCost}）。`] };
+  return { ok: true, count, spent: count * def.seedCost, logs: [`你在灵田补种「${def.name}」${count} 株（耗灵石 ${count * def.seedCost}），约 ${def.grow} 个月后成熟。`] };
+}
+
 /** 收获一株已成熟的灵草 → 产出材料入袋 */
 export function harvestHerb(state, idx) {
   ensureLifeState(state);

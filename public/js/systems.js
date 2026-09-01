@@ -3535,8 +3535,8 @@ export function mysticRealmRewardPreview(state, realmId, depth = 1) {
   depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
   const dcfg = MYSTIC_DEPTH.of(depth);
   if (!realm) return null;
-  const stoneMin = Math.round(realm.rewards.stones[ 0 ] * dcfg.stoneMul);
-  const stoneMax = Math.round(realm.rewards.stones[ 1 ] * dcfg.stoneMul);
+  const stoneMin = Math.round(realm.rewards.stones[0] * dcfg.stoneMul);
+  const stoneMax = Math.round(realm.rewards.stones[1] * dcfg.stoneMul);
   const matMin = Math.max(1, Math.round(1 * dcfg.matMul));
   const matMax = Math.max(1, Math.round(3 * dcfg.matMul));
   const setFlags = setBonusFlags(state);
@@ -3553,11 +3553,32 @@ export function mysticRealmRewardPreview(state, realmId, depth = 1) {
   return { stoneMin, stoneMax, matMin, matMax, artChance, beastChance, fee, requiresMap: !!realm.requiresMap, name: realm.name };
 }
 
+/**
+ * 秘境 / 宗门秘境入内前的行囊容量校验（纯函数，不消耗状态）。
+ * 海上遗府需缴纳 3 张残图 + 护阵灵石，若储物袋已满，材料产出会被 storeItem 静默丢弃，
+ * 玩家等于白付代价。故在扣任何代价之前拦截，与 harvestHerb / craftRecipe
+ * 「先确保产出能入袋、后扣代价」同口径。UI 深度选择面板也复用此函数做按钮禁用与警示。
+ * @param {object} state
+ * @param {object|null} realm 传 null 表示只做通用材料容量校验（宗门秘境）
+ * @param {string} what 产出名称，用于提示文案
+ * @returns {string|null} null 表示可进入；否则为不可进入的中文原因
+ */
+export function mysticBagBlockReason(state, realm = null, what = '秘境所得灵材') {
+  ensureLifeState(state);
+  if (realm && !(realm.rewards?.materials?.length || 0)) return null; // 该秘境本无材料产出，无需校验
+  const usage = bagUsage(state);
+  if (usage.total - usage.used >= 1) return null;
+  return `储物袋已满，${what}无处安放 —— 请先出售杂物或扩容储物袋`;
+}
+
 export function exploreMysticRealm(state, realmId, depth = 1) {
   ensureLifeState(state);
   const realm = MYSTIC_REALMS.find((r) => r.id === realmId);
   if (!realm) return { logs: ['无此秘境。'] };
   if (state.player.level < realm.minLevel) return { logs: [`修为不足，需达到 Lv.${realm.minLevel}。`] };
+  // 行囊容量前置校验：先确保灵材放得下，再扣残图与护阵灵石（避免「付费后静默丢失」）
+  const bagBlock = mysticBagBlockReason(state, realm, '秘境所得灵材');
+  if (bagBlock) return { logs: [`${bagBlock}。本次未消耗残图与护阵灵石。`] };
   depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
   const dcfg = MYSTIC_DEPTH.of(depth);
   const logs = [`你深入「${realm.name}·${dcfg.name}」：${realm.desc}`];
@@ -3599,6 +3620,7 @@ export function exploreMysticRealm(state, realmId, depth = 1) {
     if (gather) matQty += gather;
     const mat = { 名称: matName, 类型: '材料', 数量: matQty, 描述: '秘境所得' };
     if (storeItem(state, mat)) logs.push(`获得材料：${matName} ×${mat.数量}${gather ? '（玄水护盾相助，灵材丰盈）' : ''}。`);
+    else logs.push(`储物袋空间不足，「${matName} ×${mat.数量}」只得遗落秘境。`);
   }
   // 法宝掉落（深度越高越易出高阶法宝）
   const artChance = (realm.rewards.artifactChance + findBonus) * dcfg.artMul;
@@ -3662,6 +3684,9 @@ export function exploreSectRealm(state, depth = 1) {
   depth = Math.min(MYSTIC_DEPTH.max, Math.max(1, Number(depth) || 1));
   const dcfg = MYSTIC_DEPTH.of(depth);
   const logs = [`你步入「宗门秘境·${dcfg.name}」，灵脉环绕，宗门先辈留下的洞天福地静候你的体悟……`];
+  // 满仓预警：宗门秘境无入门代价，贡献与灵石照常入账，但灵脉晶与深处丹药需占格
+  const sectBagWarn = mysticBagBlockReason(state, null, '灵脉晶与丹房旧藏');
+  if (sectBagWarn) logs.push(`⚠ ${sectBagWarn}，本次所得灵脉晶与丹药将无法带走。`);
   // 体悟传承：宗门贡献（确定性，按深度缩放）
   const gain = Math.round(30 * dcfg.stoneMul);
   state.sect.contribution += gain;
@@ -3674,11 +3699,13 @@ export function exploreSectRealm(state, depth = 1) {
   const matCount = Math.max(1, Math.round(depth * dcfg.matMul));
   const mat = { 名称: '宗门灵脉晶', 类型: '材料', 数量: matCount, 描述: '宗门秘境灵脉所凝之晶，可充作炼器灵材。' };
   if (storeItem(state, mat)) logs.push(`获得材料：宗门灵脉晶 ×${mat.数量}。`);
+  else logs.push(`储物袋空间不足，宗门灵脉晶 ×${mat.数量} 未能带走（贡献与灵石已入账）。`);
   // 深处藏有宗门丹房旧藏（确定性，depth>=2 可得聚气丹，数量随深度 ×artMul 缩放）
   if (depth >= 2) {
     const pillCount = Math.max(1, Math.round(dcfg.artMul));
     const pill = { 名称: '聚气丹', 类型: '丹药', 数量: pillCount, effect: { exp: 90 }, toxicity: 8, 描述: '宗门丹房旧藏，服下修为 +90（连续服用生丹毒）。' };
     if (storeItem(state, pill)) logs.push(`于深处丹室寻得宗门旧藏：聚气丹 ×${pillCount}。`);
+    else logs.push(`储物袋空间不足，宗门旧藏聚气丹 ×${pillCount} 未能带走。`);
   }
   makeChronicle(state, { type: '宗门', title: `潜修宗门秘境·${dcfg.name}`, text: logs.join('') });
   addLog(state, '事件', `潜修宗门秘境·${dcfg.name}：${logs.slice(1).join('')}`);

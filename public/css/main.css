@@ -1695,6 +1695,7 @@ button { font-family: inherit; }
 .herb-seed-info b { font-size: .9rem; color: var(--text); }
 .herb-seed-info span { font-size: .72rem; color: var(--text-dim); }
 .herb-seed .btn:disabled { opacity: .5; cursor: not-allowed; }
+.herb-seed-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 
 /* N2. 丹炉（洞府） */
 .side-subsubtitle { font-family: "Songti SC", serif; font-size: .82rem; color: var(--text-dim); margin: 10px 0 6px; }

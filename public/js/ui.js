@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -1855,9 +1855,12 @@ async function chooseMysticDepth(realmId) {
   const st = GameState.data;
   const depths = D.MYSTIC_DEPTH.levels;
   let pick = null;
+  // 满仓前置警示：与 systems.exploreMysticRealm 的拦截同口径（同一纯函数，杜绝 UI 与结算漂移）
+  const bagBlock = S.mysticBagBlockReason(st, D.MYSTIC_REALMS.find((r) => r.id === realmId) || null, '秘境所得灵材');
   await new Promise((resolve) => {
     const m = openModal(`
       <div class="choice-intro">选择本次探索的深度。越深，灵石、材料与法宝越丰厚，但护宝妖兽更凶、更可能出现隐藏奇遇。</div>
+      ${bagBlock ? `<div class="herb-bag-warn">⚠ ${bagBlock}。（残图与护阵灵石不会被消耗）</div>` : ''}
       <div class="depth-list">
         ${depths.map((d) => { const dv = depths.indexOf(d) + 1; const pw = S.mysticRealmRewardPreview(st, realmId, dv); const rng = pw ? `灵石 +${pw.stoneMin}~${pw.stoneMax} ｜ 材料 ×${pw.matMin}~${pw.matMax} ｜ 法宝 ${pw.artChance >= 100 ? '必得' : pw.artChance + '%'}${pw.fee > 0 ? ` ｜ 护阵灵石 -${pw.fee}` : ''}` : ''; return `
           <div class="depth-opt">
@@ -1865,7 +1868,7 @@ async function chooseMysticDepth(realmId) {
             <div class="depth-detail">灵石×${d.stoneMul} ｜ 材料×${d.matMul} ｜ 法宝×${d.artMul} ｜ 妖兽风险 +${Math.round(d.beastAdd * 100)}%${d.hiddenChance > 0 ? ` ｜ 隐藏奇遇 ${Math.round(d.hiddenChance * 100)}%` : ''}</div>
             ${(() => { const wr = S.mysticBeastRate(st, dv); return `<div class="region-winrate ${wr >= 70 ? 'wr-high' : wr >= 40 ? 'wr-mid' : 'wr-low'}" title="基于该深度护宝妖兽典型等级（等级区间中点，深度≥3 更强）估算的胜率，实际遭遇等级会在区间内浮动">预估护宝妖兽胜率 ${wr}%</div>`; })()}
             <div class="depth-detail">预计收益：${rng}</div>
-            <button class="btn btn-sm btn-gold" data-depth="${dv}">深入${d.name}</button>
+            <button class="btn btn-sm btn-gold" data-depth="${dv}" ${bagBlock ? 'disabled' : ''}>深入${d.name}</button>
           </div>`; }).join('')}
       </div>
       <div class="modal-actions"><button class="btn" id="btn-cancel-depth">取消</button></div>`,
@@ -1881,9 +1884,12 @@ async function chooseSectDepth() {
   const st = GameState.data;
   const depths = D.MYSTIC_DEPTH.levels;
   let pick = null;
+  // 满仓预警：贡献与灵石照常入账，但灵脉晶与深处丹药需占格（口径同 exploreSectRealm）
+  const sectBagWarn = S.mysticBagBlockReason(st, null, '灵脉晶与丹房旧藏');
   await new Promise((resolve) => {
     const m = openModal(`
       <div class="choice-intro">选择本次潜修的纵深。越深，宗门贡献、灵石与材料越丰厚；深处更藏有宗门丹房旧藏（聚气丹）。无妖兽风险。</div>
+      ${sectBagWarn ? `<div class="herb-bag-warn">⚠ ${sectBagWarn}，本次所得灵脉晶与丹药无法带走（贡献与灵石仍照常入账）。</div>` : ''}
       <div class="depth-list">
         ${depths.map((d) => { const dv = depths.indexOf(d) + 1; const rw = S.sectRealmRewardPreview(st, dv); return `
           <div class="depth-opt">
@@ -3003,7 +3009,10 @@ function alchemyCatalystBlock(st) {
           ${herbs.map((hb) => `
             <div class="herb-seed">
               <div class="herb-seed-info"><b>${hb.name}</b><span>${hb.desc} ｜ ${hb.grow}月熟 ｜ 产出 ${hb.yield.名称}×${hb.yield.数量 || 1}</span></div>
-              <button class="btn btn-sm btn-gold" data-plant="${hb.id}" ${garden.length >= gardenCapacity(st) ? 'disabled' : ''}>播种（${hb.seedCost}灵石）</button>
+              <div class="herb-seed-acts">
+                <button class="btn btn-sm btn-gold" data-plant="${hb.id}" ${garden.length >= gardenCapacity(st) ? 'disabled' : ''}>播种（${hb.seedCost}灵石）</button>
+                ${garden.length < gardenCapacity(st) ? `<button class="btn btn-sm" data-plantfill="${hb.id}" title="把剩余 ${gardenCapacity(st) - garden.length} 个空位全部播上「${hb.name}」">补满 ${gardenCapacity(st) - garden.length} 株（${(gardenCapacity(st) - garden.length) * hb.seedCost}灵石）</button>` : ''}
+              </div>
             </div>`).join('')}
         </div>
         <div class="opt-desc" style="margin-top:8px">灵草成熟需若干月（随游戏月度推进），<b>播种即解锁「灵草」图鉴</b>，收获产物自动入袋，可在行囊「材料」分类与图鉴中查看。集齐全部 4 种灵草可触发「百草通鉴」成就。<b>灵泉浇灌除加速生长外，每次还会累积提升最终收获产量（累计封顶 +${HERB_IRRIGATE_YIELD_CAP}）。</b></div>
@@ -3026,6 +3035,12 @@ function alchemyCatalystBlock(st) {
       const r = plantHerb(st, b.dataset.plant);
       (r.logs || []).forEach((l) => pushLog(l));
       toast(r.ok ? r.logs[0] : (r.logs[0] || '无法播种'), r.ok ? 'jade' : 'warn');
+      renderAll();
+    }));
+    box.querySelectorAll('[data-plantfill]').forEach((b) => b.addEventListener('click', () => {
+      const r = plantHerbFill(st, b.dataset.plantfill);
+      (r.logs || []).forEach((l) => pushLog(l));
+      toast(r.ok ? `已补种 ${r.count} 株（耗灵石 ${r.spent}）` : (r.logs[0] || '无法补种'), r.ok ? 'jade' : 'warn');
       renderAll();
     }));
     box.querySelectorAll('[data-harvest]').forEach((b) => b.addEventListener('click', () => {

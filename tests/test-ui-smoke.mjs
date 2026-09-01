@@ -121,6 +121,12 @@ try {
     ok(fullHtml.includes('储物袋已满'), '储物袋已满且有成熟灵草时给出常驻警示');
     st.cave.garden.pop();
     st.inventory.capacity = 200;
+    UI.renderAll(); await sleep(150);
+    // 一键补种（批量 QoL）：灵田有空位时每种灵草都给「补满 N 株」按钮
+    const fillBtns = $$('[data-plantfill]').length;
+    const fillHtml = $('#center-body') ? $('#center-body').innerHTML : '';
+    ok(fillBtns > 0 && fillHtml.includes('补满'), `洞府面板显示一键补种按钮（${fillBtns} 个）`);
+    ok(!!$('.herb-seed-acts'), '补种按钮以独立容器布局，不与播种按钮挤在一列');
   } catch (e) { ok(false, `洞府灵草园预估渲染: ${e.message}`); }
 
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
