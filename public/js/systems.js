@@ -3420,6 +3420,8 @@ export function buyoutAuction(state, itemIdx) {
   if (!item) return { ok: false, logs: ['无此拍品。'] };
   const amount = item.buyout;
   if (!canAfford(state, amount)) return { ok: false, logs: [`灵石不足（一口价需 ${amount}）。`] };
+  const bagBlock = auctionBagBlockReason(state, item);
+  if (bagBlock) return { ok: false, logs: [bagBlock] };
   spendStones(state, amount);
   awardAuctionItem(state, item, amount);
   state.auction.items.splice(itemIdx, 1);
@@ -3452,6 +3454,8 @@ export function placeBid(state, itemIdx, amount) {
     }
   }
   // 对手放弃 → 你以当前出价落槌
+  const bagBlock2 = auctionBagBlockReason(state, item);
+  if (bagBlock2) return { ok: false, logs: [bagBlock2] };
   spendStones(state, amount);
   awardAuctionItem(state, item, amount);
   state.auction.items.splice(itemIdx, 1);
@@ -3467,6 +3471,20 @@ export function withdrawAuctionItem(state, itemIdx) {
   if (!item) return { ok: false, logs: ['无此拍品。'] };
   state.auction.items.splice(itemIdx, 1);
   return { ok: true, logs: [`你放弃了「${item.name}」，此物流拍。`] };
+}
+
+/**
+ * 拍卖落槌前的储物袋预检：装备/法宝入装备库、功法入功法栏，皆不受行囊格位限制；
+ * 其余拍品（丹药/材料/道具等）需占用储物袋格位，容量不足时返回拒绝理由
+ * （调用方须在扣灵石前拦截），避免「付款成功却因满仓被静默丢弃」。
+ * 纯函数、确定性、不改动状态。
+ */
+export function auctionBagBlockReason(state, item) {
+  if (!item) return null;
+  if (item.type === '装备' || item.type === '法宝' || item.type === '功法') return null;
+  const probe = { 名称: item.name, 类型: item.type || '杂物', 数量: 1 };
+  if (canStore(state, probe)) return null;
+  return `储物袋空间不足，「${item.name}」无处安放，请先出售杂物或扩容储物袋再行竞价。`;
 }
 
 /** 拍卖成交后的统一发放（按类型生成对应物品） */

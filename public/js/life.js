@@ -539,14 +539,21 @@ export function harvestHerb(state, idx) {
   if (h.progress < h.grow) return { ok: false, logs: [`「${h.name}」尚未成熟（${h.progress}/${h.grow} 月）。`] };
   const def = HERB_TYPES.find((d) => d.id === h.id);
   if (!def) return { ok: false, logs: ['未知灵草种子，无法收获。'] };
-  state.cave.garden.splice(idx, 1);
   if (def.yield) {
     const q = herbQuality(state);
     const baseQty = def.yield.数量 || 1;
     const qualityQty = Math.max(1, Math.round(baseQty * q.mul));
     const irriBonus = Math.min(h.irrigated || 0, HERB_IRRIGATE_YIELD_CAP);
     const qty = qualityQty + irriBonus;
-    storeItem(state, { ...def.yield, 数量: qty });
+    const outItem = { ...def.yield, 数量: qty };
+    // 满仓保护：产物先入袋，成功才移除灵草。
+    // 旧写法先 splice 灵草再 storeItem，储物袋满时产出被静默丢弃 —— 玩家白白
+    // 损失播种灵石、浇灌灵石与数月生长，日志却仍写「已收入储物袋」。
+    if (!canStore(state, outItem)) {
+      return { ok: false, logs: [`储物袋空间不足，「${def.yield.名称}」×${qty} 无处安放；灵草仍留在灵田，请先出售杂物或扩容储物袋。`] };
+    }
+    storeItem(state, outItem);
+    state.cave.garden.splice(idx, 1);
     const qualityExtra = qualityQty - baseQty;
     const tagParts = [];
     if (q.tier !== '下品') tagParts.push(`${q.tier}灵田·+${qualityExtra}`);
@@ -558,6 +565,7 @@ export function harvestHerb(state, idx) {
     if (!notes.length) notes.push('灵田灵气平淡，产出寻常。');
     return { ok: true, logs: [`你采得「${def.yield.名称}」×${qty}${tag}，已收入储物袋。`, ...notes] };
   }
+  state.cave.garden.splice(idx, 1);
   return { ok: true, logs: [`「${h.name}」已收获，但灵种异变，未见产出。`] };
 }
 
@@ -714,6 +722,40 @@ export function irrigateHerb(state, idx) {
   return { ok: true, logs: [`你引灵泉浇灌「${h.name}」，灵草生长 +1 月（${h.progress}/${h.grow} 月）${mature ? '，现已可收获！' : ''}。`, `耗灵石 ${HERB_IRRIGATE_COST}（本月已浇灌 ${h.irrigatedThisMonth}/${HERB_IRRIGATE_CAP_PER_MONTH} 次）。`] };
 }
 
+/**
+ * 灵草园「一键浇灌」：本月内对所有仍可浇灌的未熟灵草各浇灌 1 次，
+ * 优先浇灌最接近成熟的（灵石优先换来「当下即可收获」的收益），
+ * 直至灵石不足或无株可浇。等价于逐个调用 irrigateHerb，确定性、无 RNG。
+ * 返回 { ok, count, spent, logs }。
+ */
+export function irrigateAllHerbs(state) {
+  ensureLifeState(state);
+  const garden = state.cave.garden || [];
+  const order = [];
+  for (let i = 0; i < garden.length; i++) {
+    const h = garden[i];
+    if (!h || h.progress >= h.grow) continue;
+    if ((h.irrigatedThisMonth || 0) >= HERB_IRRIGATE_CAP_PER_MONTH) continue;
+    order.push(i);
+  }
+  if (!order.length) {
+    return { ok: false, count: 0, spent: 0, logs: ['灵草园中没有可浇灌的灵草（均已成熟或本月浇灌已达上限）。'] };
+  }
+  order.sort((a, b) => (garden[a].grow - garden[a].progress) - (garden[b].grow - garden[b].progress));
+  let count = 0;
+  let spent = 0;
+  const logs = [];
+  for (const idx of order) {
+    const r = irrigateHerb(state, idx);
+    if (!r.ok) { if (r.logs && r.logs[0]) logs.push(r.logs[0]); break; }
+    count += 1;
+    spent += HERB_IRRIGATE_COST;
+    logs.push(...(r.logs || []));
+  }
+  if (!count) return { ok: false, count: 0, spent: 0, logs };
+  return { ok: true, count, spent, logs: [`你引灵泉遍洒灵田，共浇灌 ${count} 株灵草（耗灵石 ${spent}）。`, ...logs] };
+}
+
 /* ============================================================
  * 灵草杂交（洞府灵草园进阶玩法）
  * ----------------------------------------------------------
@@ -740,10 +782,16 @@ export function crossbreedHerbs(state, aName, bName) {
   if (!itemA || (itemA.数量 || 0) < 1 || !itemB || (itemB.数量 || 0) < 1) {
     return { ok: false, logs: [`灵草产物不足：需要「${aName}」与「${bName}」各 1 份。`] };
   }
+  const outItem = { ...def.out };
+  // 满仓保护：先确认奇珍灵材有处安放，再扣灵石与材料。
+  // 旧写法先扣代价再 storeItem，储物袋满时玩家损失灵石 + 两份灵草产物却一无所获。
+  if (!canStore(state, outItem)) {
+    return { ok: false, logs: ['储物袋空间不足，奇珍灵材无处安放；请先出售杂物或扩容储物袋再行杂交。'] };
+  }
   if (!spendStoneLike(state, HERB_HYBRID_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_HYBRID_COST}）。`] };
+  storeItem(state, outItem);
   itemA.数量 -= 1; if (itemA.数量 <= 0) state.items.splice(state.items.indexOf(itemA), 1);
   itemB.数量 -= 1; if (itemB.数量 <= 0) state.items.splice(state.items.indexOf(itemB), 1);
-  storeItem(state, { ...def.out });
   state.inventory.used = inventoryUsed(state);
   return { ok: true, logs: [`你将「${aName}」与「${bName}」杂交，凝成奇珍灵材「${def.out.名称}」×1。`, `耗灵石 ${HERB_HYBRID_COST}。`] };
 }

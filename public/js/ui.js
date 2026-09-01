@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -2986,6 +2986,17 @@ function alchemyCatalystBlock(st) {
             <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
           </div>`;
         }).join('') : '<div class="opt-desc">灵田空置，挑选一株灵草播下灵种吧。</div>'}
+        ${(() => {
+          const canIrr = garden.filter((h) => h.progress < h.grow && (h.irrigatedThisMonth || 0) < HERB_IRRIGATE_CAP_PER_MONTH);
+          if (!canIrr.length) return '';
+          return `<button class="btn btn-sm btn-gold btn-block" id="btn-irrigate-all" style="margin:6px 0 2px">💧 一键浇灌 ${canIrr.length} 株（${canIrr.length * HERB_IRRIGATE_COST} 灵石）</button>`;
+        })()}
+        ${(() => {
+          const left = (st.inventory.capacity || 0) + (st.inventory.ringBonus || 0) - inventoryUsed(st);
+          const matureN = garden.filter((h) => h.progress >= h.grow).length;
+          if (matureN > 0 && left <= 0) return `<div class="herb-bag-warn">⚠ 储物袋已满，成熟灵草无处安放 —— 请先出售杂物或扩容储物袋再收获。</div>`;
+          return '';
+        })()}
         ${garden.some((h) => h.progress >= h.grow) ? `<button class="btn btn-gold btn-block" id="btn-harvest-all" style="margin:6px 0 4px">🌿 一键收获成熟灵草（${garden.filter((h) => h.progress >= h.grow).length} 株）</button>` : ''}
         <div class="side-subtitle">播种灵草</div>
         <div class="herb-seed-list">
@@ -3036,6 +3047,13 @@ function alchemyCatalystBlock(st) {
       toast(r.ok ? r.logs[0] : (r.logs[0] || '无法浇灌'), r.ok ? 'jade' : 'warn');
       renderAll();
     }));
+    const iaBtn = box.querySelector('#btn-irrigate-all');
+    if (iaBtn) iaBtn.addEventListener('click', () => {
+      const r = irrigateAllHerbs(st);
+      (r.logs || []).forEach((l) => pushLog(l));
+      toast(r.ok ? `已浇灌 ${r.count} 株灵草（耗灵石 ${r.spent}）` : (r.logs[0] || '无可浇灌灵草'), r.ok ? 'jade' : 'warn');
+      renderAll();
+    });
     box.querySelectorAll('[data-cross]').forEach((b) => b.addEventListener('click', () => {
       const [a, bname] = b.dataset.cross.split('|');
       const r = crossbreedHerbs(st, a, bname);

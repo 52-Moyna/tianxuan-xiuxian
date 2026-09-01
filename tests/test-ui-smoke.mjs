@@ -107,6 +107,20 @@ try {
     ok(caveHtml.includes('每月生长'), '洞府面板显示灵草园每月生长');
     ok(caveHtml.includes('聚灵阵 +2'), '每月生长标注聚灵阵贡献 +2');
     ok(caveHtml.includes('约 2 月后熟'), '灵草行按聚灵阵月生长给出成熟预估（约 2 月后熟）');
+    // 一键浇灌（批量 QoL）：灵田有未熟灵草时应出现批量按钮
+    ok(caveHtml.includes('一键浇灌'), '洞府面板显示一键浇灌按钮');
+    ok(caveHtml.includes('btn-irrigate-all'), '一键浇灌按钮带绑定 id');
+
+    // 满仓警示：有成熟灵草且储物袋已满时，给出「先清理再收获」的常驻提示
+    st.cave.garden.push({ id: 'herb_lingcao', name: '凝露灵草', progress: 5, grow: 5, planted: '1年1月', irrigatedThisMonth: 0, irrigated: 0 });
+    const usedNow = LIFE.inventoryUsed(st);
+    st.inventory.capacity = Math.max(1, usedNow);
+    st.inventory.ringBonus = 0;
+    UI.renderAll(); await sleep(150);
+    const fullHtml = $('#center-body') ? $('#center-body').innerHTML : '';
+    ok(fullHtml.includes('储物袋已满'), '储物袋已满且有成熟灵草时给出常驻警示');
+    st.cave.garden.pop();
+    st.inventory.capacity = 200;
   } catch (e) { ok(false, `洞府灵草园预估渲染: ${e.message}`); }
 
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
