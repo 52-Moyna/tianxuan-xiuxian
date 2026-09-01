@@ -714,6 +714,7 @@ button { font-family: inherit; }
 .compass-item .ci-title .done, .compass-item .done { color: var(--jade); font-style: normal; font-size: .72rem; }
 .price-up { color: var(--danger); font-style: normal; font-size: .72rem; }
 .price-down { color: var(--jade); font-style: normal; font-size: .72rem; }
+.price-spec { color: var(--gold); font-style: normal; font-size: .72rem; margin-left: 4px; }
 .ci-icon {
   width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
   background: rgba(216,177,90,.12); font-size: 1.2rem;
@@ -959,6 +960,11 @@ button { font-family: inherit; }
   background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 8px; }
 .shop-batch-label { font-size: .74rem; color: var(--text-dim); margin-right: 2px; }
 .shop-batch .btn-sm { padding: 5px 10px; font-size: .76rem; }
+.shop-batch .btn-sm[disabled] { opacity: .42; cursor: not-allowed; }
+.batch-est { font-style: normal; font-size: .68rem; color: var(--text-dim); margin-left: 4px; }
+.shop-batch .btn-sm:not([disabled]) .batch-est { color: var(--gold-soft); }
+.shop-item-locked { opacity: .55; }
+.shop-item-locked .si-price { color: var(--text-dim); }
 /* 购买页列表 */
 .shop-buy-list { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 4px;
   /* 隐藏滚动条但保留功能 */ scrollbar-width: thin; scrollbar-color: var(--line-soft) transparent;

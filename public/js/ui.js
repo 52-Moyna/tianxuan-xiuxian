@@ -1634,16 +1634,28 @@ async function flowMarket() {
 
       // ---- 出售页 HTML（抽成函数，便于批量/单件出售后就地重渲染，避免索引漂移） ----
       const buildSellHtml = () => st.items.length ? st.items.map((it, i) => {
-        const mul = S.newsPriceMul(st, it);
-        const trendTag = mul > 1 ? '<em class="price-up">行情↑</em>' : mul < 1 ? '<em class="price-down">行情↓</em>' : '';
-        const est = Math.max(1, Math.round((it.价值 || (it.类型 === '材料' ? 35 : 15)) * (it.数量 || 1) * mul));
+        // 预估价与实际结算共用 itemSellPrice（withFluct=false）：此前这里只乘行情倍率，
+        // 漏掉地域特产 1.25x 与交易运势倍率，玩家看到的价与到手价会系统性偏差。
+        const f = S.sellPriceFactors(st, it);
+        const trendTag = f.news > 1 ? '<em class="price-up">行情↑</em>' : f.news < 1 ? '<em class="price-down">行情↓</em>' : '';
+        const specTag = f.regional > 1 ? '<em class="price-spec">本地特产↑25%</em>' : '';
+        const omenTag = f.omen > 1 ? `<em class="price-up">交易运势↑${Math.round((f.omen - 1) * 100)}%</em>`
+          : f.omen < 1 ? `<em class="price-down">交易运势↓${Math.round((1 - f.omen) * 100)}%</em>` : '';
+        const isContainer = it.类型 === '容器';
         return `
-          <div class="shop-item" data-sell="${i}">
-            <div class="si-body"><b>${it.名称}</b>${it.数量 > 1 ? `<span> ×${it.数量}</span>` : ''}<span>${it.描述 || ''} ${trendTag}</span></div>
-            <div class="si-price">约${est}灵石</div>
-            <button class="btn btn-sm shop-sell-btn">出售</button>
+          <div class="shop-item${isContainer ? ' shop-item-locked' : ''}" data-sell="${i}">
+            <div class="si-body"><b>${it.名称}</b>${it.数量 > 1 ? `<span> ×${it.数量}</span>` : ''}<span>${it.描述 || ''} ${trendTag}${specTag}${omenTag}</span></div>
+            <div class="si-price">${isContainer ? '在用' : `约${f.est}灵石`}</div>
+            ${isContainer ? '<button class="btn btn-sm" disabled title="当前使用中的储物袋不可出售">在用</button>' : '<button class="btn btn-sm shop-sell-btn">出售</button>'}
           </div>`;
       }).join('') : '<div class="opt-desc">储物袋空空如也。</div>';
+      // 批量清空按钮 —— 点击前先把「几件 / 约多少灵石 / 腾出几格」摆出来，消除信息盲区
+      const buildBatchHtml = () => ['材料', '杂物', '消耗品'].map((t) => {
+        const p = S.sellBatchPreview(st, (it) => it.类型 === t);
+        return p.count
+          ? `<button class="btn btn-sm" data-batch="${t}">全部${t} <em class="batch-est">${p.count}件 · 约${p.stones}灵石 · 腾${p.space}格</em></button>`
+          : `<button class="btn btn-sm" data-batch="${t}" disabled title="行囊中没有此类物品">全部${t} <em class="batch-est">无</em></button>`;
+      }).join('');
 
       const m = openModal(`
         <div class="shop-money">随身灵石（折下品）：<b>${S.totalStones(st)}</b></div>
@@ -1668,9 +1680,7 @@ async function flowMarket() {
             </div>
             <div class="shop-batch">
               <span class="shop-batch-label">一键清空：</span>
-              <button class="btn btn-sm" data-batch="材料">全部材料</button>
-              <button class="btn btn-sm" data-batch="杂物">全部杂物</button>
-              <button class="btn btn-sm" data-batch="消耗品">全部消耗品</button>
+              ${buildBatchHtml()}
             </div>
             <div class="shop-sell-list">${buildSellHtml()}</div>
           </div>
@@ -1702,9 +1712,27 @@ async function flowMarket() {
       }));
 
       // 出售列表就地重渲染（每次出售后重建，索引始终与 state.items 对齐，避免漂移）
+      const bindBatch = () => {
+        m.querySelectorAll('[data-batch]').forEach((b) => b.addEventListener('click', () => {
+          if (b.disabled) return;
+          const type = b.dataset.batch;
+          const res = S.sellItems(st, (it) => it.类型 === type);
+          if (!res.count) { toast(`行囊中没有可出售的「${type}」。`, 'gold'); return; }
+          toast(`已售出 ${res.count} 件${type}，共得灵石${res.stones}。`, 'gold');
+          logs.push(`批量售出 ${res.count} 件${type}，得灵石${res.stones}。`);
+          renderSellList();
+          renderAll();
+        }));
+      };
       const renderSellList = () => {
         const list = m.querySelector('.shop-sell-list');
         if (list) list.innerHTML = buildSellHtml();
+        // 批量按钮的件数/总价预览会随出售变化，必须一并重建（否则显示过期数字）
+        const batchBar = m.querySelector('.shop-batch');
+        if (batchBar) {
+          batchBar.innerHTML = `<span class="shop-batch-label">一键清空：</span>${buildBatchHtml()}`;
+          bindBatch();
+        }
         m.querySelector('.shop-money b').textContent = S.totalStones(st);
         m.querySelectorAll('.shop-sell-btn').forEach((b) => b.addEventListener('click', () => {
           const row = b.closest('.shop-item');
@@ -1717,17 +1745,6 @@ async function flowMarket() {
         }));
       };
       renderSellList();
-
-      // 批量出售按钮（一键清空某类杂物）
-      m.querySelectorAll('[data-batch]').forEach((b) => b.addEventListener('click', () => {
-        const type = b.dataset.batch;
-        const res = S.sellItems(st, (it) => it.类型 === type);
-        if (!res.count) { toast(`行囊中没有可出售的「${type}」。`, 'gold'); return; }
-        toast(`已售出 ${res.count} 件${type}，共得灵石${res.stones}。`, 'gold');
-        logs.push(`批量售出 ${res.count} 件${type}，得灵石${res.stones}。`);
-        renderSellList();
-        renderAll();
-      }));
 
       m.querySelector('#btn-back-shop').addEventListener('click', () => { closeModal(); resolve('back'); });
       m.querySelector('#btn-leave-shop').addEventListener('click', () => { closeModal(); resolve('leave'); });

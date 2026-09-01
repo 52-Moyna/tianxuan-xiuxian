@@ -2577,6 +2577,33 @@ export function lowValueSuggestions(state, n = 5) {
   });
   return rows.sort((a, b) => a.perSlot - b.perSlot || a.price - b.price).slice(0, Math.max(1, n));
 }
+/** 拆解出售价的加成来源，供 UI 明示「为何是这个价」。
+ *  regional=地域特产倍率、news=行情倍率、omen=交易运势倍率，est=确定性预估价（不含 ±8% 浮动）。
+ *  与 itemSellPrice 同源，不消耗随机数，可在渲染期安全调用。 */
+export function sellPriceFactors(state, item) {
+  ensureLifeState(state);
+  const regional = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(item.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
+  const news = newsPriceMul(state, item);
+  const omen = omenMul(state, 'trade');
+  return { regional, news, omen, base: item.价值 || (item.类型 === '材料' ? 35 : 15), est: itemSellPrice(state, item, false) };
+}
+/** 批量出售确定性预览：件数 / 预估总灵石 / 可腾出格位。
+ *  与 sellItems 的筛选口径一致（跳过在用容器），但不消耗随机数、不改状态，
+ *  供「一键清空某类」按钮在点击前就把收益摆给玩家看。 */
+export function sellBatchPreview(state, predicate) {
+  ensureLifeState(state);
+  let count = 0;
+  let stones = 0;
+  let space = 0;
+  for (const it of state.items || []) {
+    if (!it || it.类型 === '容器') continue;
+    if (predicate && !predicate(it)) continue;
+    count += 1;
+    stones += itemSellPrice(state, it, false);
+    space += itemSpace(it) * Math.max(1, Number(it.数量) || 1);
+  }
+  return { count, stones, space };
+}
 /** 使用丹药（含丹毒系统） */
 export function useItem(state, idx) {
   const it = state.items[idx];

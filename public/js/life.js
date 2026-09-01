@@ -235,9 +235,19 @@ export function ensureLifeState(state) {
   if (!state.cave) state.cave = { level: 0, name: CAVE_LEVELS[0].name, bonus: 0, springLevel: 0, arrayLevel: 0 };
   state.cave.garden = Array.isArray(state.cave.garden) ? state.cave.garden : [];
   const regionName = String(state.world.region || '中州圣城');
-  const found = Object.entries(REGION_NAMES).find(([id, name]) => id === state.world.regionId || name === regionName || regionName.includes(name));
-  state.world.regionId = found?.[0] || 'zhongzhou';
-  state.world.region = REGION_NAMES[state.world.regionId] || regionName;
+  // regionId 是权威口径：合法则直接采信，并据此刷新中文显示名。
+  // 此前把「id 命中」和「名称命中」混在同一次 find 的 OR 条件里，结果取决于 REGION_NAMES 的键序，
+  // 只要 id 与中文名不一致就会被键序更靠前的地域（中州）悄悄顶替，
+  // 连带影响坊市特产售价、妖兽等级区间、野外材料与旅行路线判定。
+  let rid = REGION_NAMES[state.world.regionId] ? state.world.regionId : '';
+  if (!rid) {
+    // 旧档兼容：只有中文名时按名反查（先全等，再退化到包含匹配）
+    const exact = Object.entries(REGION_NAMES).find(([, name]) => name === regionName);
+    const fuzzy = exact || Object.entries(REGION_NAMES).find(([, name]) => regionName.includes(name));
+    rid = fuzzy?.[0] || 'zhongzhou';
+  }
+  state.world.regionId = rid;
+  state.world.region = REGION_NAMES[rid] || regionName;
   state.world.travel = state.world.travel || { destination: '', remaining: 0 };
   state.world.marketTrend = state.world.marketTrend || {};
   state.world.market = state.world.market || { stock: [], refreshTurn: -1 };
