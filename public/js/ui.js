@@ -2658,8 +2658,14 @@ function renderCenter() {
       return it.类型 || '杂物';
     };
     const nonContainerItems = st.items.filter((it) => resolveType(it) !== 'container');
+    // 行囊搜索：名称 + 描述模糊匹配（物品一多靠翻找太低效），与既有类型筛选叠加生效。
+    // 关键词存在 box.dataset.invQuery 上，重渲染后仍保留（与 itemFilter 同机制）。
+    const invQuery = (box.dataset.invQuery || '').trim().toLowerCase();
+    const visibleItems = invQuery
+      ? nonContainerItems.filter((it) => `${it.名称 || ''} ${it.描述 || ''}`.toLowerCase().includes(invQuery))
+      : nonContainerItems;
     const grouped = {};
-    for (const it of nonContainerItems) {
+    for (const it of visibleItems) {
       const t = resolveType(it);
       (grouped[t] = grouped[t] || []).push(it);
     }
@@ -2680,12 +2686,32 @@ function renderCenter() {
         ${(() => { const effCap = st.inventory.capacity + (st.inventory.ringBonus || 0); return `
         <div class="bag-capacity"><b>${st.inventory.used}/${effCap} 格</b><span>占用按数量计算${st.inventory.ringBonus ? ` · 含戒指+${st.inventory.ringBonus}` : ''}</span></div>
         <div class="bag-meter"><i style="width:${Math.min(100, st.inventory.used / effCap * 100)}%"></i></div>`; })()}
+        ${(() => {
+          const bag = S.bagUsage(st);
+          if (!bag || bag.ratio < 0.85) return '';
+          const sug = S.lowValueSuggestions(st, 5);
+          if (!sug.length) return '';
+          const gain = sug.reduce((a, r) => a + r.price, 0);
+          const free = sug.reduce((a, r) => a + r.space, 0);
+          return `
+          <div class="bag-cleanup">
+            <div class="bag-cleanup-title">🧺 储物袋吃紧 · 建议清理这 ${sug.length} 件（腾出 ${free} 格，约售 ${gain} 灵石）</div>
+            ${sug.map((r) => `<div class="bag-cleanup-row"><span>${r.name}${r.qty > 1 ? ` ×${r.qty}` : ''}</span><em>${r.space}格 · 约${r.price}灵石</em></div>`).join('')}
+            <button class="btn btn-sm btn-gold" id="btn-sell-cleanup">💰 售出以上 ${sug.length} 件</button>
+            <div class="bag-cleanup-tip">清单按「每格能卖多少」排序，优先清理最不值钱的；珍贵材料与在用储物袋不会列入。</div>
+          </div>`;
+        })()}
         <div class="opt-desc">普通物品每件 1 格；装备和法宝每件 2 格。扩容可通过坊市服务、百艺或特殊机缘获得。</div>
 
         <div class="item-section-title">装备管理 <span>已移至左侧「个人属性」</span></div>
         <button class="btn btn-sm btn-gold" id="btn-jump-equip">🛡 前往个人属性管理装备</button>
 
         <div class="item-section-title">行囊物品 <span>按类型分类 · 可直接使用的显示「使用」</span></div>
+        <div class="inv-search">
+          <input type="text" id="inv-search" placeholder="🔍 搜索名称或描述…" value="${attr(box.dataset.invQuery || '')}" />
+          ${invQuery ? '<button class="btn btn-xs" id="inv-search-clear">✕ 清空</button>' : ''}
+        </div>
+        ${invQuery ? `<div class="inv-search-hit">匹配 ${visibleItems.length} 种${visibleItems.length ? '' : ' · 换个关键词试试'}</div>` : ''}
         <div class="inv-filters">
           ${['全部', ...TYPE_ORDER].filter((t) => t === '全部' || grouped[t]?.length).map((t) => `<button class="inv-filter ${itemFilter === t ? 'on' : ''}" data-itemfilter="${t}">${t}</button>`).join('')}
         </div>
@@ -2694,7 +2720,7 @@ function renderCenter() {
           <div class="inv-category">
             <div class="inv-cat-header">${TYPE_ICONS[t] || '📦'} ${t} <span class="inv-cat-count">${grouped[t].length}种</span></div>
             ${grouped[t].map((it, _) => {
-              const i = nonContainerItems.indexOf(it);
+              const i = st.items.indexOf(it); // 必须相对 state.items：nonContainerItems 去掉容器后会整体错位
               const pv = usePreviewOf(it);
               return `
               <div class="item-row">
@@ -2710,7 +2736,7 @@ function renderCenter() {
               </div>`;
             }).join('')}
           </div>
-        `).join('') || '<div class="opt-desc">空空如也。</div>'}
+        `).join('') || `<div class="opt-desc">${invQuery ? `没有匹配「${box.dataset.invQuery}」的物品。` : '空空如也。'}</div>`}
         ${techSectionHtml(st)}
       </div>`;
     box.querySelector('#btn-jump-equip').addEventListener('click', () => flashEquip());
@@ -2718,6 +2744,26 @@ function renderCenter() {
     box.querySelector('#btn-organize').addEventListener('click', () => {
       const n = organizeBag(st);
       toast(`行囊已整理，共 ${n} 件物品。`, 'gold');
+      renderAll();
+    });
+    // 搜索：input 事件即时过滤，重渲染后把焦点还给输入框并置于文末（否则每敲一个字就失焦）
+    const invSearch = box.querySelector('#inv-search');
+    if (invSearch) invSearch.addEventListener('input', () => {
+      box.dataset.invQuery = invSearch.value;
+      renderCenter();
+      const again = box.querySelector('#inv-search');
+      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+    });
+    const invClear = box.querySelector('#inv-search-clear');
+    if (invClear) invClear.addEventListener('click', () => { box.dataset.invQuery = ''; renderCenter(); });
+    // 一键清理：售出建议清单（按索引精确出货，不会误卖同类里的珍贵品）
+    const cleanupBtn = box.querySelector('#btn-sell-cleanup');
+    if (cleanupBtn) cleanupBtn.addEventListener('click', () => {
+      const sug = S.lowValueSuggestions(st, 5);
+      const res = S.sellItemsByIndex(st, sug.map((r) => r.idx));
+      if (!res.count) { toast('没有可出售的物品。', 'gold'); return; }
+      pushLog(`售出 ${res.count} 件杂物，得灵石${res.stones}，腾出 ${res.space} 格。`);
+      toast(`已售出 ${res.count} 件，得灵石 ${res.stones}，腾出 ${res.space} 格。`, 'gold');
       renderAll();
     });
     box.querySelectorAll('[data-use]').forEach((b) => b.addEventListener('click', () => {

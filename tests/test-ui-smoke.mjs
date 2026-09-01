@@ -159,6 +159,59 @@ try {
     UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `宗门兑换所满仓渲染: ${e.message}`); }
 
+  // 行囊搜索 + 满仓「建议清理」一键出货
+  try {
+    const SS = await import(pathToFileURL(join(ROOT, 'public/js/systems.js')).href);
+    const invBtn = $$('.side-tab').find((b) => b.dataset.tab === 'items');
+    invBtn.click(); await sleep(150);
+    ok(!!$('#inv-search'), '行囊渲染搜索框 #inv-search');
+    ok($('#inv-search').placeholder.includes('搜索'), '搜索框含占位提示文案');
+
+    // 搜索过滤：按名称命中
+    const st3 = GameState.data;
+    st3.items.push({ 名称: '独角测试草', 类型: '材料', 数量: 1, 价值: 20, 描述: '仅用于搜索验证的灵草。' });
+    st3.items.push({ 名称: '另一件杂物', 类型: '材料', 数量: 1, 价值: 20, 描述: '描述里含暗号麒麟。' });
+    UI.renderAll(); await sleep(120);
+    const inp = $('#inv-search');
+    inp.value = '独角';
+    inp.dispatchEvent(new window.Event('input', { bubbles: true })); await sleep(150);
+    ok($('#center-body').textContent.includes('独角测试草'), '搜索「独角」命中目标物品');
+    ok(!$('#center-body').textContent.includes('另一件杂物'), '搜索时过滤掉不相关物品');
+    ok(!!$('.inv-search-hit') && $('.inv-search-hit').textContent.includes('匹配'), '搜索显示命中数量');
+
+    // 描述匹配
+    const inp2 = $('#inv-search');
+    inp2.value = '麒麟';
+    inp2.dispatchEvent(new window.Event('input', { bubbles: true })); await sleep(150);
+    ok($('#center-body').textContent.includes('另一件杂物'), '搜索可命中描述中的关键词');
+
+    // 清空按钮
+    $('#inv-search-clear').click(); await sleep(150);
+    ok($('#center-body').textContent.includes('独角测试草'), '清空搜索后恢复全部物品');
+    ok(!$('#inv-search-clear'), '清空后清空按钮自身消失');
+
+    // 满仓时出现「建议清理」区块，并可一键出货腾格
+    const body = $('#center-body');
+    body.dataset.invQuery = '';
+    UI.renderAll(); await sleep(120);
+    const s4 = GameState.data;
+    // 容量 = 当前占用 → ratio = 1，必定触发「建议清理」（注意 capacity 不能设 0，会被归一成 100）
+    s4.inventory.capacity = Math.max(1, SS.bagUsage(s4).used);
+    s4.inventory.ringBonus = 0;
+    UI.renderAll(); await sleep(150);
+    ok(!!$('.bag-cleanup'), '储物袋吃紧时行囊出现「建议清理」区块');
+    ok(!!$('#btn-sell-cleanup'), '建议清理区块含一键出售按钮');
+    const used4 = SS.bagUsage(s4).used;
+    const stones4 = SS.totalStones(s4);
+    $('#btn-sell-cleanup').click(); await sleep(200);
+    ok(SS.bagUsage(s4).used < used4, `一键清理后占用下降（${used4} → ${SS.bagUsage(s4).used}）`);
+    ok(SS.totalStones(s4) > stones4, '一键清理后灵石增加');
+    ok(!$('.bag-cleanup'), '清理后建议区块自动消失（不再吃紧）');
+    s4.inventory.capacity = 200;
+    s4.items = s4.items.filter((i) => !['独角测试草', '另一件杂物'].includes(i.名称));
+    UI.renderAll(); await sleep(120);
+  } catch (e) { ok(false, `行囊搜索/清理交互: ${e.message}`); }
+
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
   const setBtn = $$('.side-tab').find((b) => b.dataset.tab === 'settings');
   setBtn.click(); await sleep(100);

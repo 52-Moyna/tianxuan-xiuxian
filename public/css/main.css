@@ -1223,6 +1223,25 @@ button { font-family: inherit; }
 .inv-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .inv-filter { padding: 4px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: .78rem; background: var(--bg-3); border: 1px solid var(--line); color: var(--text-dim); }
 .inv-filter.on { background: var(--gold); border-color: var(--gold-soft); color: #1a1408; font-weight: 700; }
+.inv-search { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.inv-search input {
+  flex: 1; min-width: 0; padding: 6px 10px; border-radius: 8px; font: inherit; font-size: .82rem;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--text);
+}
+.inv-search input:focus { outline: none; border-color: var(--gold-soft); }
+.inv-search-hit { font-size: .74rem; color: var(--text-dim); margin: -2px 0 8px; }
+.bag-cleanup {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: linear-gradient(145deg, rgba(255,180,80,.10), rgba(255,180,80,.03));
+  border: 1px solid rgba(255,180,80,.28);
+}
+.bag-cleanup-title { font-size: .84rem; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+.bag-cleanup-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: .78rem; color: var(--text); padding: 3px 0;
+}
+.bag-cleanup-row em { font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.bag-cleanup-tip { font-size: .72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
 /* 行囊分类组 —— 液态玻璃卡片式 */
 .inv-category { margin-bottom: 14px; }
 .inv-cat-header { font-size: .88rem; font-weight: 700; color: var(--gold);

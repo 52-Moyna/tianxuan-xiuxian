@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, itemSpace, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -1693,6 +1693,7 @@ export const WANDER_EVENTS = [
       if (Rng.chance(0.3)) {
         const rare = { 名称: '天材地宝·月华露', 类型: '材料', 数量: 1, 描述: '月华凝露，炼丹圣物，价值连城。', 价值: 160 };
         if (storeItem(state, rare)) logs.push('草丛中竟藏着一滴泛着月华的露珠——「月华露」！');
+        else logs.push('草丛中竟藏着一滴「月华露」，储物袋已满，只能眼睁睁看它蒸散在晨光里。');
       }
       return { logs };
     },
@@ -2481,19 +2482,32 @@ export function marketCompare(state, goods) {
   return { cls: 'flat', tag: '➖', text: '持平' };
 }
 
+/** 坊市出售价（唯一计价口径）：地域特产 1.25x · 行情 newsMul · 交易运势 omenMul，
+ *  另含 ±8% 随机浮动（withFluct=false 时不消耗 RNG，供 UI 预估价展示，避免渲染污染随机序列）。
+ *  sellItem / sellItems / sellItemsByIndex 三处共用，杜绝「同一件物品不同入口报价不一致」。 */
+export function itemSellPrice(state, item, withFluct = true) {
+  const regionalBonus = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(item.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
+  const newsMul = newsPriceMul(state, item);
+  const base = item.价值 || (item.类型 === '材料' ? 35 : 15);
+  const fluct = withFluct ? Rng.float(0.92, 1.08) : 1;
+  return Math.max(1, Math.round(base * (item.数量 || 1) * regionalBonus * newsMul * fluct * omenMul(state, 'trade')));
+}
+/** 行情播报文案（看涨 / 低迷），与 itemSellPrice 同口径取 newsPriceMul。 */
+export function priceFluctNote(state, item) {
+  const m = newsPriceMul(state, item);
+  return m > 1 ? '（行情看涨，价格上扬）' : m < 1 ? '（行情低迷，价格走低）' : '';
+}
+
 export function sellItem(state, idx) {
   ensureLifeState(state);
   const it = state.items[idx];
   if (!it) return '物品不存在。';
   if (it.类型 === '容器') return '当前储物袋正在使用，不能直接出售。';
-  const regionalBonus = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(it.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
-  const newsMul = newsPriceMul(state, it);
-  const base = it.价值 || (it.类型 === '材料' ? 35 : 15);
-  const price = Math.max(1, Math.round(base * (it.数量 || 1) * regionalBonus * newsMul * Rng.float(0.92, 1.08) * omenMul(state, 'trade')));
+  const fluct = priceFluctNote(state, it);
+  const price = itemSellPrice(state, it);
   addStones(state, price);
   state.items.splice(idx, 1);
   ensureLifeState(state);
-  const fluct = newsMul > 1 ? '（行情看涨，价格上扬）' : newsMul < 1 ? '（行情低迷，价格走低）' : '';
   addLog(state, '操作', `坊市售出「${it.名称}」，得灵石${price}。${fluct}`);
   return `售出「${it.名称}」，得灵石${price}。${fluct}`;
 }
@@ -2511,10 +2525,7 @@ export function sellItems(state, predicate) {
   for (const { i } of targets.slice().reverse()) {
     const it = state.items[i];
     if (!it) continue;
-    const regionalBonus = (REGION_TRAVEL[state.world.regionId]?.specialty || '').includes(it.类型 === '材料' ? '材料' : '奇珍') ? 1.25 : 1;
-    const newsMul = newsPriceMul(state, it);
-    const base = it.价值 || (it.类型 === '材料' ? 35 : 15);
-    const price = Math.max(1, Math.round(base * (it.数量 || 1) * regionalBonus * newsMul * Rng.float(0.92, 1.08) * omenMul(state, 'trade')));
+    const price = itemSellPrice(state, it);
     addStones(state, price);
     stones += price;
     names.push(it.名称);
@@ -2523,6 +2534,48 @@ export function sellItems(state, predicate) {
   ensureLifeState(state);
   addLog(state, '操作', `坊市批量售出 ${targets.length} 件物品，共得灵石${stones}。`);
   return { count: targets.length, stones, names };
+}
+/** 按索引批量出售：供「满仓建议清理」等由 UI 指定具体物品的场合使用，
+ *  相比按类型批量（sellItems）更精准，不会误卖同类材料里的珍贵品。
+ *  索引从大到小删除避免 splice 偏移；在用容器（当前储物袋）自动跳过。
+ *  返回 {count, stones, names, space}（space = 腾出的格位数）。 */
+export function sellItemsByIndex(state, indexes) {
+  ensureLifeState(state);
+  // 只接受 number 类型的合法整数下标：若用 Number(i) 强转，null / '' 会被当成 0 而误售首件物品
+  const idxs = [...new Set((indexes || [])
+    .filter((i) => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < state.items.length))]
+    .sort((a, b) => b - a);
+  let stones = 0;
+  let space = 0;
+  const names = [];
+  for (const i of idxs) {
+    const it = state.items[i];
+    if (!it || it.类型 === '容器') continue;
+    const price = itemSellPrice(state, it);
+    addStones(state, price);
+    stones += price;
+    space += itemSpace(it) * Math.max(1, Number(it.数量) || 1);
+    names.push(it.名称);
+    state.items.splice(i, 1);
+  }
+  ensureLifeState(state);
+  if (names.length) addLog(state, '操作', `坊市售出 ${names.length} 件指定物品，共得灵石${stones}。`);
+  return { count: names.length, stones, names, space };
+}
+/** 满仓「建议清理」清单：按「每格能卖多少灵石」升序挑出最该处理的 n 件。
+ *  无 RNG（用 withFluct=false 的确定性估价），可在 UI 渲染期安全调用而不污染随机序列。
+ *  返回 [{idx, name, qty, price, space, perSlot}]，perSlot 越低越值得卖。 */
+export function lowValueSuggestions(state, n = 5) {
+  ensureLifeState(state);
+  const rows = [];
+  (state.items || []).forEach((it, idx) => {
+    if (!it || it.类型 === '容器') return;
+    const qty = Math.max(1, Number(it.数量) || 1);
+    const space = itemSpace(it) * qty;
+    const price = itemSellPrice(state, it, false);
+    rows.push({ idx, name: it.名称, qty, price, space, perSlot: space > 0 ? price / space : price });
+  });
+  return rows.sort((a, b) => a.perSlot - b.perSlot || a.price - b.price).slice(0, Math.max(1, n));
 }
 /** 使用丹药（含丹毒系统） */
 export function useItem(state, idx) {
