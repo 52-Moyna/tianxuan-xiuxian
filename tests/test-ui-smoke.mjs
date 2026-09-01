@@ -212,6 +212,21 @@ try {
     UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `行囊搜索/清理交互: ${e.message}`); }
 
+  // 选档卡片摘要：境界优先于道号，缺数据不出现 undefined
+  try {
+    const T = UI.slotSummaryText;
+    ok(typeof T === 'function', '导出 slotSummaryText 供测试');
+    const full = T({ name: '测试道友', realm: '玄尘子', realmName: '金丹期', level: 42, age: 88, power: 12345, year: 128 });
+    ok(full.includes('金丹期') && full.includes('Lv.42') && full.includes('战力 12,345') && full.includes('天玄历 128 年'),
+      `选档摘要含境界/等级/战力/纪年（实际：${full}）`);
+    ok(!full.includes('undefined'), '选档摘要无 undefined 字段');
+    const legacy = T({ name: '旧档', realm: '练气', age: 20 });
+    ok(legacy.includes('练气') && legacy.includes('20岁') && !legacy.includes('undefined'),
+      `旧档无境界时退回道号（实际：${legacy}）`);
+    const empty = T({});
+    ok(empty === '无名 ｜ 境界未知', `空档摘要兜底（实际：${empty}）`);
+  } catch (e) { ok(false, `选档摘要文案: ${e.message}`); }
+
   // 设置面板含窗口大小 + 内置头像选择（已移除上传/移除）
   const setBtn = $$('.side-tab').find((b) => b.dataset.tab === 'settings');
   setBtn.click(); await sleep(100);

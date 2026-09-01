@@ -178,7 +178,9 @@ function listSlots() {
     if (!isValidSlot(e.name)) continue;
     const dir = path.join(SAVE_ROOT, e.name);
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.ini') && isValidSaveName(f));
-    const summary = { slot: e.name, hasSave: files.includes('个人信息.ini'), name: '', realm: '', age: '', saveCode: '', savedTime: '', avatarPreset: '' };
+    // 说明：realm 取自「道号」（玩家自取称号，可能是「玄尘子」这类），并非境界；
+    // 真正的境界/等级/战力在 属性.ini 的「修为」段，另读一份，供选档卡片展示。
+    const summary = { slot: e.name, hasSave: files.includes('个人信息.ini'), name: '', realm: '', age: '', saveCode: '', savedTime: '', avatarPreset: '', realmName: '', level: 0, power: 0, year: 0 };
     if (summary.hasSave) {
       try {
         const info = IniCodec.parse(fs.readFileSync(path.join(dir, '个人信息.ini'), 'utf-8'));
@@ -193,6 +195,21 @@ function listSlots() {
       try {
         const settings = (fs.existsSync(path.join(dir, '设置.ini'))) ? IniCodec.parse(fs.readFileSync(path.join(dir, '设置.ini'), 'utf-8'))['游戏设置'] || {} : {};
         summary.avatarPreset = settings.avatarPreset || settings['头像预设'] || '';
+      } catch { /* 忽略解析失败 */ }
+      // 境界 / 等级 / 战力 / 纪年：老存档可能缺文件，缺则留空由 UI 容错。
+      try {
+        const attrFile = path.join(dir, '属性.ini');
+        if (fs.existsSync(attrFile)) {
+          const xiu = IniCodec.parse(fs.readFileSync(attrFile, 'utf-8'))['修为'] || {};
+          summary.realmName = String(xiu.境界 || '');
+          summary.level = Number(xiu.等级) || 0;
+          summary.power = Number(xiu.战力) || 0;
+        }
+        const worldFile = path.join(dir, '世界.ini');
+        if (fs.existsSync(worldFile)) {
+          const t = IniCodec.parse(fs.readFileSync(worldFile, 'utf-8'))['时间'] || {};
+          summary.year = Number(t.天玄历年) || 0;
+        }
       } catch { /* 忽略解析失败 */ }
     }
     slots.push(summary);

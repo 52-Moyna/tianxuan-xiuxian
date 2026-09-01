@@ -355,6 +355,16 @@ export function renderTitle(hasSave) {
   renderSlotPicker();
 }
 
+/** 选档卡片摘要文案（纯函数）：境界优先于道号，等级/岁数/战力/纪年一并列出。
+ *  老存档只有道号没有境界时，退回道号，保证不出现空白卡片。 */
+export function slotSummaryText(s) {
+  const who = s.name || '无名';
+  const rank = [s.realmName ? `${s.realmName}` : (s.realm || ''), s.level ? `Lv.${s.level}` : ''].filter(Boolean).join(' · ');
+  const head = [who, rank || '境界未知', s.age ? `${s.age}岁` : ''].filter(Boolean).join(' ｜ ');
+  const tail = [s.power ? `战力 ${s.power.toLocaleString('zh-CN')}` : '', s.year ? `天玄历 ${s.year} 年` : ''].filter(Boolean).join(' ｜ ');
+  return tail ? `${head} ｜ ${tail}` : head;
+}
+
 /** 标题页：多存档槽选择 */
 async function renderSlotPicker() {
   const listBox = $('#slot-list');
@@ -376,7 +386,7 @@ async function renderSlotPicker() {
       <div class="slot-avatar">${slotAvatarHTML(s)}</div>
       <div class="slot-info">
         <div class="slot-name">存档 ${s.slot}${String(s.slot) === String(current) ? ' · 使用中' : ''}</div>
-        <div class="slot-sub">${s.hasSave ? `${s.name || '无名'} ｜ ${s.realm || ''} ｜ ${s.age || ''}岁` : '（空）'}</div>
+        <div class="slot-sub" title="${s.hasSave ? slotSummaryText(s) : ''}">${s.hasSave ? slotSummaryText(s) : '（空）'}</div>
         ${s.savedTime ? `<div class="slot-time">${s.savedTime}</div>` : ''}
         ${s.backups && s.backups.length ? `<div class="slot-backup">🗄 历史备份 ${s.backups.length} 份</div>` : ''}
       </div>
