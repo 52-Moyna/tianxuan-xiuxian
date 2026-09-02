@@ -1182,7 +1182,23 @@ function playerGuidance(st, opts) {
   const bottleneck = S.checkBottleneck(st);
   const destiny = S.destinyCurrent(st);
   if (bottleneck) return { title: `当前目标：冲击「${bottleneck.name}」`, detail: '修为已满。突破有风险，可先准备对应丹药，或继续经营积累资源。', action: '突破' };
-  if (st.flags.wounded > 0) return { title: '当前目标：恢复伤势', detail: `伤势还需 ${st.flags.wounded} 个月恢复。可服用凝血丹立即痊愈，受伤期间高风险历练收益会降低。`, action: '行囊' };
+  // 受伤指引此前硬编码「服用凝血丹」，玩家身上只有疗伤丹 / 兽骨续命丹 / 露华丹时
+  // 指引等于空话。现按行囊实际持有的疗伤药给方案：有药说药名、无药指路坊市。
+  if (st.flags.wounded > 0) {
+    const wn = Number(st.flags.wounded);
+    const cures = (typeof S.woundCureItems === 'function') ? S.woundCureItems(st) : [];
+    const best = cures[0] || null;
+    const how = best
+      ? (best.amount === Infinity
+        ? `服「${best.名称}」可立刻痊愈`
+        : `服「${best.名称}」可减 ${Math.min(best.amount, wn)} 个月伤势`)
+      : '行囊中无疗伤丹药，可到坊市购买，或静养自愈';
+    return {
+      title: '当前目标：恢复伤势',
+      detail: `伤势还需 ${wn} 个月恢复。${how}；受伤期间高风险历练收益会降低。`,
+      action: best ? '行囊' : '坊市',
+    };
+  }
   if (destiny && S.destinyAvailable(st) && st.world.month <= 3) return { title: `当前目标：推进天命「${destiny.name}」`, detail: '天命行动只在年初稳定出现。完成后会获得关键成长奖励。', action: '天命' };
   if (st.player.level < 6) return { title: '当前目标：先熟悉修炼', detail: '推荐闭关苦修提升等级；达到更高修为后，天命、秘境和装备玩法会逐步展开。', action: '闭关' };
   const materials = st.items.filter((i) => i.类型 === '材料').length;

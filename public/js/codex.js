@@ -456,7 +456,7 @@ export const ACHIEVEMENTS = [
   { id: 'codex75', name: '博物洽闻', icon: '📚', desc: '发现 75% 的物品图鉴。', reward: { stones: 1200 }, check: (s) => (s.codex?.discovered?.length || 0) >= Math.ceil(CODEX_ITEMS.length * 0.75), progress: (s) => ({ cur: s.codex?.discovered?.length || 0, max: Math.ceil(CODEX_ITEMS.length * 0.75) }) },
   { id: 'stones50k',name: '灵石富贾', icon: '💎', desc: '持有灵石总值达 50000。', reward: { stones: 2000 }, check: (s) => totalStonesOf(s) >= 50000, progress: (s) => ({ cur: totalStonesOf(s), max: 50000 }) },
   { id: 'sectCore',name: '宗门栋梁', icon: '🏯', desc: '在宗门中晋升至核心弟子。', reward: { stones: 1000 }, check: (s) => (s.sect?.rank || 0) >= 3, progress: (s) => ({ cur: s.sect?.rank || 0, max: 3 }) },
-  { id: 'heal',    name: '妙手回春', icon: '💉', desc: '服下疗伤丹，清除一身伤势。', reward: { stones: 200 }, check: (s) => !!s.flags?.curedWounds },
+  { id: 'heal',    name: '妙手回春', icon: '💉', desc: '服丹疗伤，将一身伤势尽数清除（服疗伤丹只减月份不算）。', reward: { stones: 200 }, check: (s) => !!s.flags?.curedWounds },
   { id: 'dujie',   name: '九九归真', icon: '⚡', desc: '成功渡过一次大境界天劫。', reward: { stones: 2000 }, check: (s) => !!s.flags?.tribulationSuccess },
   { id: 'herbCodex', name: '百草通鉴', icon: '🍃', desc: '集齐灵草园全部 4 种灵草图鉴。', reward: { stones: 800 }, check: (s) => ['灵草:凝露灵草', '灵草:火精枣树', '灵草:玉髓芝', '灵草:月华露藤'].every((k) => (s.codex?.discovered || []).includes(k)) },
   { id: 'herbHybrid', name: '灵植奇才', icon: '🌿', desc: '杂交出全部 4 种奇珍灵材。', reward: { stones: 1200 }, check: (s) => ['材料:凝火奇实', '材料:玉华灵髓', '材料:露华玉液', '材料:炎玉灵枣'].every((k) => (s.codex?.discovered || []).includes(k)) },

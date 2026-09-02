@@ -668,17 +668,43 @@ export function toxicityWarning(state) {
 /** 伤势危机预警（纯函数，不修改状态；供危机横幅展示）。
  *  level: 'danger' 身负重伤(伤势≥3月，历练胜率-9%起、收益大降)、'warn' 带伤(≥1月)、'ok' 无伤。
  *  hint 指向「凝血丹」(清除全部伤势) 这一已实现途径，与危机横幅「服用」按钮闭环（寿元→延寿丹、丹毒→解毒丹同口径）。 */
+/** 疗伤药效力（纯函数）：effect.heal 为 true 表示清除全部伤势，为数字表示清除 N 个月。
+ *  【为何存在】此前 effect.heal 只当布尔用，「疗伤丹」在坊市/图鉴/掉落里都写着
+ *  「清除 1 个月伤势」，服用却一律全清 —— 与凝血丹（45 灵石）等价，文案骗人、
+ *  高价药失去意义。现按量级结算，true 仍代表全清，老数据零改动。 */
+export function healAmount(eff) {
+  if (!eff || !eff.heal) return 0;
+  if (eff.heal === true) return Infinity;
+  const n = Math.floor(Number(eff.heal));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** 行囊中的疗伤药清单（纯函数）：按效力从强到弱排序，全清类优先。
+ *  【为何存在】危机横幅此前把解药名硬编码为「凝血丹」，玩家身上只有疗伤丹 /
+ *  兽骨续命丹 / 露华丹时按钮直接消失 —— 明明有药却无处可点。现按实际持有列单。 */
+export function woundCureItems(state) {
+  const list = [];
+  (state?.items || []).forEach((it, idx) => {
+    const amt = healAmount(it.effect);
+    if (amt > 0) list.push({ idx, 名称: it.名称, amount: amt });
+  });
+  return list.sort((a, b) => b.amount - a.amount);
+}
+
 export function woundWarning(state) {
   const wounds = Number(state.flags?.wounded || 0);
   let level = 'ok', hint = '', cure = '';
-  if (wounds >= 3) {
-    level = 'danger';
-    hint = `身负重伤（伤势 ${wounds} 月）！历练胜率与收益大降，宜速服「凝血丹」痊愈。`;
-    cure = '凝血丹';
-  } else if (wounds >= 1) {
-    level = 'warn';
-    hint = `身负伤势（${wounds} 月），历练胜率略降，可服「凝血丹」立即痊愈或静养自愈。`;
-    cure = '凝血丹';
+  if (wounds >= 1) {
+    level = wounds >= 3 ? 'danger' : 'warn';
+    const cures = woundCureItems(state);
+    const best = cures[0] || null;
+    cure = best ? best.名称 : '';
+    const healWord = best
+      ? (best.amount === Infinity ? `服「${best.名称}」立刻伤势尽去` : `服「${best.名称}」可减 ${Math.min(best.amount, wounds)} 个月伤势`)
+      : '坊市有售疗伤丹药';
+    hint = wounds >= 3
+      ? `身负重伤（伤势 ${wounds} 月）！历练胜率与收益大降，宜速${healWord}。`
+      : `身负伤势（${wounds} 月），历练胜率略降，可${healWord}，或静养自愈。`;
   }
   return { level, wounds, hint, cure };
 }
@@ -1785,7 +1811,7 @@ export const WANDER_EVENTS = [
     id: 'village', weight: 7, regionBoost: { lingnan: 1.3 },
     run(state) {
       const logs = [];
-      const pill = { 名称: '疗伤丹', 类型: '丹药', 数量: Rng.int(1, 2), effect: { heal: true }, 描述: '清除 1 个月伤势。', 价值: 40 };
+      const pill = { 名称: '疗伤丹', 类型: '丹药', 数量: Rng.int(1, 2), effect: { heal: 1 }, 描述: '清除 1 个月伤势。', 价值: 15 };
       if (storeItem(state, pill)) logs.push('途经凡人村落，你施法驱散了蔓延的瘴气，村老硬塞给你几枚「疗伤丹」。');
       else logs.push('村老欲赠你「疗伤丹」，储物袋已满只得谢绝。');
       addDaoBaseExp(state, '气运', Rng.int(5, 12), logs);
@@ -2725,6 +2751,12 @@ export function useItem(state, idx) {
     return logs.length ? logs : ['装备已更换。'];
   }
   if (!it.effect) return null;
+  // 无伤势时服用「纯疗伤丹」毫无收益，此前仍照扣一颗（45 灵石白扔）。
+  // 若丹药除疗伤外另有药效（如露华丹兼补悟性），则允许继续服用，仅跳过疗伤那一段。
+  if (healAmount(it.effect) > 0 && (state.flags?.wounded || 0) <= 0
+      && Object.keys(it.effect).filter((k) => k !== 'heal').length === 0) {
+    return [`身无伤势，「${it.名称}」无处着力，留待受伤后再服（未被消耗）。`];
+  }
   const setFlags = setBonusFlags(state);
   // 瓶颈专属丹（筑基丹等）与渡劫丹：留待突破 / 渡劫时由 attemptBreakthrough 自动消耗，不可直接服用
   if (it.breakthrough || (it.effect && typeof it.effect.tribulation === 'number')) {
@@ -2743,10 +2775,26 @@ export function useItem(state, idx) {
     logs.push(`你服下「${it.名称}」${it.quality ? `（${it.quality.grade}）` : ''}，修为+${expGain}。`);
     tryLevelUp(state, logs);
   }
-  if (it.effect.heal) {
-    state.flags.wounded = 0;
-    state.flags.curedWounds = true;
-    logs.push('伤势尽去，龙精虎猛。');
+  // 疗伤：effect.heal 为 true 清除全部伤势，为数字则按量级清除 N 个月（疗伤丹）。
+  // 无伤时纯疗伤丹无处着力 —— 一律不消耗（与延寿丹/洗髓丹满额同口径，避免白扔一颗丹药）。
+  const healAmt = healAmount(it.effect);
+  if (healAmt > 0) {
+    const cur = Number(state.flags?.wounded || 0);
+    if (cur <= 0) {
+      logs.push(`身无伤势，「${it.名称}」的疗伤药力无从着力（其余药效照常生效）。`);
+    } else if (healAmt === Infinity) {
+      state.flags.wounded = 0;
+      state.flags.curedWounds = true;
+      logs.push('伤势尽去，龙精虎猛。');
+    } else {
+      const cut = Math.min(healAmt, cur);
+      state.flags.wounded = cur - cut;
+      // 「妙手回春」图鉴成就以「伤势清零」为准：只减月份不算妙手回春
+      if (state.flags.wounded === 0) state.flags.curedWounds = true;
+      logs.push(cut >= cur
+        ? '伤势尽去，龙精虎猛。'
+        : `伤势好转 ${cut} 个月，尚余 ${cur - cut} 个月未愈。`);
+    }
   }
   // 悟性经验（凝神丹等）
   if (it.effect.wuxing) {
@@ -2875,7 +2923,13 @@ export function itemUsePreview(state, it) {
     const gain = Math.round(eff.exp * mult);
     parts.push(mult !== 1 ? `修为 +${gain}（${it.quality.grade} ×${mult}）` : `修为 +${gain}`);
   }
-  if (eff.heal) parts.push('伤势尽去');
+  if (eff.heal) {
+    const amt = healAmount(eff);
+    const cur = Number(state?.flags?.wounded || 0);
+    if (cur <= 0) parts.push(amt === Infinity ? '清除全部伤势（当前无伤势，服用无效）' : `清除 ${amt} 个月伤势（当前无伤势，服用无效）`);
+    else if (amt === Infinity) parts.push(`清除全部伤势（现 ${cur} 个月）`);
+    else parts.push(`清除 ${amt} 个月伤势（现 ${cur} 个月，愈后余 ${Math.max(0, cur - amt)} 个月）`);
+  }
   if (eff.wuxing) parts.push(`悟性经验 +${eff.wuxing}`);
   if (eff.daoBase) {
     const kb = eff.daoBase || {};

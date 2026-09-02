@@ -67,7 +67,8 @@ export function beastPowerOfLevel(level, danger = 2) {
 export const REGION_MARKET = {
   zhongzhou: [
     { name: '基础功法玉简', type: '功法', price: 180, desc: '凡品功法，适合初学者。', effect: { technique: '基础吐纳术' } },
-    { name: '疗伤丹', type: '丹药', price: 40, desc: '清除 1 个月伤势。', effect: { heal: true } },
+    // 疗伤丹只清 1 个月（凝血丹 45 灵石清全部），故定价 15：低阶修士的应急药，而非凝血丹的下位替代品
+    { name: '疗伤丹', type: '丹药', price: 15, desc: '清除 1 个月伤势（重伤需多服几枚）。', effect: { heal: 1 } },
     { name: '制式护心甲', type: '装备', price: 160, level: 1, desc: '稳定防护，战力 +1。' },
     { name: '旅行凭证', type: '消耗品', price: 160, desc: '下次跨域旅行费用减半。', effect: { travel: 50 } },
   ],

@@ -2388,7 +2388,13 @@ ok(S.woundWarning({ flags: { wounded: 3 } }).level === 'danger', '伤势预警�
 // 危机横幅「服用」按钮契约：各危险态须暴露 cure 字段（否则横幅无按钮，预警→行动断链）
 ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).cure === '延寿丹', '危机预警契约：寿元危险提供 cure=延寿丹');
 ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).cure === '解毒丹', '危机预警契约：丹毒危险提供 cure=解毒丹');
-ok(S.woundWarning({ flags: { wounded: 3 } }).cure === '凝血丹', '危机预警契约：重伤危险提供 cure=凝血丹');
+// 伤势契约与寿元/丹毒不同：解药有「全清 / 减 N 月」之分、且玩家未必持有凝血丹，
+// 故 cure 按行囊实际持有给（有药给最优药、无药给空并指路坊市），不再硬编码单一丹名 ——
+// 硬编码会让「身上只有疗伤丹」的玩家看到按钮直接消失。
+ok(S.woundWarning({ flags: { wounded: 3 } }).cure === '', '危机预警契约：无疗伤药时不谎报 cure');
+ok(S.woundWarning({ flags: { wounded: 3 } }).hint.includes('坊市'), '危机预警契约：无药时指路坊市');
+ok(S.woundWarning({ flags: { wounded: 3 }, items: [{ 名称: '凝血丹', 类型: '丹药', 数量: 1, effect: { heal: true } }] }).cure === '凝血丹', '危机预警契约：持有凝血丹时 cure=凝血丹');
+ok(S.woundWarning({ flags: { wounded: 3 }, items: [{ 名称: '疗伤丹', 类型: '丹药', 数量: 1, effect: { heal: 1 } }] }).cure === '疗伤丹', '危机预警契约：只有疗伤丹时 cure=疗伤丹');
 
 // —— 残片法宝：死道具→炼器「残片修复」闭环（消除“待修复成长”假承诺）——
 ok(ART_RECIPES.炼器.some((r) => r.id === 'repair_canpian'), '残片修复：炼器配方已登记');
@@ -3718,6 +3724,105 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const legacy = { ...files, '设置.ini': { 游戏设置: { avatarPreset: 'x' } } };
   const back4 = deserialize(legacy);
   ok((Number(back4.settings?.customAvatarTs) || 0) === 0, '旧档缺 customAvatarTs 时回落为 0');
+}
+
+/* ---------- 疗伤药口径（量级 / 无伤不白吃 / 有什么用什么） ---------- */
+{
+  const mk = () => {
+    const s = S.createNewGame({ name: '疗伤测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(s);
+    return s;
+  };
+  // 口径纯函数
+  ok(S.healAmount({ heal: true }) === Infinity, 'heal:true 表示全清');
+  ok(S.healAmount({ heal: 1 }) === 1, 'heal:1 表示清 1 个月');
+  ok(S.healAmount({ heal: 3 }) === 3, 'heal:3 表示清 3 个月');
+  ok(S.healAmount({}) === 0 && S.healAmount(null) === 0, '无 heal 字段时为 0');
+
+  // 疗伤丹只清 1 个月（此前文案写 1 个月、结算却全清，与 45 灵石的凝血丹等价）
+  {
+    const s = mk();
+    s.flags.wounded = 3;
+    s.items.push({ 名称: '疗伤丹', 类型: '丹药', 数量: 2, 描述: '清除 1 个月伤势。', effect: { heal: 1 } });
+    S.useItem(s, s.items.length - 1);
+    ok(s.flags.wounded === 2, `疗伤丹按量级清 1 个月（3 → ${s.flags.wounded}）`);
+    ok(s.items[s.items.length - 1].数量 === 1, '疗伤丹服用后被消耗 1 颗');
+    ok(!s.flags.curedWounds, '伤势未清零不计「妙手回春」');
+  }
+  // 凝血丹全清
+  {
+    const s = mk();
+    s.flags.wounded = 4;
+    s.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '清除全部伤势。', effect: { heal: true } });
+    S.useItem(s, s.items.length - 1);
+    ok(s.flags.wounded === 0, '凝血丹清除全部伤势');
+    ok(!!s.flags.curedWounds, '全愈写入 curedWounds（妙手回春成就）');
+  }
+  // 无伤时服纯疗伤丹：不消耗（此前会白扔一颗）
+  {
+    const s = mk();
+    s.flags.wounded = 0;
+    s.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 3, 描述: '清除全部伤势。', effect: { heal: true } });
+    const logs = S.useItem(s, s.items.length - 1);
+    ok(s.items[s.items.length - 1].数量 === 3, '无伤服凝血丹不消耗');
+    ok(Array.isArray(logs) && logs[0].includes('未被消耗'), '无伤服用给出「未被消耗」提示');
+  }
+  // 兼有其它药效的丹（露华丹：全清 + 悟性）：无伤仍可服用，只跳过疗伤段
+  {
+    const s = mk();
+    s.flags.wounded = 0;
+    const wx = () => (s.player.daoBase && s.player.daoBase['悟性'] && s.player.daoBase['悟性'].exp) || 0;
+    const before = wx();
+    s.items.push({ 名称: '露华丹', 类型: '丹药', 数量: 1, 描述: '伤势尽去、悟性 +200。', effect: { heal: true, wuxing: 200 } });
+    S.useItem(s, s.items.length - 1);
+    ok(!s.items.some((i) => i.名称 === '露华丹'), '露华丹无伤时照常服用（不因疗伤无效而卡住）');
+    ok(wx() > before, `露华丹无伤时仍补悟性（${before} → ${wx()}）`);
+    ok((s.flags.wounded || 0) === 0, '露华丹无伤时不误改伤势');
+  }
+  // 行囊疗伤药清单：全清类优先
+  {
+    const s = mk();
+    s.items.push({ 名称: '疗伤丹', 类型: '丹药', 数量: 1, effect: { heal: 1 } });
+    s.items.push({ 名称: '兽骨续命丹', 类型: '丹药', 数量: 1, effect: { heal: true } });
+    s.items.push({ 名称: '百年灵芝', 类型: '材料', 数量: 1 });
+    const list = S.woundCureItems(s);
+    ok(list.length === 2, `只列疗伤药（${list.length} 种）`);
+    ok(list[0].名称 === '兽骨续命丹', '全清类排在量级类之前');
+    ok(list[0].amount === Infinity && list[1].amount === 1, '清单带效力数值，供 UI 直接使用');
+  }
+  // 危机预警：按实际持有给解药名（此前硬编码「凝血丹」，有其它药时按钮消失）
+  {
+    const s = mk();
+    s.flags.wounded = 2;
+    ok(S.woundWarning(s).cure === '', '无疗伤药时 cure 为空（不谎报）');
+    ok(S.woundWarning(s).hint.includes('坊市'), '无药时提示去坊市购买');
+    s.items.push({ 名称: '疗伤丹', 类型: '丹药', 数量: 1, effect: { heal: 1 } });
+    const w1 = S.woundWarning(s);
+    ok(w1.cure === '疗伤丹', `只有疗伤丹时推荐疗伤丹（${w1.cure}）`);
+    ok(w1.hint.includes('减 1 个月'), '提示写明能减几个月');
+    s.items.push({ 名称: '凝血丹', 类型: '丹药', 数量: 1, effect: { heal: true } });
+    const w2 = S.woundWarning(s);
+    ok(w2.cure === '凝血丹', '有全清药时优先推荐全清药');
+    ok(w2.hint.includes('立刻'), '全清药提示写明立刻痊愈');
+  }
+  // 服用前预览与结算同口径
+  {
+    const s = mk();
+    s.flags.wounded = 3;
+    const li = { 名称: '疗伤丹', 类型: '丹药', 数量: 1, effect: { heal: 1 } };
+    const x = { 名称: '凝血丹', 类型: '丹药', 数量: 1, effect: { heal: true } };
+    ok(S.itemUsePreview(s, li).text.includes('余 2 个月'), `疗伤丹预览写明愈后余 2 个月（${S.itemUsePreview(s, li).text}）`);
+    ok(S.itemUsePreview(s, x).text.includes('现 3 个月'), '凝血丹预览写明当前伤势');
+    s.flags.wounded = 0;
+    ok(S.itemUsePreview(s, x).text.includes('服用无效'), '无伤时预览提示服用无效');
+  }
+  // 坊市定价：疗伤丹只清 1 个月，不应与 45 灵石的凝血丹同价
+  {
+    const item = (REGION_MARKET.zhongzhou || []).find((r) => r.name === '疗伤丹');
+    ok(!!item, '中州坊市有售疗伤丹');
+    ok(item && item.effect && item.effect.heal === 1, '坊市疗伤丹按量级配置（清 1 个月）');
+    ok(item && item.price < 45, `疗伤丹定价低于凝血丹（${item && item.price} < 45）`);
+  }
 }
 
 console.log(`

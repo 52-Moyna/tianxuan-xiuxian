@@ -299,6 +299,49 @@ try {
     st.currencies = keep; UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `地图路费门禁: ${e.message}`); }
 
+  // 受伤闭环：危机横幅/指引必须「有什么药就说什么药」——
+  // 此前解药名硬编码为凝血丹，玩家身上只有疗伤丹时按钮直接消失、指引成空话。
+  try {
+    const SYS = await import(pathToFileURL(join(ROOT, 'public/js/systems.js')).href);
+    const LIFEX = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const st4 = GameState.data;
+    LIFEX.storeItem(st4, { 名称: '疗伤丹', 类型: '丹药', 数量: 2, 描述: '清除 1 个月伤势。', effect: { heal: 1 } });
+    st4.flags.wounded = 3;
+    UI.renderAll(); await sleep(150);
+    const ban1 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(ban1.includes('服用疗伤丹'), '受伤且只有疗伤丹时，危机横幅给出「服用疗伤丹」按钮');
+    ok(ban1.includes('减 1 个月'), '横幅写明该药能减几个月伤势（不谎称痊愈）');
+    // 换成全清药：横幅应改推全清药
+    LIFEX.storeItem(st4, { 名称: '凝血丹', 类型: '丹药', 数量: 1, 描述: '清除全部伤势。', effect: { heal: true } });
+    UI.renderAll(); await sleep(150);
+    const ban2 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(ban2.includes('服用凝血丹'), '持有全清药时横幅优先推荐凝血丹');
+    ok(ban2.includes('立刻'), '全清药提示写明立刻痊愈');
+    // 一键服用真能落地：点按钮后伤势清零、凝血丹被消耗
+    const cureBtn = $$('#crisis-banner [data-cure]')[0];
+    ok(!!cureBtn, '横幅服用按钮带 data-cure 绑定');
+    if (cureBtn) {
+      cureBtn.click(); await sleep(200);
+      ok((st4.flags.wounded || 0) === 0, `点击横幅按钮后伤势清零（${st4.flags.wounded}）`);
+      ok(!st4.items.some((i) => i.名称 === '凝血丹' && i.数量 > 0), '凝血丹已被消耗');
+    }
+    // 无药时：不谎报药名，指路坊市
+    const st5 = GameState.data;
+    st5.items = st5.items.filter((i) => !i.effect || !i.effect.heal);
+    st5.flags.wounded = 2;
+    UI.renderAll(); await sleep(150);
+    const ban3 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok($$('#crisis-banner [data-cure]').length === 0, '无疗伤药时不出现服用按钮');
+    ok(ban3.includes('坊市'), '无药时横幅指路坊市');
+    // 指引条同步：受伤有药时 detail 点名该药
+    LIFEX.storeItem(st5, { 名称: '疗伤丹', 类型: '丹药', 数量: 1, 描述: '清除 1 个月伤势。', effect: { heal: 1 } });
+    UI.setSideTab('items'); await sleep(120);
+    UI.renderAll(); await sleep(150);
+    const sideHtml = $('#side-body') ? $('#side-body').innerHTML : '';
+    ok(sideHtml.includes('疗伤丹'), '侧栏「当前目标」点名实际持有的疗伤药');
+    st5.flags.wounded = 0; UI.renderAll(); await sleep(120);
+  } catch (e) { ok(false, `受伤闭环: ${e.message}`); }
+
 } catch (e) {
   console.log('运行异常：', e.stack || e.message); fail++;
 } finally {
