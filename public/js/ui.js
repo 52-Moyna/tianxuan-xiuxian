@@ -893,7 +893,8 @@ export function renderAll() {
       banner.className = `crisis-banner ${warns.some((w) => w.level === 'danger') ? 'danger' : 'warn'}`;
       banner.innerHTML = warns.map((w) => {
         const cure = w.cure || '';
-        const cidx = cure ? findItemIndex(st, cure) : -1;
+        // 优先用预警函数直接给出的行囊下标（与「有什么药就说什么药」同源，避免同名错位）
+        const cidx = (Number.isInteger(w.cureIdx) && w.cureIdx >= 0) ? w.cureIdx : (cure ? findItemIndex(st, cure) : -1);
         const btn = cidx >= 0 ? ` <button class="cb-cure" data-cure="${cidx}">服用${cure}</button>` : '';
         return `<div class="cb-item">${w.hint}${btn}</div>`;
       }).join('');
@@ -1181,6 +1182,35 @@ function actionGroup(option) {
 function playerGuidance(st, opts) {
   const bottleneck = S.checkBottleneck(st);
   const destiny = S.destinyCurrent(st);
+  // 寿元将尽 / 丹毒攻心会直接终结这一世，优先级高于一切成长目标。
+  // 此前指引完全不提，玩家余寿仅剩几年时仍被指引去「提升至 Lv.N」。
+  // 现与危机横幅同口径：有药点药名（去行囊服用）、无药指路坊市。
+  if (typeof S.lifespanWarning === 'function') {
+    const lw = S.lifespanWarning(st);
+    if (lw.level !== 'ok') {
+      const best = (typeof S.lifespanCureItems === 'function' ? S.lifespanCureItems(st) : [])[0] || null;
+      return {
+        title: '当前目标：延续寿元',
+        detail: best
+          ? `寿元仅余 ${lw.lifeLeft} 年。服「${best.名称}」可延寿 ${best.years} 年，或冲击更高境界增寿。`
+          : `寿元仅余 ${lw.lifeLeft} 年，囊中无延寿丹药。可到坊市/拍卖/宗门兑换所寻觅，或冲击更高境界增寿。`,
+        action: best ? '行囊' : '坊市',
+      };
+    }
+  }
+  if (typeof S.toxicityWarning === 'function') {
+    const tw = S.toxicityWarning(st);
+    if (tw.level === 'danger') {
+      const best = (typeof S.detoxCureItems === 'function' ? S.detoxCureItems(st) : [])[0] || null;
+      return {
+        title: '当前目标：化解丹毒',
+        detail: best
+          ? `丹毒已达 ${tw.toxic}，修炼效率大降、再服毒丹将重创修为。服「${best.名称}」可减 ${best.amount} 点丹毒。`
+          : `丹毒已达 ${tw.toxic}，修炼效率大降、再服毒丹将重创修为。囊中无解毒丹药，可到坊市购买或自炼（需百年灵芝 + 星砂）。`,
+        action: best ? '行囊' : '坊市',
+      };
+    }
+  }
   if (bottleneck) return { title: `当前目标：冲击「${bottleneck.name}」`, detail: '修为已满。突破有风险，可先准备对应丹药，或继续经营积累资源。', action: '突破' };
   // 受伤指引此前硬编码「服用凝血丹」，玩家身上只有疗伤丹 / 兽骨续命丹 / 露华丹时
   // 指引等于空话。现按行囊实际持有的疗伤药给方案：有药说药名、无药指路坊市。
@@ -2804,7 +2834,9 @@ function renderCenter() {
                 ${it.数量 > 1 ? `<div class="item-qty">×${it.数量}</div>` : ''}
                 <div class="item-acts">
                   ${pv.mode === 'equip' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">装备</button>` : ''}
-                  ${pv.mode === 'use' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">${pv.label}</button>` : ''}
+                  ${pv.mode === 'use' ? (pv.usable === false
+                    ? `<button class="btn btn-sm btn-useless" data-use="${i}" disabled title="${attr(pv.text)}（当前服用无效，不会消耗）">${pv.label}</button>`
+                    : `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">${pv.label}</button>`) : ''}
                   ${pv.mode === 'auto' ? `<span class="item-auto-note" title="${attr(pv.text)}">⚙ 自动生效</span>` : ''}
                   <button class="btn btn-sm" data-codex="${it.名称}">图鉴</button>
                 </div>

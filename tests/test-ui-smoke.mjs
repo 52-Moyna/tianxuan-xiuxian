@@ -342,6 +342,74 @@ try {
     st5.flags.wounded = 0; UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `受伤闭环: ${e.message}`); }
 
+  // 寿元 / 丹毒危机指引：此前完全不提，玩家余寿只剩几年仍被指引去「提升至 Lv.N」。
+  // 现与受伤同口径 —— 有药点药名、无药指路坊市；延寿丹「一生 3 颗」服满后不再推荐。
+  try {
+    const LX = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const st6 = GameState.data;
+    st6.items = st6.items.filter((i) => !i.effect || !(i.effect.lifespan || i.effect.detox));
+    st6.player.age = st6.player.lifespan - 3;
+    st6.player.lifespanPillsTaken = 0;
+    UI.renderAll(); await sleep(150);
+    const ban4 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(ban4.includes('寿元'), '余寿将尽时危机横幅给出寿元预警');
+    ok($$('#crisis-banner [data-cure]').length === 0, '无延寿丹药时不出现服用按钮');
+    ok(ban4.includes('坊市'), '无延寿丹药时横幅指路坊市');
+    UI.setSideTab('items'); await sleep(120);
+    UI.renderAll(); await sleep(150);
+    const side6 = $('#side-body') ? $('#side-body').innerHTML : '';
+    ok(side6.includes('延续寿元'), '侧栏「当前目标」改为延续寿元（不再指引去升级）');
+    // 放一颗延寿丹：按钮出现且点名
+    LX.storeItem(st6, { 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 } });
+    UI.renderAll(); await sleep(150);
+    const ban5 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(ban5.includes('服用延寿丹'), '持有延寿丹时横幅给出「服用延寿丹」按钮');
+    // 额度服满：服下无效、不消耗，故不再推荐（否则玩家点了才发现白搭）
+    st6.player.lifespanPillsTaken = 3;
+    UI.renderAll(); await sleep(150);
+    const ban6 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(!ban6.includes('服用延寿丹'), '延寿丹一生额度已满：横幅不再推荐（服下无效、不消耗）');
+    st6.player.lifespanPillsTaken = 0;
+    st6.player.age = 20;
+    // 丹毒攻心但囊中无解毒丹：不谎报药名、不出现点了无效的幻影按钮，改指路坊市
+    st6.flags.pillToxicity = 90;
+    UI.renderAll(); await sleep(150);
+    const banD = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(banD.includes('丹毒'), '丹毒攻心时危机横幅给出丹毒预警');
+    ok(!banD.includes('服用解毒丹'), '无解毒丹药时不出现「服用解毒丹」按钮（不谎报）');
+    ok(banD.includes('坊市'), '无解毒丹药时横幅指路坊市');
+    ok(!banD.includes('服「解毒丹」'), '无解毒丹药时提示不谎称「服解毒丹」（旧版硬编码药名）');
+    // 持有解毒丹：点名且写明能减多少
+    LX.storeItem(st6, { 名称: '解毒丹', 类型: '丹药', 数量: 1, 描述: '解毒', effect: { detox: 30 } });
+    UI.renderAll(); await sleep(150);
+    const ban7 = $('#crisis-banner') ? $('#crisis-banner').innerHTML : '';
+    ok(ban7.includes('服用解毒丹'), '丹毒攻心且持有解毒丹时给出服用按钮');
+    ok(ban7.includes('减 30'), '横幅写明解毒丹能减多少丹毒');
+    st6.flags.pillToxicity = 0;
+    st6.items = st6.items.filter((i) => !i.effect || !(i.effect.lifespan || i.effect.detox));
+    UI.renderAll(); await sleep(120);
+  } catch (e) { ok(false, `寿元/丹毒指引: ${e.message}`); }
+
+  // 行囊失效按钮：所有药效段均失效时置灰（点了也白搭，useItem 不消耗、无效果）
+  try {
+    const LX = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const st7 = GameState.data;
+    st7.items = st7.items.filter((i) => i.名称 !== '疗伤丹');
+    LX.storeItem(st7, { 名称: '疗伤丹', 类型: '丹药', 数量: 1, 描述: '清除 1 个月伤势。', effect: { heal: 1 } });
+    st7.flags.wounded = 0;
+    UI.setSideTab('items'); await sleep(120);
+    UI.renderAll(); await sleep(180);
+    const rowOf = (name) => $$('#center-body .item-row').find((r) => r.textContent.includes(name));
+    const btnA = (rowOf('疗伤丹') || {}).querySelector ? rowOf('疗伤丹').querySelector('[data-use]') : null;
+    ok(!!btnA && btnA.disabled, '无伤时纯疗伤丹「服用」按钮置灰（点了无效、不消耗）');
+    ok(!!btnA && btnA.className.includes('btn-useless'), '失效按钮带 btn-useless 样式类');
+    st7.flags.wounded = 2; UI.renderAll(); await sleep(180);
+    const rowB = rowOf('疗伤丹');
+    const btnB = rowB ? rowB.querySelector('[data-use]') : null;
+    ok(!!btnB && !btnB.disabled, '带伤时疗伤丹按钮恢复可用');
+    st7.flags.wounded = 0; UI.renderAll(); await sleep(120);
+  } catch (e) { ok(false, `行囊失效按钮: ${e.message}`); }
+
 } catch (e) {
   console.log('运行异常：', e.stack || e.message); fail++;
 } finally {

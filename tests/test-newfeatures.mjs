@@ -2348,7 +2348,7 @@ ok(S.lifespanWarning(mkCrisisState({ age: 30, lifespan: 100 })).lifeLeft === 70,
 ok(S.lifespanWarning(mkCrisisState({ age: 30, lifespan: 45 })).level === 'warn', '寿元预警：余寿15年→警告');
 ok(S.lifespanWarning(mkCrisisState({ age: 90, lifespan: 100 })).level === 'warn', '寿元预警：余寿10年→警告(>8)');
 ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).level === 'danger', '寿元预警：余寿5年→危险');
-ok(S.lifespanWarning(mkCrisisState({ age: 30, lifespan: 45 })).hint.includes('延寿丹'), '寿元预警：警告提示含延寿丹途径');
+ok(S.lifespanWarning(mkCrisisState({ age: 30, lifespan: 45 })).hint.includes('延寿'), '寿元预警：警告提示给出延寿途径');
 ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).hint.includes('转世'), '寿元预警：危险提示含转世途径');
 // 丹毒预警：清净 / 警告 / 危险 三档
 ok(S.toxicityWarning(mkCrisisState({ toxic: 0 })).level === 'ok', '丹毒预警：0→清净');
@@ -2357,7 +2357,7 @@ ok(S.toxicityWarning(mkCrisisState({ toxic: 60 })).level === 'warn', '丹毒预�
 ok(S.toxicityWarning(mkCrisisState({ toxic: 85 })).level === 'danger', '丹毒预警：85→危险');
 ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).level === 'danger', '丹毒预警：90→危险');
 ok(S.toxicityWarning(mkCrisisState({ toxic: 70 })).hint.includes('暂缓毒性丹药'), '丹毒预警：警告提示宜暂缓毒性丹药');
-ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).hint.includes('解毒丹'), '丹毒预警：危险提示含解毒丹');
+ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).hint.includes('解毒'), '丹毒预警：危险提示给出解毒途径');
 // 纯函数：完全不改动原状态
 const cst = mkCrisisState({ age: 95, lifespan: 100, toxic: 90 });
 S.lifespanWarning(cst); S.toxicityWarning(cst);
@@ -2386,8 +2386,13 @@ ok(S.woundWarning({ flags: { wounded: 0 } }).level === 'ok', '伤势预警：0�
 ok(S.woundWarning({ flags: { wounded: 1 } }).level === 'warn' && S.woundWarning({ flags: { wounded: 2 } }).level === 'warn', '伤势预警：1~2月→警告');
 ok(S.woundWarning({ flags: { wounded: 3 } }).level === 'danger', '伤势预警：3月→危险');
 // 危机横幅「服用」按钮契约：各危险态须暴露 cure 字段（否则横幅无按钮，预警→行动断链）
-ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).cure === '延寿丹', '危机预警契约：寿元危险提供 cure=延寿丹');
-ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).cure === '解毒丹', '危机预警契约：丹毒危险提供 cure=解毒丹');
+// 寿元/丹毒的 cure 与伤势同口径：按行囊实际持有给（有药给最优、无药为空并指路）。
+// 旧断言用没有 items 的假 state 断言 cure === '延寿丹'/'解毒丹'（恒定硬编码），
+// 验证的正是「身上没药也谎报药名」这个缺陷本身 —— 现改为按状态推导的契约。
+const LS_PILL = { 名称: '延寿丹', 类型: '丹药', 数量: 1, effect: { lifespan: 20 } };
+const DT_PILL = { 名称: '解毒丹', 类型: '丹药', 数量: 1, effect: { detox: 30 } };
+ok(S.lifespanWarning(mkCrisisState({ age: 95, lifespan: 100 })).cure === '', '危机预警契约：无延寿丹药时不谎报 cure');
+ok(S.toxicityWarning(mkCrisisState({ toxic: 90 })).cure === '', '危机预警契约：无解毒丹药时不谎报 cure');
 // 伤势契约与寿元/丹毒不同：解药有「全清 / 减 N 月」之分、且玩家未必持有凝血丹，
 // 故 cure 按行囊实际持有给（有药给最优药、无药给空并指路坊市），不再硬编码单一丹名 ——
 // 硬编码会让「身上只有疗伤丹」的玩家看到按钮直接消失。
@@ -2395,6 +2400,51 @@ ok(S.woundWarning({ flags: { wounded: 3 } }).cure === '', '危机预警契约：
 ok(S.woundWarning({ flags: { wounded: 3 } }).hint.includes('坊市'), '危机预警契约：无药时指路坊市');
 ok(S.woundWarning({ flags: { wounded: 3 }, items: [{ 名称: '凝血丹', 类型: '丹药', 数量: 1, effect: { heal: true } }] }).cure === '凝血丹', '危机预警契约：持有凝血丹时 cure=凝血丹');
 ok(S.woundWarning({ flags: { wounded: 3 }, items: [{ 名称: '疗伤丹', 类型: '丹药', 数量: 1, effect: { heal: 1 } }] }).cure === '疗伤丹', '危机预警契约：只有疗伤丹时 cure=疗伤丹');
+
+// —— 寿元/丹毒动态解药：有药点名、无药指路；延寿丹「一生 3 颗」服满后不再推荐 ——
+const lsEmpty = mkCrisisState({ age: 95, lifespan: 100 });
+const lsHold = { ...lsEmpty, items: [LS_PILL] };
+ok(S.lifespanWarning(lsHold).cure === '延寿丹', '危机预警契约：持有延寿丹时 cure=延寿丹');
+ok(S.lifespanWarning(lsHold).cureIdx === 0, '危机预警契约：cureIdx 指向该药在行囊中的真实下标');
+ok(S.lifespanWarning(lsEmpty).hint.includes('坊市'), '危机预警契约：无延寿药时指路坊市');
+ok(S.lifespanWarning(lsEmpty).cureIdx === -1, '危机预警契约：无药时 cureIdx=-1（横幅不渲染按钮）');
+// 额度已满的延寿丹服下无效（useItem early return、不消耗），不该再被推给玩家
+const lsFull = { ...lsEmpty, player: { ...lsEmpty.player, lifespanPillsTaken: 3 }, items: [LS_PILL] };
+ok(S.lifespanWarning(lsFull).cure === '', '延寿丹额度已满：不再推荐（服下无效、不消耗）');
+ok(!S.lifespanWarning(lsFull).hint.includes('速服'), '延寿丹额度已满：hint 不叫玩家去服');
+ok(S.lifespanCureItems(lsFull).length === 0, 'lifespanCureItems 排除已服满的延寿丹');
+ok(S.lifespanCureItems(lsHold).length === 1, 'lifespanCureItems 收录可用的延寿丹');
+const txEmpty = mkCrisisState({ toxic: 90 });
+const txHold = { ...txEmpty, items: [DT_PILL] };
+ok(S.toxicityWarning(txHold).cure === '解毒丹', '危机预警契约：持有解毒丹时 cure=解毒丹');
+ok(S.toxicityWarning(txHold).cureIdx === 0, '危机预警契约：丹毒 cureIdx 指向真实下标');
+ok(S.toxicityWarning(txEmpty).hint.includes('坊市'), '危机预警契约：无解毒药时指路坊市');
+ok(S.detoxCureItems({ ...txEmpty, items: [DT_PILL, { 名称: '清毒散', 类型: '丹药', 数量: 1, effect: { detox: 10 } }] })[0].名称 === '解毒丹', 'detoxCureItems 按解毒量降序（30 > 10）');
+// 闭环：cureIdx 指向的那颗丹真能生效（不是只给个名字看）
+const lsReal = JSON.parse(JSON.stringify(state));
+lsReal.player.age = lsReal.player.lifespan - 3;
+lsReal.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 }, toxicity: 15 });
+const lwR = S.lifespanWarning(lsReal);
+const lsBefore = lsReal.player.lifespan;
+ok(lwR.cureIdx >= 0 && lsReal.items[lwR.cureIdx].名称 === '延寿丹', 'cureIdx 指向行囊中真实那颗延寿丹');
+ok(S.useItem(lsReal, lwR.cureIdx) && lsReal.player.lifespan === lsBefore + 20, `按 cureIdx 服用延寿丹：寿元上限 +20（${lsBefore}→${lsReal.player.lifespan}）`);
+const txReal = JSON.parse(JSON.stringify(state));
+txReal.flags = Object.assign({}, txReal.flags, { pillToxicity: 90 });
+txReal.items.push({ 名称: '解毒丹', 类型: '丹药', 数量: 1, 描述: '解丹毒', effect: { detox: 30 }, toxicity: 0 });
+const twR = S.toxicityWarning(txReal);
+ok(twR.cureIdx >= 0 && txReal.items[twR.cureIdx].名称 === '解毒丹', 'cureIdx 指向行囊中真实那颗解毒丹');
+ok(S.useItem(txReal, twR.cureIdx) && txReal.flags.pillToxicity === 60, `按 cureIdx 服解毒丹：丹毒 90→${txReal.flags.pillToxicity}`);
+
+// —— 行囊「使用」按钮可用性：所有药效段均失效时 usable=false（UI 置灰），免得点了才发现白搭 ——
+ok(S.itemUsePreview({ flags: { wounded: 0 } }, { 名称: '疗伤丹', 类型: '丹药', effect: { heal: 1 } }).usable === false, '无伤时的纯疗伤丹 usable=false（服用无效，按钮置灰）');
+ok(S.itemUsePreview({ flags: { wounded: 2 } }, { 名称: '凝血丹', 类型: '丹药', effect: { heal: true } }).usable === true, '有伤时凝血丹 usable=true');
+ok(S.itemUsePreview({ flags: { wounded: 0 } }, { 名称: '露华丹', 类型: '丹药', effect: { heal: true, wuxing: 200 } }).usable === true, '兼有其它药效的丹无伤时仍可服用（usable=true）');
+ok(S.itemUsePreview({ player: { lifespanPillsTaken: 3 } }, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } }).usable === false, '延寿丹已服满 3 颗：usable=false');
+ok(S.itemUsePreview({ player: { lifespanPillsTaken: 1 } }, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } }).usable === true, '延寿丹未服满：usable=true');
+ok(S.itemUsePreview({ player: { marrowPillsTaken: 2 } }, { 名称: '洗髓丹', 类型: '丹药', effect: { daoBase: { keys: ['根骨'], min: 1, max: 2 } } }).usable === false, '洗髓丹已服满 2 颗：usable=false');
+ok(S.itemUsePreview({ beasts: { maxSlots: 6 } }, { 名称: '御兽环', 类型: '丹药', effect: { beastSlot: 1 } }).usable === false, '灵兽栏已达上限：usable=false');
+ok(S.itemUsePreview({ beasts: { maxSlots: 2 } }, { 名称: '御兽环', 类型: '丹药', effect: { beastSlot: 1 } }).usable === true, '灵兽栏未满：usable=true');
+ok(S.itemUsePreview({ flags: { wounded: 0 } }, { 名称: '凝神丹', 类型: '丹药', effect: { wuxing: 50 } }).usable === true, '常规丹药恒 usable=true（不受影响）');
 
 // —— 残片法宝：死道具→炼器「残片修复」闭环（消除“待修复成长”假承诺）——
 ok(ART_RECIPES.炼器.some((r) => r.id === 'repair_canpian'), '残片修复：炼器配方已登记');

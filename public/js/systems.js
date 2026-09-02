@@ -631,15 +631,21 @@ export function lifespanWarning(state) {
   const p = state.player;
   const lifeLeft = Math.max(0, (p.lifespan || 0) - (p.age || 0));
   let level = 'ok', hint = '';
-  if (lifeLeft <= 8) {
-    level = 'danger';
-    hint = '寿元将尽！可服「延寿丹」(+20年)、冲击更高境界增寿，或寿元耗尽后转世续道。';
-  } else if (lifeLeft <= 20) {
-    level = 'warn';
-    hint = '寿元渐少，留意「延寿丹」（坊市/拍卖/宗门兑换所可得）以备不时之需。';
+  if (lifeLeft <= 8) level = 'danger';
+  else if (lifeLeft <= 20) level = 'warn';
+  // 解药按行囊实际持有推导：有药点名、无药指路，不再谎报「延寿丹」
+  const cures = level !== 'ok' ? lifespanCureItems(state) : [];
+  const best = cures[0] || null;
+  if (level === 'danger') {
+    hint = best
+      ? `寿元仅余 ${lifeLeft} 年！速服「${best.名称}」(+${best.years}年)续命，或冲击更高境界增寿，亦可待寿元耗尽后转世续道。`
+      : `寿元仅余 ${lifeLeft} 年！囊中无延寿丹药，宜速往坊市/拍卖/宗门兑换所寻觅，或冲击更高境界增寿，亦可待寿元耗尽后转世续道。`;
+  } else if (level === 'warn') {
+    hint = best
+      ? `寿元渐少（余 ${lifeLeft} 年），囊中「${best.名称}」(+${best.years}年)可备不时之需。`
+      : `寿元渐少（余 ${lifeLeft} 年），坊市/拍卖/宗门兑换所可得延寿丹，宜早做打算。`;
   }
-  const cure = level !== 'ok' ? '延寿丹' : '';
-  return { level, lifeLeft, hint, cure };
+  return { level, lifeLeft, hint, cure: best ? best.名称 : '', cureIdx: best ? best.idx : -1 };
 }
 
 /** 丹毒危机预警（纯函数，不修改状态；供状态卡展示）。
@@ -647,17 +653,21 @@ export function lifespanWarning(state) {
  *  hint 提醒减服毒性丹药，必要时服「解毒丹」化解丹毒。 */
 export function toxicityWarning(state) {
   const toxic = Number(state.flags?.pillToxicity || 0);
-  let level = 'ok', hint = '', cure = '';
-  if (toxic >= 85) {
-    level = 'danger';
-    hint = '丹毒攻心！再服毒丹将重创修为，可服「解毒丹」化解丹毒或暂停服丹。';
-    cure = '解毒丹';
-  } else if (toxic >= 60) {
-    level = 'warn';
-    hint = '丹毒累积偏多，服丹收益下降、风险升高，宜暂缓毒性丹药或服「解毒丹」化解。';
-    cure = '解毒丹';
+  let level = 'ok', hint = '';
+  if (toxic >= 85) level = 'danger';
+  else if (toxic >= 60) level = 'warn';
+  const cures = level !== 'ok' ? detoxCureItems(state) : [];
+  const best = cures[0] || null;
+  if (level === 'danger') {
+    hint = best
+      ? `丹毒攻心（${toxic}）！再服毒丹将重创修为，服「${best.名称}」可减 ${best.amount} 点丹毒，或暂停服丹静待自解。`
+      : `丹毒攻心（${toxic}）！再服毒丹将重创修为。囊中无解毒丹药，可往坊市购买或自炼（需百年灵芝 + 星砂）。`;
+  } else if (level === 'warn') {
+    hint = best
+      ? `丹毒累积（${toxic}），服丹收益下降、风险升高，可服「${best.名称}」减 ${best.amount} 点，或暂缓毒性丹药。`
+      : `丹毒累积（${toxic}），服丹收益下降、风险升高，宜暂缓毒性丹药，或往坊市/百艺备下解毒丹。`;
   }
-  return { level, toxic, hint, cure };
+  return { level, toxic, hint, cure: best ? best.名称 : '', cureIdx: best ? best.idx : -1 };
 }
 
 /** 道基加经验（含升级） */
@@ -691,13 +701,39 @@ export function woundCureItems(state) {
   return list.sort((a, b) => b.amount - a.amount);
 }
 
+/** 行囊中的延寿丹药（纯函数）：按延寿年数降序。
+ *  【为何存在】危机横幅此前把解药硬编码为「延寿丹」，玩家身上没有时 hint 仍叫他去服，
+ *  指引等于空话；已服满「一生 3 颗」上限的延寿丹服下也无效（useItem 会 early return
+ *  不消耗），故不计入可用解药，免得玩家点了才发现白搭。 */
+export function lifespanCureItems(state) {
+  const taken = Number(state?.player?.lifespanPillsTaken || 0);
+  const list = [];
+  (state?.items || []).forEach((it, idx) => {
+    const years = Number(it?.effect?.lifespan) || 0;
+    if (years <= 0) return;
+    if (it.名称 === '延寿丹' && taken >= 3) return;
+    list.push({ idx, 名称: it.名称, years });
+  });
+  return list.sort((a, b) => b.years - a.years);
+}
+
+/** 行囊中的解毒丹药（纯函数）：按解毒量降序。丹毒危机唯一主动恢复途径。 */
+export function detoxCureItems(state) {
+  const list = [];
+  (state?.items || []).forEach((it, idx) => {
+    const amount = Number(it?.effect?.detox) || 0;
+    if (amount > 0) list.push({ idx, 名称: it.名称, amount });
+  });
+  return list.sort((a, b) => b.amount - a.amount);
+}
+
 export function woundWarning(state) {
   const wounds = Number(state.flags?.wounded || 0);
-  let level = 'ok', hint = '', cure = '';
+  let level = 'ok', hint = '', cure = '', best = null;
   if (wounds >= 1) {
     level = wounds >= 3 ? 'danger' : 'warn';
     const cures = woundCureItems(state);
-    const best = cures[0] || null;
+    best = cures[0] || null;
     cure = best ? best.名称 : '';
     const healWord = best
       ? (best.amount === Infinity ? `服「${best.名称}」立刻伤势尽去` : `服「${best.名称}」可减 ${Math.min(best.amount, wounds)} 个月伤势`)
@@ -706,7 +742,7 @@ export function woundWarning(state) {
       ? `身负重伤（伤势 ${wounds} 月）！历练胜率与收益大降，宜速${healWord}。`
       : `身负伤势（${wounds} 月），历练胜率略降，可${healWord}，或静养自愈。`;
   }
-  return { level, wounds, hint, cure };
+  return { level, wounds, hint, cure, cureIdx: best ? best.idx : -1 };
 }
 
 export function seclusionRiskWarning(state) {
@@ -2918,50 +2954,57 @@ export function itemUsePreview(state, it) {
       : '低阶护身道具：战斗败北时自动消耗一件，护住灵石分毫未失（重伤仍会承受）' };
   if (typeof eff.tame === 'number') return { mode: 'auto', label: '', text: `驯兽口粮：收服灵兽时自动投喂（成功率 +${eff.tame}%）` };
   const parts = [];
+  // 有效段 / 失效段计数：某段因额度上限或无伤势而无效时 useItem 会 early return
+  // （不消耗物品），UI 据此在「所有段都失效」时把按钮置灰，免得玩家点了才发现白搭。
+  let alive = 0, dead = 0;
+  const A = (t) => { parts.push(t); alive += 1; };
+  const D = (t) => { parts.push(t); dead += 1; };
   if (eff.exp) {
     const mult = (it.quality && it.quality.mult) ? it.quality.mult : 1;
     const gain = Math.round(eff.exp * mult);
-    parts.push(mult !== 1 ? `修为 +${gain}（${it.quality.grade} ×${mult}）` : `修为 +${gain}`);
+    A(mult !== 1 ? `修为 +${gain}（${it.quality.grade} ×${mult}）` : `修为 +${gain}`);
   }
   if (eff.heal) {
     const amt = healAmount(eff);
     const cur = Number(state?.flags?.wounded || 0);
-    if (cur <= 0) parts.push(amt === Infinity ? '清除全部伤势（当前无伤势，服用无效）' : `清除 ${amt} 个月伤势（当前无伤势，服用无效）`);
-    else if (amt === Infinity) parts.push(`清除全部伤势（现 ${cur} 个月）`);
-    else parts.push(`清除 ${amt} 个月伤势（现 ${cur} 个月，愈后余 ${Math.max(0, cur - amt)} 个月）`);
+    if (cur <= 0) {
+      D(amt === Infinity ? '清除全部伤势（当前无伤势，服用无效）' : `清除 ${amt} 个月伤势（当前无伤势，服用无效）`);
+    } else if (amt === Infinity) A(`清除全部伤势（现 ${cur} 个月）`);
+    else A(`清除 ${amt} 个月伤势（现 ${cur} 个月，愈后余 ${Math.max(0, cur - amt)} 个月）`);
   }
-  if (eff.wuxing) parts.push(`悟性经验 +${eff.wuxing}`);
+  if (eff.wuxing) A(`悟性经验 +${eff.wuxing}`);
   if (eff.daoBase) {
     const kb = eff.daoBase || {};
     const base = `随机提升「${(kb.keys || []).join('/')}」之一 +${kb.min}~${kb.max} 级`;
     if (it.名称 === '洗髓丹') {
       const mTaken = (state && state.player && state.player.marrowPillsTaken) || 0;
-      parts.push(mTaken >= 2
-        ? `${base}（一生限 2 颗，已服满 ${mTaken}/2，此丹暂难生效）`
-        : `${base}（一生限 2 颗，已服 ${mTaken}/2）`);
-    } else parts.push(base);
+      if (mTaken >= 2) D(`${base}（一生限 2 颗，已服满 ${mTaken}/2，此丹暂难生效）`);
+      else A(`${base}（一生限 2 颗，已服 ${mTaken}/2）`);
+    } else A(base);
   }
-  if (eff.cultivateBoostMonths) parts.push(`未来 ${eff.cultivateBoostMonths} 月修炼效率 +15%`);
-  if (eff.power) parts.push(`战力临时 +${eff.power}（持续 ${eff.powerMonths || 1} 月）`);
+  if (eff.cultivateBoostMonths) A(`未来 ${eff.cultivateBoostMonths} 月修炼效率 +15%`);
+  if (eff.power) A(`战力临时 +${eff.power}（持续 ${eff.powerMonths || 1} 月）`);
   if (eff.lifespan) {
     if (it.名称 === '延寿丹') {
       const taken = (state && state.player && state.player.lifespanPillsTaken) || 0;
-      parts.push(taken >= 3
-        ? `寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服满 ${taken}/3，此丹暂难生效）`
-        : `寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服 ${taken}/3）`);
-    } else parts.push(`寿元上限 +${eff.lifespan} 年`);
+      if (taken >= 3) D(`寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服满 ${taken}/3，此丹暂难生效）`);
+      else A(`寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服 ${taken}/3）`);
+    } else A(`寿元上限 +${eff.lifespan} 年`);
   }
   if (eff.beastSlot) {
     const cur = (state && state.beasts && state.beasts.maxSlots) || 1;
-    parts.push(cur >= 6 ? `灵兽栏上限 +1（已达上限 ${cur}/6，服用无效）` : `灵兽栏上限 +1（现 ${cur}/6 栏）`);
+    if (cur >= 6) D(`灵兽栏上限 +1（已达上限 ${cur}/6，服用无效）`);
+    else A(`灵兽栏上限 +1（现 ${cur}/6 栏）`);
   }
-  if (eff.bag) parts.push(`行囊容量 +${eff.bag} 格`);
-  if (eff.detox) parts.push(`丹毒 -${eff.detox}`);
-  if (eff.battleBuff) parts.push(`下次战斗胜率 +${eff.battleBuff}%`);
+  if (eff.bag) A(`行囊容量 +${eff.bag} 格`);
+  if (eff.detox) A(`丹毒 -${eff.detox}`);
+  if (eff.battleBuff) A(`下次战斗胜率 +${eff.battleBuff}%`);
   if (!parts.length) return none;
   const tox = (typeof it.toxicity === 'number') ? it.toxicity : 0;
   if (tox > 0) parts.push(`丹毒 +${tox}`);
-  return { mode: 'use', label: it.类型 === '丹药' ? '服用' : '使用', text: parts.join('，') };
+  // usable=false：所有药效段均失效，与 useItem 的 early return 口径一致（服用不消耗、无效果）
+  const usable = !(alive === 0 && dead > 0);
+  return { mode: 'use', label: it.类型 === '丹药' ? '服用' : '使用', text: parts.join('，'), usable };
 }
 /** 重新计算已穿戴戒指（空间戒）带来的储物袋加成，写入 inventory.ringBonus。
  *  优先读装备的 capBonus 字段，旧档/名称匹配兜底，避免容量漂移。 */
