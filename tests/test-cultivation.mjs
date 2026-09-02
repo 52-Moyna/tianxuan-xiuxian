@@ -107,5 +107,47 @@ function fresh() {
   ok(st2.cave.garden[0].progress === 1, '存档往返后生长进度保留');
 }
 
+/* ---- 渡劫预览（点破之前看得懂：成功率 / 将消耗 / 失败跌几级） ---- */
+{
+  const st = fresh();
+  ok(S.breakthroughPreview(st) === null, '非瓶颈层渡劫预览为空');
+  ok(S.breakthroughBack(95) === null, '飞升之劫失败不跌级（走轮回）');
+  ok(S.breakthroughBack(80) === 3 && S.breakthroughBack(40) === 2 && S.breakthroughBack(20) === 1, '失败跌落级数与结算一致');
+  ok(S.breakthroughWaves(20) === 4 && S.breakthroughWaves(60) === 5 && S.breakthroughWaves(5) === 3, '天劫波数与结算一致');
+}
+{
+  const st = fresh();
+  st.player.level = 20;
+  st.player.exp = 999999;
+  st.items.push({ 名称: '筑基丹', 类型: '丹药', 数量: 2, 品阶: 'shang', effect: { tribulation: 20 } });
+  const bp = S.breakthroughPreview(st);
+  ok(bp && typeof bp.rate === 'number', '瓶颈层渡劫预览给出成功率');
+  ok(bp.rate === S.breakthroughRate(st), '预览成功率与 breakthroughRate 同口径');
+  ok(bp.rate >= 5 && bp.rate <= 95, '预览成功率被夹在 5~95');
+  ok(bp.waves === S.breakthroughWaves(20), '预览波数与结算波数一致');
+  ok(bp.back === S.breakthroughBack(20), '预览跌落级数与结算一致');
+  ok(typeof bp.failText === 'string' && bp.failText.includes('跌落 1 级'), '预览明示失败跌几级');
+  const names = bp.pills.map((x) => x.名称);
+  ok(new Set(names).size === names.length, '将消耗丹药按名称去重（不重复列出同堆丹药）');
+  ok(bp.pills.length && bp.pills[0].count >= 1, '将消耗丹药带消耗数量');
+  ok(bp.parts.length >= 1 && bp.parts[0].label === '瓶颈基础', '预览给出成功率拆解来源');
+  const sum = bp.parts.reduce((a, x) => a + x.value, 0);
+  ok(Math.min(95, Math.max(5, Math.round(sum))) === bp.rate, '拆解项之和等于最终成功率（同夹取口径）');
+  // 口径一致性：预览承诺的成功率必须就是结算实际使用的成功率（预览不消耗道具/状态）
+  const before = JSON.stringify(st.items);
+  const res = S.attemptBreakthrough(st);
+  ok(res.rate === bp.rate, '预览成功率 === 结算成功率');
+  ok(res.waves.length <= bp.waves, '结算波数不超过预览承诺的波数');
+  ok(JSON.stringify(st.items) !== before, '结算确实消耗了渡劫丹（预览不消耗）');
+}
+{
+  const st = fresh();
+  st.player.level = 95;
+  st.player.exp = 999999;
+  const bp = S.breakthroughPreview(st);
+  ok(bp && bp.back === null, '飞升之劫预览标记不跌级');
+  ok(bp.failText.includes('轮回'), '飞升之劫预览明示失败将入轮回');
+}
+
 console.log(`\n===== 修仙新增系统专项测试：${pass} 通过，${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);

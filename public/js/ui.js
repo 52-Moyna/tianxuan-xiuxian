@@ -1191,6 +1191,9 @@ function playerGuidance(st, opts) {
 }
 
 function isRecommended(option, guide, st) {
+  // 指引指向「行囊」（如受伤时去服用凝血丹）时罗盘里没有对应项，
+  // 若落入默认分支会给闭关/游历打上「推荐」，出现指引与高亮互相矛盾。
+  if (guide.action === '行囊') return false;
   if (guide.action === '突破') return option.tag === '突破';
   if (guide.action === '天命') return option.action.type === 'destiny';
   if (guide.action === '坊市') return option.action.type === 'market';
@@ -2946,7 +2949,7 @@ function renderCenter() {
     const toxic = Number(st.flags?.pillToxicity || 0);
     const sideEffect = CX.pillSideEffect(st);
     const bd = S.powerBreakdown(st);
-    const btRate = S.breakthroughRate(st);
+    const bt = S.breakthroughPreview(st);
     const rp = S.realmProgress(st);
     const bn = S.checkBottleneck(st);
     const maxItem = Math.max(1, ...bd.items.map((i) => i.value));
@@ -3000,13 +3003,17 @@ function renderCenter() {
       </div>
       <div class="panel">
         <div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg><span class="pt-text">渡劫突破</span><span class="panel-hint">引动天劫 · 问鼎更高境界</span></div>
-        ${btRate == null ? `<div class="opt-desc">当前境界尚未触及瓶颈，安心修炼、稳固道基，以待突破时机。</div>` : `
-        <div class="bt-rate-text">本次突破成功率 <b>${btRate}%</b></div>
-        <div class="bt-rate-bar"><i style="width:${btRate}%"></i></div>
-        <div class="opt-desc">成功率受瓶颈基础值、道心/气运道基、渡劫丹、灵根与道韵影响；失败仅跌落若干境界，不致身死（飞升之劫除外）。</div>
-        <button class="btn btn-gold btn-block" id="btn-breakthrough">⚡ 引动天劫 · 尝试突破</button>`}
+        ${bt == null ? `<div class="opt-desc">当前境界尚未触及瓶颈，安心修炼、稳固道基，以待突破时机。</div>` : `
+        <div class="bt-rate-text">本次突破成功率 <b>${bt.rate}%</b><span class="bt-rate-sub">天劫 ${bt.waves} 波</span></div>
+        <div class="bt-rate-bar"><i style="width:${bt.rate}%"></i></div>
+        <div class="bt-fail${bt.nirvana || bt.back === 0 ? ' safe' : ''}">失败代价：${bt.failText}</div>
+        ${bt.pills.length ? `<div class="opt-desc">突破时将消耗：${bt.pills.map((x) => `「${x.名称}」×${x.count}（成功率 +${x.value}%）`).join('、')}。</div>` : `<div class="opt-desc">未持有渡劫丹：可于坊市购入或丹炉炼制，能显著提升成功率。</div>`}
+        <div class="opt-desc">成功率拆解：${bt.parts.map((x) => `${x.label}${x.value >= 0 ? '+' : ''}${x.value}`).join('，')}（上限 95%）。</div>
+        ${bn
+          ? `<button class="btn btn-gold btn-block" id="btn-breakthrough">⚡ 引动天劫 · 尝试突破</button>`
+          : `<div class="bt-fail">⚠ 本层修为未满（${fmtBig(rp.expCur)} / ${fmtBig(rp.expNeed)}）：此刻引动天劫会清空已攒修为，须先闭关苦修攒满本层，决策罗盘才会出现「冲击瓶颈」。</div>`}`}
       </div>`;
-    if (btRate != null) {
+    if (bt != null && bn) {
       const btBtn = box.querySelector('#btn-breakthrough');
       if (btBtn) btBtn.addEventListener('click', () => {
         const res = S.attemptBreakthrough(st);

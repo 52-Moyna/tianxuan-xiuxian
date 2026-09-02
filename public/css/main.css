@@ -1697,6 +1697,9 @@ button { font-family: inherit; }
 .bt-rate-text b { font-size: 1.18rem; color: var(--gold); }
 .bt-rate-bar { height: 14px; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--line-soft); overflow: hidden; margin-bottom: 12px; }
 .bt-rate-bar i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--danger), var(--gold)); transition: width .55s cubic-bezier(.22,.61,.36,1); }
+.bt-rate-sub { margin-left: 8px; font-size: .78rem; color: var(--text-dim); }
+.bt-fail { font-size: .84rem; color: var(--danger); margin-bottom: 10px; padding: 6px 10px; border-radius: 8px; background: var(--danger-bg); border: 1px solid rgba(224,138,106,.28); }
+.bt-fail.safe { color: var(--jade); background: rgba(116,179,156,.12); border-color: rgba(116,179,156,.28); }
 .btn-block { width: 100%; justify-content: center; }
 
 /* M. 装备淬炼（强化）弹窗 */

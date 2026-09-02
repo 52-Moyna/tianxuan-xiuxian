@@ -910,6 +910,79 @@ export function breakthroughRate(state) {
   return Math.min(95, Math.max(5, Math.round(rate)));
 }
 
+/**
+ * 渡劫失败跌落级数（纯函数）。飞升之劫（Lv.95）返回 null：失败不是跌级，而是触发轮回。
+ * 与 attemptBreakthrough 共用，保证「预览承诺的代价」就是「结算真正付出的代价」。
+ */
+export function breakthroughBack(level) {
+  if (level === 95) return null;
+  if (level === 10) return 1;
+  if (level === 20) return 1;
+  if (level === 40) return 2;
+  if (level === 60) return 2;
+  if (level === 80) return 3;
+  return 0;
+}
+/** 天劫波数（纯函数），与 attemptBreakthrough 共用，避免预览与动画波数对不上。 */
+export function breakthroughWaves(level) {
+  return level >= 60 ? 5 : level >= 20 ? 4 : 3;
+}
+/**
+ * 渡劫预览（纯函数：不消耗道具、不改动 state、不消耗 RNG）。
+ * 把「成功率、成功率从哪来、将消耗哪些丹药、失败跌几级」在点破之前一次讲清。
+ * 渡劫是全局风险最高的一次性抉择，此前 UI 只有一句通用文案，玩家只能盲点 ——
+ * 且失败会自动消耗行囊中每一类渡劫丹各一颗，这属于玩家必须提前知晓的代价。
+ */
+export function breakthroughPreview(state) {
+  const p = state.player;
+  const bn = BOTTLENECKS[p.level];
+  if (!bn) return null;
+  const rate = breakthroughRate(state);
+  if (rate == null) return null;
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const parts = [{ label: '瓶颈基础', value: bn.baseRate }];
+  const daoxin = r2(p.daoBase['道心'].level / 4);
+  const qiyun = r2(p.daoBase['气运'].level / 5);
+  if (daoxin) parts.push({ label: '道心', value: daoxin });
+  if (qiyun) parts.push({ label: '气运', value: qiyun });
+  // 将消耗的丹药（与 attemptBreakthrough 同口径：专属丹与每类通用渡劫丹各消耗 1 颗）
+  const pills = [];
+  if (bn.item && state.items.some((i) => i.名称 === bn.item)) pills.push({ 名称: bn.item, value: 20, count: 1 });
+  for (const i of state.items) {
+    if (i.effect && typeof i.effect.tribulation === 'number') {
+      const gradeMul = PILL_GRADES.find((g) => g.id === i.品阶)?.tribMul || 1;
+      pills.push({ 名称: i.名称, value: Math.round(i.effect.tribulation * gradeMul), count: 1 });
+    }
+  }
+  if (pills.length) {
+    const merged = [];
+    for (const x of pills) {
+      const hit = merged.find((m) => m.名称 === x.名称);
+      if (hit) { hit.count += x.count; hit.value += x.value; } else merged.push({ ...x });
+    }
+    parts.push({ label: `渡劫丹×${merged.reduce((a, x) => a + x.count, 0)}`, value: merged.reduce((a, x) => a + x.value, 0) });
+    pills.length = 0;
+    pills.push(...merged);
+  }
+  if (p.spiritRoot.gradeId === 'fei') parts.push({ label: '废灵根（天劫减半）', value: 15 });
+  if (p.daoYun.id === 'tianren') parts.push({ label: '天人道韵', value: 8 });
+  const setBt = Number(setBonusFlags(state).breakthrough || 0);
+  if (setBt) parts.push({ label: '星辉圆满', value: setBt });
+  if (state.flags.tiandaoBlessing) parts.push({ label: '天道庇护', value: state.flags.tiandaoBlessing });
+  if (state.flags.tiandaoCurse) parts.push({ label: '天道诅咒', value: -15 });
+  const pw = powerBreakthroughAdj(state);
+  if (pw) parts.push({ label: '战力参考', value: pw });
+  const back = breakthroughBack(p.level);
+  const nirvana = !!activeBeastSkillEffect(state, 'tribulationSave');
+  return {
+    name: bn.name, tribulation: bn.tribulation, reward: bn.reward, fail: bn.fail, to: bn.to,
+    rate, parts, pills, waves: breakthroughWaves(p.level), back, nirvana,
+    failText: back == null
+      ? '魂飞魄散，一线真灵入轮回转世'
+      : (nirvana ? '出战灵兽涅槃残焰护主，境界不跌落（仍清空本层经验）' : `修为跌落 ${back} 级（${realmLevelName(Math.max(1, p.level - back))}）`),
+  };
+}
+
 export function attemptBreakthrough(state) {
   const p = state.player;
   const bn = BOTTLENECKS[p.level];
@@ -945,7 +1018,7 @@ export function attemptBreakthrough(state) {
   rate = Math.min(95, Math.max(5, Math.round(rate)));
 
   // 生成天劫波次（3~5波动画）
-  const waveCount = p.level >= 60 ? 5 : p.level >= 20 ? 4 : 3;
+  const waveCount = breakthroughWaves(p.level); // 与 breakthroughPreview 同口径
   const success = Rng.chance(rate / 100);
   const waves = [];
   for (let i = 1; i <= waveCount; i++) {
@@ -964,7 +1037,7 @@ export function attemptBreakthrough(state) {
     addDaoYunExp(state, 40, logs);
     bus.emit('destiny:check');
   } else {
-    const back = p.level === 10 ? 1 : p.level === 20 ? 1 : p.level === 40 ? 2 : p.level === 60 ? 2 : p.level === 80 ? 3 : 0;
+      const back = breakthroughBack(p.level) ?? 0; // 与 breakthroughPreview 同口径（飞升劫走轮回分支，不跌级）
     if (p.level === 95) {
       logs.push('💀 飞升之劫失败，魂飞魄散……但一线真灵不灭，可入轮回转世。');
       p.exp = 0;
@@ -1593,7 +1666,17 @@ export function generateCompass(state) {
     if (o.action.type === 'explore') return { ...o, preview: '收益：材料、灵石或修为；可能进入斗法' };
     if (o.action.type === 'market') return { ...o, preview: '不会立刻结束本月，可购买、出售后再决定' };
     if (o.action.type === 'socialList' || o.action.type === 'social') return { ...o, preview: '收益：好感、道基或关系层级；切磋会进入斗法' };
-    if (o.action.type === 'breakthrough') return { ...o, preview: '高风险：成功跨越瓶颈，失败会损失修为' };
+    if (o.action.type === 'breakthrough') {
+      const bp = breakthroughPreview(state);
+      if (!bp) return { ...o, preview: '高风险：成功跨越瓶颈，失败会损失修为' };
+      const sum = bp.parts.map((x) => `${x.label}${x.value >= 0 ? '+' : ''}${x.value}`).join('，');
+      const cost = bp.pills.length ? `｜将消耗 ${bp.pills.map((x) => `${x.名称}×${x.count}`).join('、')}` : '';
+      return {
+        ...o,
+        preview: `成功率 ${bp.rate}%｜天劫 ${bp.waves} 波｜失败：${bp.failText}`,
+        previewTitle: `成功率拆解：${sum}（上限 95%）${cost}`,
+      };
+    }
     if (o.action.type === 'destiny') return { ...o, preview: destinyRewardPreview(state) };
     if (o.action.type === 'art') return { ...o, preview: '收益：技艺经验与灵石；可返回重新选择' };
     if (o.action.type === 'study') return { ...o, preview: studyGainPreview(state) };
