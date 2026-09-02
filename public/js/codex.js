@@ -910,7 +910,8 @@ export function consumeCodexPending(state) {
 export function itemDescription(item) {
   const name = item?.名称 || item?.name || '';
   const found = CODEX_ITEMS.find((x) => x.name === name);
-  return found ? `${found.effect} 获取：${found.source}。` : item?.描述 || item?.desc || '尚未记录详细效果。';
+  // 兜底返回空串（而非占位文案）：调用方统一按「有则显示、无则留白」处理。
+  return found ? `${found.effect} 获取：${found.source}。` : (item?.描述 || item?.desc || '');
 }
 
 /** 返回当前激活的套装效果列表及加成标志 */

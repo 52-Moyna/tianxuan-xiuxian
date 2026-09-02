@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize, uploadAvatar, removeAvatar, avatarUrl } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, upgradeBag, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, travelOptions, bagGradeInfo, nextBagGrade, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
@@ -1776,7 +1776,8 @@ async function flowMap() {
   const st = GameState.data;
   const current = REGION_TRAVEL[st.world.regionId] || REGION_TRAVEL.zhongzhou;
   const names = Object.fromEntries(D.REGIONS.map((r) => [r.id, r.name]));
-  const routes = current.neighbors.map((id) => ({ id, ...REGION_TRAVEL[id] }));
+  // 邻接路线统一取自 travelOptions（唯一真源），避免 UI 与 startTravel 各写一份邻接推导而分叉
+  const routes = travelOptions(st);
   const target = await new Promise((resolve) => {
     const m = openModal(`
       <div class="choice-intro">你现在位于「${st.world.region}」。旅行会消耗灵石和月份，抵达后将改变坊市库存、野外材料和天机简报。</div>
@@ -1784,7 +1785,10 @@ async function flowMap() {
       <div class="route-list">${routes.map((r) => {
         const q = travelCost(st, r.id);
         const off = q.cost < q.base ? `<em class="route-off">原价${q.base}</em>` : '';
-        return `<button class="route-row" data-region="${r.id}"><span>${names[r.id]}</span><small>${r.specialty} · 路费${q.cost}灵石${off ? ' ' : ''}${off} · ${r.months}个月</small></button>`;
+        const poor = S.totalStones(st) < q.cost;
+        return poor
+          ? `<div class="route-row route-row-poor" title="灵石不足，尚缺 ${q.cost - S.totalStones(st)}"><span>${names[r.id]}</span><small>${r.specialty} · 灵石不足（需 ${q.cost}）${off}</small></div>`
+          : `<button class="route-row" data-region="${r.id}"><span>${names[r.id]}</span><small>${r.specialty} · 路费${q.cost}灵石 ${off} · ${r.months}个月</small></button>`;
       }).join('')}</div>
       <div class="modal-actions"><button class="btn" id="btn-back-map">返回本月选择</button></div>`,
       { title: '天玄地图', lock: true, cls: 'modal-lg' });
@@ -2701,9 +2705,12 @@ function renderCenter() {
     const nonContainerItems = st.items.filter((it) => resolveType(it) !== 'container');
     // 行囊搜索：名称 + 描述模糊匹配（物品一多靠翻找太低效），与既有类型筛选叠加生效。
     // 关键词存在 box.dataset.invQuery 上，重渲染后仍保留（与 itemFilter 同机制）。
+    // 物品自带描述优先，缺失时回退图鉴的「功能 + 获取途径」（CX.itemDescription），
+    // 免得掉落物在行囊里显示空白、玩家看不出它有什么用。
+    const itemDescOf = (it) => it.描述 || CX.itemDescription(it) || '';
     const invQuery = (box.dataset.invQuery || '').trim().toLowerCase();
     const visibleItems = invQuery
-      ? nonContainerItems.filter((it) => `${it.名称 || ''} ${it.描述 || ''}`.toLowerCase().includes(invQuery))
+      ? nonContainerItems.filter((it) => `${it.名称 || ''} ${itemDescOf(it)}`.toLowerCase().includes(invQuery))
       : nonContainerItems;
     const grouped = {};
     for (const it of visibleItems) {
@@ -2721,12 +2728,17 @@ function renderCenter() {
     box.innerHTML = `
       <div class="panel">
         ${(() => {
-          const bg = D.bagGradeOf(st.inventory.capacity + (st.inventory.ringBonus || 0));
+          const bg = bagGradeInfo(st);
           return `<div class="panel-title"><svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="pt-text">行囊 · ${st.inventory.bagName}</span><span class="bag-grade" style="--bc:${bg.color}">${bg.name}</span></div>`;
         })()}
         ${(() => { const effCap = st.inventory.capacity + (st.inventory.ringBonus || 0); return `
         <div class="bag-capacity"><b>${st.inventory.used}/${effCap} 格</b><span>占用按数量计算${st.inventory.ringBonus ? ` · 含戒指+${st.inventory.ringBonus}` : ''}</span></div>
-        <div class="bag-meter"><i style="width:${Math.min(100, st.inventory.used / effCap * 100)}%"></i></div>`; })()}
+        <div class="bag-meter"><i style="width:${Math.min(100, st.inventory.used / effCap * 100)}%"></i></div>
+        ${(() => {
+          const nx = nextBagGrade(st);
+          if (!nx) return '<div class="bag-next bag-next-max">已达最高品级 · 乾坤</div>';
+          return `<div class="bag-next">再扩容 <b>${nx.need}</b> 格即可晋「<b style="color:${nx.color}">${nx.name}</b>」品（${nx.capacity} 格）</div>`;
+        })()}`; })()}
         ${(() => {
           const bag = S.bagUsage(st);
           if (!bag || bag.ratio < 0.85) return '';
@@ -2766,7 +2778,7 @@ function renderCenter() {
               return `
               <div class="item-row">
                 <div class="item-icon">${TYPE_ICONS[t] || '📦'}</div>
-                <div class="item-main"><b>${it.名称}</b><span>${it.描述 || ''}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span>${pv.mode === 'use' ? `<span class="item-eff">服用效果：${pv.text}</span>` : ''}</div>
+                <div class="item-main"><b>${it.名称}</b><span>${itemDescOf(it)}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span>${pv.mode === 'use' ? `<span class="item-eff">服用效果：${pv.text}</span>` : ''}</div>
                 ${it.数量 > 1 ? `<div class="item-qty">×${it.数量}</div>` : ''}
                 <div class="item-acts">
                   ${pv.mode === 'equip' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">装备</button>` : ''}
@@ -3244,10 +3256,12 @@ function alchemyCatalystBlock(st) {
     const traveling = !!st.world.travel?.destination;
     const bonusText = (b) => Object.entries(b || {}).map(([k, v]) => `${k}+${v}`).join(' · ') || '—';
     const dangerStars = (n) => '⚔'.repeat(n) + '·'.repeat(Math.max(0, 5 - n));
+    // 可直达的邻接地域集合统一取自 travelOptions（与 flowMap / startTravel 同口径）
+    const neighborIds = new Set(travelOptions(st).map((o) => o.id));
     const cards = regionDefs.map((r) => {
       const t = REGION_TRAVEL[r.id] || {};
       const isCur = r.id === curId;
-      const isNeighbor = (cur.neighbors || []).includes(r.id);
+      const isNeighbor = neighborIds.has(r.id);
       const marketCount = (REGION_MARKET[r.id] || []).length;
       const canGo = isNeighbor && !isCur && !traveling;
       const winRate = S.regionEncounterRate(st, r.id);
@@ -3273,7 +3287,13 @@ function alchemyCatalystBlock(st) {
             ${isCur
               ? '<span class="region-here">你正身处此地</span>'
               : canGo
-                ? `<button class="btn btn-sm btn-gold" data-go="${r.id}" title="${(() => { const q = travelCost(st, r.id); return q.cost < q.base ? `原价 ${q.base} 灵石，已享减免 → ${q.cost}` : `路费 ${q.cost} 灵石`; })()}">前往（${travelCost(st, r.id).cost}灵石·${t.months}月）</button>`
+                ? (() => {
+                  const q = travelCost(st, r.id);
+                  const tip = q.cost < q.base ? `原价 ${q.base} 灵石，已享减免 → ${q.cost}` : `路费 ${q.cost} 灵石`;
+                  return S.totalStones(st) < q.cost
+                    ? `<button class="btn btn-sm" disabled title="${tip} · 尚缺 ${q.cost - S.totalStones(st)} 灵石">灵石不足（需 ${q.cost}）</button>`
+                    : `<button class="btn btn-sm btn-gold" data-go="${r.id}" title="${tip}">前往（${q.cost}灵石·${t.months}月）</button>`;
+                })()
                 : traveling
                   ? '<span class="region-here">旅途中…</span>'
                   : '<span class="region-here">需先抵相邻地域</span>'}

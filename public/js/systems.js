@@ -2896,8 +2896,8 @@ export function stashToBag(state, stashIdx) {
 }
 
 // 兼容旧调用名
-export function equipGear(state, slotIdx) { return equipItem(state, slotIdx); }
-export function equipArtifact(state, slotIdx) { return equipItem(state, slotIdx); }
+// 注：曾经的 equipGear / equipArtifact 只是 equipItem 的等价别名（equipArtifact 零引用、
+// equipGear 仅测试引用），属「假 API」——测试绿不代表玩家路径通。已统一收敛到 equipItem。
 
 /**
  * 妖纹套装战利品加成口径（纯函数，供测试与掉落结算共用）。
@@ -3234,12 +3234,14 @@ export function claimSectStipend(state) {
   if (state.sect.rank < 1) return { ok: false, logs: ['散修无宗门俸禄可领。'] };
   const amount = state.sect.stipend || 0;
   if (amount <= 0) return { ok: false, logs: ['暂无功禄可领，下月再来。'] };
-  state.currencies['下品灵石'] = (state.currencies['下品灵石'] || 0) + amount;
+  // 必须走分层发放：直接累加「下品灵石」单档会让账面突破 1:100 分档
+  // （高阶职级月俸 700~1500，攒几个月就出现「下品灵石 3000」这种与其余收入口径打架的账面）。
+  addStones(state, amount);
   state.sect.stipend = 0;
   state.sect.claimedYear = state.world.year;
   state.sect.claimedMonth = state.world.month;
-  addLog(state, '操作', `领取宗门俸禄，下品灵石+${amount}。`);
-  return { ok: true, amount, logs: [`🏯 你从宗门库房领得本月俸禄，下品灵石 +${amount}。`] };
+  addLog(state, '操作', `领取宗门俸禄，灵石+${amount}。`);
+  return { ok: true, amount, logs: [`🏯 你从宗门库房领得本月俸禄，灵石 +${amount}。`] };
 }
 
 /* ============================================================

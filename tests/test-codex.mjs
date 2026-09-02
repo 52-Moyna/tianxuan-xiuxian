@@ -2,7 +2,7 @@ import { CURRENCIES } from '../public/js/data.js';
 /**
  * test-codex.mjs - 图鉴与新增玩法专项测试
  */
-import { createNewGame, cultivate, performAction, resolveBattle, makeEnemy, useItem, buyItem, equipGear, tameBeast, exploreMysticRealm, joinSect, doSectTask, openAuction, placeBid, calcPower, powerBreakdown, totalStones, addStones } from '../public/js/systems.js';
+import { createNewGame, cultivate, performAction, resolveBattle, makeEnemy, useItem, buyItem, equipItem, tameBeast, exploreMysticRealm, joinSect, doSectTask, openAuction, placeBid, calcPower, powerBreakdown, totalStones, addStones } from '../public/js/systems.js';
 import { ensureCodexState, discoverItem, codexEntries, codexStats, activeSetBonuses, setBonusFlags, realmGuide, rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState, achievementView, checkAchievements, claimAchievement, claimAllAchievements, ACHIEVEMENTS } from '../public/js/codex.js';
 import { ensureLifeState, storeItem, ART_RECIPES } from '../public/js/life.js';
 import { serialize, deserialize } from '../public/js/save.js';

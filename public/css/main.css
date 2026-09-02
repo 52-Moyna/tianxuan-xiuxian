@@ -1216,6 +1216,13 @@ button { font-family: inherit; }
 .destiny-future { font-size: .82rem; color: var(--text-faint); padding: 4px 0; }
 .destiny-future.now { color: var(--gold); font-weight: 600; }
 .destiny-future.past { color: var(--jade); }
+/* 路线不可达（灵石不足）：置灰且不可点击 */
+.route-row-poor { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
+.route-row-poor small { color: var(--text-faint); }
+/* 储物袋扩容进度：距下一品级还差多少格 */
+.bag-next { font-size: .76rem; color: var(--text-dim); margin-top: 6px; }
+.bag-next b { color: var(--gold); font-weight: 700; }
+.bag-next-max { color: var(--jade); }
 .bag-capacity b { color: var(--gold); }
 .bag-capacity span { font-size: .76rem; color: var(--text-dim); margin-left: 6px; }
 /* 储物袋品级标签 */

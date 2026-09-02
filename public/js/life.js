@@ -429,6 +429,16 @@ export function bagGradeInfo(state) {
   return bagGradeOf(cap);
 }
 
+/** 下一个储物袋品级 + 还差多少格（纯函数，供行囊页展示扩容进度）。
+ *  已达最高品级时返回 null。与 bagGradeInfo 同口径（容量含储物戒加成）。
+ *  用「第一个门槛高于当前容量的品级」而非下标 +1，避免容量不在档位上时算出错误档。 */
+export function nextBagGrade(state) {
+  const cap = (state.inventory?.capacity || 100) + (state.inventory?.ringBonus || 0);
+  const next = BAG_GRADES.find((g) => g.capacity > cap);
+  if (!next) return null;
+  return { id: next.id, name: next.name, color: next.color, capacity: next.capacity, need: next.capacity - cap };
+}
+
 /** 分层货币折算（下品灵石最小单位）——与 systems.totalStones 完全同口径。
  *  独立实现是为避免 life ↔ systems 循环依赖（systems 才是引用 life 的一方）。
  *
