@@ -1633,11 +1633,14 @@ async function flowMarket() {
           ${groups[t].map(({ g, i }) => {
             const cmp = (g.类型 === '装备' || g.类型 === '法宝') ? S.marketCompare(st, g) : null;
             const cmpHtml = cmp ? `<span class="si-cmp si-cmp-${cmp.cls}" title="与当前同部位已装备对比">${cmp.tag} ${cmp.text}</span>` : '';
+            // 买不起就当场说清楚：整行置灰 + 标明还差多少，别让玩家点了才吃一句「灵石不足」
+            const lack = g.价格 - S.totalStones(st);
+            const poor = lack > 0;
             return `
-            <div class="shop-item" data-buy="${i}">
+            <div class="shop-item${poor ? ' shop-item-poor' : ''}" data-buy="${i}">
               <div class="si-body"><b>${g.名称}${g.品阶 ? ` <em class="grade-${g.品阶}">${gradeName(g.品阶)}</em>` : ''}${g.品级 ? ` <em class="grade-tag">${g.品级}</em>` : ''}</b><span>${g.描述}</span>${cmpHtml}</div>
-              <div class="si-price">${g.价格} 灵石</div>
-              <button class="btn btn-sm btn-gold shop-buy-btn">购买</button>
+              <div class="si-price${poor ? ' poor' : ''}">${g.价格} 灵石${poor ? `<em class="si-lack">尚缺 ${lack}</em>` : ''}</div>
+              <button class="btn btn-sm ${poor ? '' : 'btn-gold'} shop-buy-btn" ${poor ? 'disabled title="灵石不足"' : ''}>购买</button>
             </div>`;
           }).join('')}
         </div>`).join('') || '<div class="opt-desc">今日坊市无货。</div>';
@@ -3099,7 +3102,14 @@ function alchemyCatalystBlock(st) {
         ${(() => {
           const canIrr = garden.filter((h) => h.progress < h.grow && (h.irrigatedThisMonth || 0) < HERB_IRRIGATE_CAP_PER_MONTH);
           if (!canIrr.length) return '';
-          return `<button class="btn btn-sm btn-gold btn-block" id="btn-irrigate-all" style="margin:6px 0 2px">💧 一键浇灌 ${canIrr.length} 株（${canIrr.length * HERB_IRRIGATE_COST} 灵石）</button>`;
+          // 按「当下付得起几株」显示：灵石只够浇 3 株就别承诺 5 株，
+          // 否则玩家点下去只浇了部分，日志里混着「灵石不足」，像 bug。
+          const afford = Math.min(canIrr.length, Math.floor(S.totalStones(st) / HERB_IRRIGATE_COST));
+          if (afford <= 0) {
+            return `<button class="btn btn-sm btn-block" disabled title="灵石不足（单次浇灌需 ${HERB_IRRIGATE_COST} 灵石）" style="margin:6px 0 2px">💧 灵石不足，暂无法浇灌</button>`;
+          }
+          const partial = afford < canIrr.length;
+          return `<button class="btn btn-sm btn-gold btn-block" id="btn-irrigate-all" style="margin:6px 0 2px" title="${partial ? `灵石仅够浇灌 ${afford}/${canIrr.length} 株` : ''}">💧 一键浇灌 ${partial ? `${afford}/${canIrr.length}` : canIrr.length} 株（${afford * HERB_IRRIGATE_COST} 灵石）${partial ? ' · 灵石不足，仅浇部分' : ''}</button>`;
         })()}
         ${(() => {
           const left = (st.inventory.capacity || 0) + (st.inventory.ringBonus || 0) - inventoryUsed(st);

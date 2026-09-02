@@ -1216,6 +1216,10 @@ button { font-family: inherit; }
 .destiny-future { font-size: .82rem; color: var(--text-faint); padding: 4px 0; }
 .destiny-future.now { color: var(--gold); font-weight: 600; }
 .destiny-future.past { color: var(--jade); }
+/* 坊市买不起的货：整行压暗，价格旁附「尚缺 N」 */
+.shop-item-poor { opacity: .5; }
+.shop-item-poor .si-price.poor { color: var(--text-faint); text-decoration: line-through; }
+.si-lack { display: block; font-style: normal; font-size: .72rem; color: var(--text-faint); text-decoration: none; }
 /* 路线不可达（灵石不足）：置灰且不可点击 */
 .route-row-poor { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
 .route-row-poor small { color: var(--text-faint); }

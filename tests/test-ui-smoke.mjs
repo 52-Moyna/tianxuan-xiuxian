@@ -107,9 +107,27 @@ try {
     ok(caveHtml.includes('每月生长'), '洞府面板显示灵草园每月生长');
     ok(caveHtml.includes('聚灵阵 +2'), '每月生长标注聚灵阵贡献 +2');
     ok(caveHtml.includes('约 2 月后熟'), '灵草行按聚灵阵月生长给出成熟预估（约 2 月后熟）');
-    // 一键浇灌（批量 QoL）：灵田有未熟灵草时应出现批量按钮
-    ok(caveHtml.includes('一键浇灌'), '洞府面板显示一键浇灌按钮');
-    ok(caveHtml.includes('btn-irrigate-all'), '一键浇灌按钮带绑定 id');
+    // 一键浇灌（批量 QoL）：灵田有未熟灵草且灵石充足时应出现批量按钮
+    // 新行为：灵石不足会降级/禁用，故先给足灵石再断言「完整形态」
+    const keepCur = JSON.parse(JSON.stringify(st.currencies || {}));
+    LIFE.lifeAddStones(st, 10000);
+    UI.renderAll(); await sleep(120);
+    const caveHtml2 = $('#center-body') ? $('#center-body').innerHTML : '';
+    ok(caveHtml2.includes('一键浇灌'), '洞府面板显示一键浇灌按钮');
+    ok(!!$('#btn-irrigate-all'), '一键浇灌按钮带绑定 id');
+    // 灵石只够浇 1 株（共 2 株可浇）→ 按钮只承诺 1/2，不再谎报 2 株
+    st.cave.garden.push({ id: 'herb_lingcao', name: '乙株灵草', progress: 1, grow: 5, planted: '1年1月', irrigatedThisMonth: 0, irrigated: 0 });
+    for (const k of Object.keys(st.currencies)) st.currencies[k] = 0;
+    LIFE.lifeAddStones(st, LIFE.HERB_IRRIGATE_COST);
+    UI.renderAll(); await sleep(120);
+    const irrTxt = $('#btn-irrigate-all') ? $('#btn-irrigate-all').textContent : '';
+    ok(irrTxt.includes('1/2'), `灵石只够 1 株时按钮只承诺 1/2（实际：${irrTxt}）`);
+    // 一株都浇不起 → 按钮禁用并写明原因（而非点了才发现）
+    for (const k of Object.keys(st.currencies)) st.currencies[k] = 0;
+    UI.renderAll(); await sleep(120);
+    ok($$('#center-body button[disabled]').some((b) => b.textContent.includes('灵石不足，暂无法浇灌')),
+      '灵石归零时一键浇灌按钮禁用并写明原因');
+    st.currencies = keepCur; UI.renderAll(); await sleep(100);
 
     // 满仓警示：有成熟灵草且储物袋已满时，给出「先清理再收获」的常驻提示
     st.cave.garden.push({ id: 'herb_lingcao', name: '凝露灵草', progress: 5, grow: 5, planted: '1年1月', irrigatedThisMonth: 0, irrigated: 0 });
