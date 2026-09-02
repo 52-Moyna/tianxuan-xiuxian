@@ -1,11 +1,22 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus } from '../public/js/life.js';
-import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES } from '../public/js/data.js';
+import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES, CURRENCIES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, canTameBeast, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
 const ok = (c, n) => c ? pass++ : (fail++, console.error('FAIL:', n));
+
+/* 分层货币辅助：货币分 5 档、1:100 递进，收入/支出都会重新分档，
+ * 故「下品灵石」单档账面恒 < 100。测试一律以总资产（下品单位）存取，
+ * 避免用单档账面断言——那正是历史 bug 的潜伏方式。 */
+const stones = (st) => S.totalStones(st);
+function setStones(st, n) {
+  st.currencies = st.currencies || {};
+  for (const c of CURRENCIES) st.currencies[c] = 0;
+  S.addStones(st, n);
+}
+
 
 const state = S.createNewGame({
   name: '新功能测试', gender: '男', raceId: 'human', ageId: 'young',
@@ -65,7 +76,7 @@ S.checkTitles(state);
 ok(state.player.titles.includes('guji_tanxun'), '满层探索授予古迹探寻封号');
 
 /* ---------- 拍卖竞拍增强 ---------- */
-state.currencies['下品灵石'] = 100000;
+setStones(state, 100000);
 const items = S.openAuction(state);
 ok(items.length >= 3 && items.every((it) => it.buyout > it.currentBid && it.rivalBudget > it.currentBid), '拍卖生成一口价与对手预算');
 // 一口价必定落槌（在 placeBid 之前测，避免索引错位）
@@ -89,7 +100,7 @@ let evtErr = null;
 try {
   for (const ef of newEffects) {
     const st = JSON.parse(JSON.stringify(state)); st.flags = {}; st.player.level = 40;
-    st.currencies['下品灵石'] = 5000; st.items = [];
+    setStones(st, 5000); st.items = [];
     const evt = { name: '测试事件', desc: 'x', options: [{ text: 'a', effect: ef }] };
     S.resolveSpecialEvent(st, evt, 0);
   }
@@ -155,7 +166,7 @@ ok(activeSetBonuses(state).some((s) => s.name === '妖纹'), '集齐两件装备
 /* ---------- 灵兽升星 ---------- */
 ensureBeastState(state);
 state.currencies = state.currencies || {};
-state.currencies['下品灵石'] = 100000;
+setStones(state, 100000);
 state.beasts.slots = [{ name: '测试灵兽', element: '火', power: 100, skill: '吐息', desc: '测试', star: 1, tamed: true }];
 ok(beastPowerBonus(state) === 100, '升星前灵兽战力为100');
 const up1 = S.upgradeBeast(state, 0);
@@ -168,7 +179,7 @@ const upMax = S.upgradeBeast(state, 0);
 ok(!upMax.ok, '满星后不可再升');
 // 灵石不足拒绝
 state.beasts.slots.push({ name: '穷灵兽', element: '水', power: 50, skill: '水弹', desc: '测试', star: 1, tamed: true });
-state.currencies['下品灵石'] = 0;
+setStones(state, 0);
 const upPoor = S.upgradeBeast(state, state.beasts.slots.length - 1);
 ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '灵石不足时拒绝升星');
 
@@ -229,9 +240,9 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(!S.claimSectStipend(s3).ok, '未入宗不可领俸禄');
   for (let i = 0; i < 3; i++) S.nextMonth(s2);
   ok(s2.sect.stipend === 150, `每月累积俸禄 50×3=150（实际 ${s2.sect.stipend}）`);
-  const before = s2.currencies['下品灵石'];
+  const before = stones(s2);
   const claim = S.claimSectStipend(s2);
-  ok(claim.ok && s2.currencies['下品灵石'] === before + 150 && s2.sect.stipend === 0, '领取俸禄入账并清零');
+  ok(claim.ok && stones(s2) === before + 150 && s2.sect.stipend === 0, '领取俸禄入账并清零');
   ok(!S.claimSectStipend(s2).ok, '无待领俸禄时拒绝重复领取');
   let guard = 0;
   while (s2.sect.rank < 2 && guard++ < 30) S.doSectTask(s2, 'escort');
@@ -358,7 +369,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
     const g = S.createNewGame({ name: '天命测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(g);
     g.currencies = g.currencies || {};
-    g.currencies['下品灵石'] = 500;
+    setStones(g, 500);
     g.player.level = 10; g.player.power = 500;
     return g;
   };
@@ -532,24 +543,24 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   g.cave = g.cave || {};
   g.cave.garden = [];
   g.currencies = g.currencies || {};
-  g.currencies['下品灵石'] = 1000;
+  setStones(g, 1000);
   const plant = plantHerb(g, 'yushu');
   ok(plant.ok && g.cave.garden.length === 1, '播种灵草成功且占用一格');
   ok(g.cave.garden[0].progress === 0 && g.cave.garden[0].grow === 7, '灵草初始进度为0、生长周期7月');
-  const before = g.currencies['下品灵石'];
+  const before = stones(g);
   const ir = irrigateHerb(g, 0);
   ok(ir.ok && g.cave.garden[0].progress === 1, '灵泉浇灌使进度+1');
-  ok(g.currencies['下品灵石'] === before - HERB_IRRIGATE_COST, '浇灌扣除对应灵石');
+  ok(stones(g) === before - HERB_IRRIGATE_COST, '浇灌扣除对应灵石');
   g.cave.garden[0].progress = g.cave.garden[0].grow;
   ok(!irrigateHerb(g, 0).ok, '已成熟灵草拒绝浇灌');
   g.cave.garden[0].progress = 1;
-  g.currencies['下品灵石'] = 0;
+  setStones(g, 0);
   ok(!irrigateHerb(g, 0).ok, '灵石不足拒绝浇灌且不抛错');
   g.cave.garden = [{ id: '不存在的草', name: '幻草', progress: 5, grow: 5, planted: 'x' }];
   const hr = harvestHerb(g, 0);
   ok(hr && typeof hr.ok === 'boolean', '收获未知灵种返回结构化结果不崩溃');
   g.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 3, grow: 3, planted: 'x' }];
-  g.currencies['下品灵石'] = 1000;
+  setStones(g, 1000);
   const hr2 = harvestHerb(g, 0);
   ok(hr2.ok && g.cave.garden.length === 0, '收获成熟灵草后成功移除');
   ok(g.items.some((it) => it.名称 === '凝露草'), '收获产物（凝露草）已入储物袋');
@@ -575,7 +586,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   function harvestQtyAt(level) {
     const g = S.createNewGame({ name: 'hq', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(g); g.cave.level = level; g.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 3, grow: 3, planted: 'x' }];
-    g.currencies = g.currencies || {}; g.currencies['下品灵石'] = 1000;
+    g.currencies = g.currencies || {}; setStones(g, 1000);
     const before = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
     harvestHerb(g, 0);
     const after = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
@@ -587,12 +598,12 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(harvestQtyAt(8) === 5, 'Lv.8 收获凝露草×5（仙品·2×2.5=5）');
   // 播种容量联动 gardenCapacity（Lv.0 满 4 拒第 5 株）
   const g0 = S.createNewGame({ name: 'cap0', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(g0); g0.cave.level = 0; g0.cave.garden = []; g0.currencies = g0.currencies || {}; g0.currencies['下品灵石'] = 99999;
+  ensureLifeState(g0); g0.cave.level = 0; g0.cave.garden = []; g0.currencies = g0.currencies || {}; setStones(g0, 99999);
   let planted = 0; for (let i = 0; i < 5; i++) { if (plantHerb(g0, 'lingcao').ok) planted++; }
   ok(planted === 4 && g0.cave.garden.length === 4, 'Lv.0 最多播种 4 株，第 5 株被拒');
   // Lv.8 可播 8 株
   const g8 = S.createNewGame({ name: 'cap8', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(g8); g8.cave.level = 8; g8.cave.garden = []; g8.currencies = g8.currencies || {}; g8.currencies['下品灵石'] = 99999;
+  ensureLifeState(g8); g8.cave.level = 8; g8.cave.garden = []; g8.currencies = g8.currencies || {}; setStones(g8, 99999);
   let p8 = 0; for (let i = 0; i < 9; i++) { if (plantHerb(g8, 'lingcao').ok) p8++; }
   ok(p8 === 8 && g8.cave.garden.length === 8, 'Lv.8 最多播种 8 株，第 9 株被拒');
 }
@@ -603,7 +614,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   function yieldOf(level, irrigated) {
     const g = S.createNewGame({ name: 'irr', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(g); g.cave.level = level; g.cave.garden = [{ id: 'lingcao', name: '凝露灵草', progress: 3, grow: 3, planted: 'x', irrigated: irrigated }];
-    g.currencies = g.currencies || {}; g.currencies['下品灵石'] = 1000;
+    g.currencies = g.currencies || {}; setStones(g, 1000);
     const before = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
     harvestHerb(g, 0);
     const after = g.items.filter((it) => it.名称 === '凝露草').reduce((a, it) => a + (it.数量 || 1), 0);
@@ -615,7 +626,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(yieldOf(0, 99) === 5, 'Lv.0 + 浸润99次 → 仍封顶 ×5（2+3）');
   ok(yieldOf(8, 2) === 7, 'Lv.8 仙品×5 + 浸润2 → ×7（品质与浸润叠加）');
   const g2 = S.createNewGame({ name: 'irr2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(g2); g2.cave.level = 0; g2.cave.garden = []; g2.currencies = g2.currencies || {}; g2.currencies['下品灵石'] = 99999;
+  ensureLifeState(g2); g2.cave.level = 0; g2.cave.garden = []; g2.currencies = g2.currencies || {}; setStones(g2, 99999);
   const pr = plantHerb(g2, 'lingcao'); ok(pr.ok && g2.cave.garden[0].irrigated === 0, '播种后浸润计数初始化为 0');
   ok(irrigateHerb(g2, 0).ok && g2.cave.garden[0].irrigated === 1, '首次浇灌浸润计数=1');
   ok(irrigateHerb(g2, 0).ok && g2.cave.garden[0].irrigated === 2, '二次浇灌浸润计数=2（达月度上限）');
@@ -634,7 +645,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   g.cave = g.cave || {};
   g.cave.garden = [];
   g.currencies = g.currencies || {};
-  g.currencies['下品灵石'] = 99999;
+  setStones(g, 99999);
   for (const id of ['lingcao', 'huoqing', 'yushu', 'yuehua']) plantHerb(g, id);
   ok(g.cave.garden.length === 4, '四种灵草均可播种且各占一格');
   const herbKeys = ['灵草:凝露灵草', '灵草:火精枣树', '灵草:玉髓芝', '灵草:月华露藤'];
@@ -656,7 +667,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   g.cave = g.cave || {};
   g.cave.garden = [];
   g.currencies = g.currencies || {};
-  g.currencies['下品灵石'] = 1000;
+  setStones(g, 1000);
   plantHerb(g, 'yushu'); // grow=7，progress=0
   const cap = HERB_IRRIGATE_CAP_PER_MONTH;
   ok(cap >= 1, '浇灌上限常量存在且>=1');
@@ -706,23 +717,23 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(herbSpringBonus(highS) === 3, '洞府 Lv.6 + 引泉2重 = 灵泉总加成 3');
   // 升级：费用递增、扣灵石、重数+1、封顶、不足拒绝
   const gS = S.createNewGame({ name: '引泉升级', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(gS); gS.cave = gS.cave || {}; gS.currencies = gS.currencies || {}; gS.currencies['下品灵石'] = 5000;
-  const beforeS = gS.currencies['下品灵石'];
+  ensureLifeState(gS); gS.cave = gS.cave || {}; gS.currencies = gS.currencies || {}; setStones(gS, 5000);
+  const beforeS = stones(gS);
   const rS1 = upgradeHerbSpring(gS);
-  ok(rS1.ok && gS.cave.springLevel === 1 && beforeS - gS.currencies['下品灵石'] === HERB_SPRING_COST_BASE * 1, '首次引泉：重数1、扣费=400');
+  ok(rS1.ok && gS.cave.springLevel === 1 && beforeS - stones(gS) === HERB_SPRING_COST_BASE * 1, '首次引泉：重数1、扣费=400');
   const rS2 = upgradeHerbSpring(gS);
-  ok(rS2.ok && gS.cave.springLevel === 2 && beforeS - gS.currencies['下品灵石'] === HERB_SPRING_COST_BASE * (1 + 2), '二次引泉：重数2、累计扣费=1200');
+  ok(rS2.ok && gS.cave.springLevel === 2 && beforeS - stones(gS) === HERB_SPRING_COST_BASE * (1 + 2), '二次引泉：重数2、累计扣费=1200');
   const rS3 = upgradeHerbSpring(gS);
   ok(rS3.ok && gS.cave.springLevel === 3, '三次引泉达上限3');
   const rS4 = upgradeHerbSpring(gS);
   ok(!rS4.ok && gS.cave.springLevel === 3, '已达上限拒绝再引泉');
   const poorS = S.createNewGame({ name: '引泉贫', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(poorS); poorS.cave = poorS.cave || {}; poorS.currencies = poorS.currencies || {}; poorS.currencies['下品灵石'] = 100;
+  ensureLifeState(poorS); poorS.cave = poorS.cave || {}; poorS.currencies = poorS.currencies || {}; setStones(poorS, 100);
   const rS5 = upgradeHerbSpring(poorS);
   ok(!rS5.ok && (poorS.cave.springLevel || 0) === 0, '灵石不足引泉被拒且重数不变');
   // 引泉叠加后影响 growHerbs 自然生长（确定性）
   const gG = S.createNewGame({ name: '引泉生长', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(gG); gG.cave = gG.cave || {}; gG.cave.garden = []; gG.cave.level = 6; gG.cave.springLevel = 2; gG.currencies = gG.currencies || {}; gG.currencies['下品灵石'] = 1000;
+  ensureLifeState(gG); gG.cave = gG.cave || {}; gG.cave.garden = []; gG.cave.level = 6; gG.cave.springLevel = 2; gG.currencies = gG.currencies || {}; setStones(gG, 1000);
   const plantG = plantHerb(gG, 'yushu');
   ok(plantG.ok && gG.cave.garden.length === 1, '引泉生长：播种成功入列');
   const bp = gG.cave.garden[0].progress;
@@ -735,7 +746,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   const g = S.createNewGame({ name: '观星卜算', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(g);
   g.currencies = g.currencies || {};
-  g.currencies['下品灵石'] = 1000;
+  setStones(g, 1000);
   const before = S.totalStones(g);
   const yunBefore = (g.player.daoYun?.exp || 0);
   const wuxingBefore = (g.player.daoBase?.悟性?.exp || 0);
@@ -827,7 +838,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 2) 开炉炼制：材料 + 灵石扣减（走总灵石断言，规避分层货币口径差异）
   const a = S.createNewGame({ name: '丹炉炼制', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(a);
-  a.currencies['下品灵石'] = 1000;
+  setStones(a, 1000);
   storeItem(a, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(a, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   const stonesBefore = S.totalStones(a);
@@ -844,7 +855,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(!rrSlot.ok && /丹炉已满/.test(rrSlot.logs[0]), '丹炉满时拒绝开炉');
   // 材料不足时拒绝
   const b = S.createNewGame({ name: '缺料', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
-  ensureLifeState(b); b.currencies['下品灵石'] = 1000;
+  ensureLifeState(b); setStones(b, 1000);
   ok(!refinePill(b, '聚气丹').ok, '材料不足时开炉被拒');
 
   // 3) 跨月结算：success / fail 双路径（force 注入，确定性，消除 RNG flaky）
@@ -875,7 +886,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 6) 炼丹催化：「年份灵草」「私藏丹方·残卷」自动消耗提升成丹率（消除死道具，确定性）
   const cat = S.createNewGame({ name: '炼丹催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(cat);
-  cat.currencies['下品灵石'] = 1000;
+  setStones(cat, 1000);
   storeItem(cat, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(cat, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(cat, { 名称: '年份灵草', 类型: '材料', 数量: 2, 描述: '催化材料', 价值: 60 });
@@ -887,7 +898,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
 
   const cat2 = S.createNewGame({ name: '丹方催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(cat2);
-  cat2.currencies['下品灵石'] = 1000;
+  setStones(cat2, 1000);
   storeItem(cat2, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(cat2, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(cat2, { 名称: '私藏丹方·残卷', 类型: '材料', 数量: 1, 描述: '催化材料', 价值: 120 });
@@ -898,7 +909,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 无催化材料时不消耗、无加成（无回归）
   const cat3 = S.createNewGame({ name: '无催化', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(cat3);
-  cat3.currencies['下品灵石'] = 1000;
+  setStones(cat3, 1000);
   storeItem(cat3, { 名称: '百越灵草', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   storeItem(cat3, { 名称: '海灵珠', 类型: '材料', 数量: 5, 描述: '测试材料', 价值: 5 });
   const rrNo = refinePill(cat3, '聚气丹');
@@ -967,7 +978,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   const g = S.createNewGame({ name: '灵草杂交', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(g);
   g.currencies = g.currencies || {};
-  g.currencies['下品灵石'] = 99999;
+  setStones(g, 99999);
   // 配方查找：顺序无关 + 无效组合
   ok(findHerbHybrid('凝露草', '火精枣') !== null && findHerbHybrid('火精枣', '凝露草') !== null, 'findHerbHybrid 顺序无关');
   ok(findHerbHybrid('凝露草', '凝露草') === null, '相同灵草无配方');
@@ -978,10 +989,10 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 准备材料（各 1）与配方（顺序颠倒也应成功）
   g.items.push({ 名称: '凝露草', 类型: '材料', 数量: 1, 描述: '', 价值: 40 });
   g.items.push({ 名称: '火精枣', 类型: '材料', 数量: 1, 描述: '', 价值: 50 });
-  const before = g.currencies['下品灵石'];
+  const before = stones(g);
   const rr = crossbreedHerbs(g, '火精枣', '凝露草');
   ok(rr.ok && g.items.some((it) => it.名称 === '凝火奇实'), '杂交成功并产出奇珍灵材（不分先后）');
-  ok(g.currencies['下品灵石'] === before - HERB_HYBRID_COST, '杂交扣除对应灵石');
+  ok(stones(g) === before - HERB_HYBRID_COST, '杂交扣除对应灵石');
   ok(!g.items.some((it) => it.名称 === '凝露草') && !g.items.some((it) => it.名称 === '火精枣'), '杂交消耗两种灵草产物各 1 份');
   ok(g.codex.discovered.includes('材料:凝火奇实'), '杂交奇珍灵材解锁图鉴');
   // 全部 4 种杂交 → 解锁「灵植奇才」成就
@@ -1013,7 +1024,7 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   // 2) 闭环：杂交产出奇珍灵材 → 作为高阶丹方材料开炉
   const g = S.createNewGame({ name: '闭环炼丹', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(g);
-  g.currencies = g.currencies || {}; g.currencies['下品灵石'] = 999999;
+  g.currencies = g.currencies || {}; setStones(g, 999999);
   storeItem(g, { 名称: '凝露草', 类型: '材料', 数量: 5, 描述: '测试', 价值: 5 });
   storeItem(g, { 名称: '火精枣', 类型: '材料', 数量: 5, 描述: '测试', 价值: 5 });
   const cross = crossbreedHerbs(g, '凝露草', '火精枣');
@@ -1172,24 +1183,24 @@ const pickNeighbor = (st) => travelOptions(st)[0];
   const t1 = S.createNewGame({ name: '旅行测试1', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(t1);
   const nb1 = pickNeighbor(t1);
-  t1.currencies['下品灵石'] = 100000;
-  const b1 = t1.currencies['下品灵石'];
+  setStones(t1, 100000);
+  const b1 = stones(t1);
   const r1 = startTravel(t1, nb1.id);
   ok(r1.ok, '无凭证旅行可规划');
-  ok(b1 - t1.currencies['下品灵石'] === nb1.cost, '无凭证路费=全额');
+  ok(b1 - stones(t1) === nb1.cost, '无凭证路费=全额');
   ok(!r1.text.includes('减半'), '无凭证文案不含减半');
 
   // 持旅行凭证：路费减半且消耗一张
   const t2 = S.createNewGame({ name: '旅行测试2', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(t2);
   const nb2 = pickNeighbor(t2);
-  t2.currencies['下品灵石'] = 100000;
+  setStones(t2, 100000);
   t2.items.push({ 名称: '旅行凭证', 类型: '消耗品', 数量: 1, effect: { travel: 50 }, 描述: '跨域旅行费用减半。' });
-  const b2 = t2.currencies['下品灵石'];
+  const b2 = stones(t2);
   const r2 = startTravel(t2, nb2.id);
   const exp2 = Math.max(0, Math.round(nb2.cost * 0.5));
   ok(r2.ok, '持旅行凭证旅行可规划');
-  ok(b2 - t2.currencies['下品灵石'] === exp2, '持旅行凭证路费减半(实扣' + (b2 - t2.currencies['下品灵石']) + ',期望' + exp2 + ')');
+  ok(b2 - stones(t2) === exp2, '持旅行凭证路费减半(实扣' + (b2 - stones(t2)) + ',期望' + exp2 + ')');
   ok(!t2.items.some((i) => i.名称 === '旅行凭证'), '旅行凭证被消耗');
   ok(r2.text.includes('减半'), '持凭证文案提示减半');
 
@@ -1197,11 +1208,11 @@ const pickNeighbor = (st) => travelOptions(st)[0];
   const t3 = S.createNewGame({ name: '旅行测试3', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(t3);
   const nb3 = pickNeighbor(t3);
-  t3.currencies['下品灵石'] = 100000;
+  setStones(t3, 100000);
   t3.items.push({ 名称: '远航凭证', 类型: '消耗品', 数量: 1, effect: { travel: 50 }, 描述: '跨域旅行费用减半。' });
-  const b3 = t3.currencies['下品灵石'];
+  const b3 = stones(t3);
   const r3 = startTravel(t3, nb3.id);
-  ok(r3.ok && b3 - t3.currencies['下品灵石'] === Math.max(0, Math.round(nb3.cost * 0.5)), '远航凭证同样减半并消耗');
+  ok(r3.ok && b3 - stones(t3) === Math.max(0, Math.round(nb3.cost * 0.5)), '远航凭证同样减半并消耗');
 }
 
 /* ---------- 死道具修复：海岛通行令（海上遗府护阵灵石减费，持久生效） ---------- */
@@ -1210,12 +1221,12 @@ const pickNeighbor = (st) => travelOptions(st)[0];
     const g = S.createNewGame({ name: '遗府测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(g);
     g.player.level = 55;
-    g.currencies['下品灵石'] = 1000;
+    setStones(g, 1000);
     for (let k = 0; k < 3; k++) g.items.push({ 名称: '海上遗府残图', 类型: '线索', 数量: 1, 描述: '残图' });
     return g;
   };
   // 灵石不足：提前返回且残图不消耗
-  const a = mkYifu(); a.currencies['下品灵石'] = 0;
+  const a = mkYifu(); setStones(a, 0);
   const ra = S.exploreMysticRealm(a, 'yifu', 1);
   ok(ra.logs.some((l) => l.includes('灵石不足')), '遗府灵石不足时拒绝进入');
   ok(a.items.filter((i) => i.名称 === '海上遗府残图').reduce((s, i) => s + (i.数量 || 1), 0) === 3, '灵石不足时残图不被消耗');
@@ -2260,7 +2271,7 @@ state.destiny.stage = savedStage;
 // 一键收获：播种若干株并强制成熟，批量收获应全部入库
 const hg = S.createNewGame({ name: '收获测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
 ensureLifeState(hg);
-hg.cave.level = 4; hg.currencies['下品灵石'] = 99999;
+hg.cave.level = 4; setStones(hg, 99999);
 const seedPool = ['lingcao', 'huoqing', 'yushu', 'yuehua'];
 let plantedN = 0;
 for (let i = 0; i < 4; i++) { if (plantHerb(hg, seedPool[i]).ok) plantedN++; }
@@ -2319,7 +2330,7 @@ const wux = pv.daoList.find((d) => d.name === '悟性');
 ok(wux && wux.cur === 5 && wux.add === 1 && wux.next === 6, '转世预览：悟性 +floor(5×0.3)=+1（5→6）');
 ok(pv.yunExp === 40, '转世预览：道韵经验 +floor(200×0.2)=+40');
 ok(pv.techName === rcS.techniques[0].名称, '转世预览：主修功法名为当前主修');
-ok(rcS.player.daoBase['根骨'].level === 10 && rcS.player.daoYun.exp === 200 && rcS.currencies['下品灵石'] === 1000, '转世预览纯函数：完全不改动原状态');
+ok(rcS.player.daoBase['根骨'].level === 10 && rcS.player.daoYun.exp === 200 && stones(rcS) === 1000, '转世预览纯函数：完全不改动原状态');
 const inhR = S.reincarnate(rcS, false);
 ok(inhR && inhR.stones === 500 && inhR.daoBase['根骨'] === 3 && inhR.yunExp === 40 && inhR.tech && inhR.tech.名称 === rcS.techniques[0].名称, 'reincarnate 返回继承对象与预览一致（行为不变）');
 ok(S.reincarnate(rcS, true) === null, 'reincarnate(full=true) 返回 null（完全重开走新建流程）');
@@ -3034,7 +3045,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
 
   // 升级：灵石充裕时布设第 1 重，扣费且 arrayLevel 递增
   st.currencies = st.currencies || {};
-  st.currencies['下品灵石'] = 100000;
+  setStones(st, 100000);
   const before = S.totalStones(st);
   const rep = S.performAction(st, { title: '布设聚灵阵', action: { type: 'upgradeArray' } });
   ok(st.cave.arrayLevel === 1, '聚灵阵：升级后 arrayLevel=1');
@@ -3078,7 +3089,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const optState = S.createNewGame({ name: '阵选项', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(optState);
   optState.currencies = optState.currencies || {};
-  optState.currencies['下品灵石'] = 100000;
+  setStones(optState, 100000);
   const opt = S.generateCompass(optState);
   ok(opt.some((o) => o.action.type === 'upgradeArray'), '聚灵阵：罗盘经营出现布设选项');
 }
@@ -3135,7 +3146,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 升级日志：跨过 2 重阈值时明确提示灵草收益
   const lg = S.createNewGame({ name: '阵草日志', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(lg);
-  lg.currencies['下品灵石'] = 100000;
+  setStones(lg, 100000);
   lg.cave.arrayLevel = 1;
   const rep2 = S.performAction(lg, { title: '布设聚灵阵', action: { type: 'upgradeArray' } });
   ok(lg.cave.arrayLevel === 2, '聚灵阵·灵草：布设至 2 重成功');
@@ -3144,7 +3155,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 罗盘经营选项描述同步标注灵草增益（信息一致，不做隐藏加成）
   const ds = S.createNewGame({ name: '阵草描述', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
   ensureLifeState(ds);
-  ds.currencies['下品灵石'] = 100000;
+  setStones(ds, 100000);
   const arrOpt = S.generateCompass(ds).find((o) => o.action.type === 'upgradeArray');
   ok(!!arrOpt && arrOpt.desc.includes('灵草月生长'), '聚灵阵·灵草：罗盘选项描述标注灵草增益');
 }
@@ -3155,7 +3166,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const mk = () => {
     const s = S.createNewGame({ name: '满仓保护', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(s);
-    s.currencies['下品灵石'] = 100000;
+    setStones(s, 100000);
     return s;
   };
   // 构造「储物袋满载」：capacity 会被 ensureLifeState 归一（0 视作缺省、重置为 100），
@@ -3197,10 +3208,10 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   storeItem(c, { 名称: '凝露草', 类型: '材料', 数量: 2, 描述: '测试材料。' });
   storeItem(c, { 名称: '火精枣', 类型: '材料', 数量: 2, 描述: '测试材料。' });
   fillBag(c);
-  const stonesBefore = c.currencies['下品灵石'];
+  const stonesBefore = stones(c);
   const rc = crossbreedHerbs(c, '凝露草', '火精枣');
   ok(!rc.ok, '满仓·杂交：拒绝杂交');
-  ok(c.currencies['下品灵石'] === stonesBefore, '满仓·杂交：不扣灵石');
+  ok(stones(c) === stonesBefore, '满仓·杂交：不扣灵石');
   ok((c.items.find((x) => x.名称 === '凝露草')?.数量 || 0) === 2, '满仓·杂交：不消耗材料');
   freeBag(c);
   const rc2 = crossbreedHerbs(c, '凝露草', '火精枣');
@@ -3235,7 +3246,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const mk = () => {
     const s = S.createNewGame({ name: '一键浇灌', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(s);
-    s.currencies['下品灵石'] = 100000;
+    setStones(s, 100000);
     return s;
   };
 
@@ -3258,10 +3269,10 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const p = mk();
   plantHerb(p, 'lingcao');
   plantHerb(p, 'huoqing');
-  p.currencies['下品灵石'] = HERB_IRRIGATE_COST + 5;
+  setStones(p, HERB_IRRIGATE_COST + 5);
   const rp = irrigateAllHerbs(p);
   ok(rp.ok && rp.count === 1, '一键浇灌：灵石不足时只浇能负担的株数');
-  ok(p.currencies['下品灵石'] === 5, '一键浇灌：不会透支灵石');
+  ok(stones(p) === 5, '一键浇灌：不会透支灵石');
 }
 
 /* ---------- 秘境满仓前置校验：付费（残图 + 护阵灵石）后不得静默丢失灵材 ---------- */
@@ -3270,7 +3281,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
     const g = S.createNewGame({ name: '遗府满仓测试', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(g);
     g.player.level = 55;
-    g.currencies['下品灵石'] = 1000;
+    setStones(g, 1000);
     for (let k = 0; k < 3; k++) g.items.push({ 名称: '海上遗府残图', 类型: '线索', 数量: 1, 描述: '残图' });
     return g;
   };
@@ -3339,7 +3350,7 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   const mk = () => {
     const s = S.createNewGame({ name: '一键补种', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, spiritRoot: S.rollSpiritRoot() });
     ensureLifeState(s);
-    s.currencies['下品灵石'] = 100000;
+    setStones(s, 100000);
     return s;
   };
   const seedCost = (id) => HERB_TYPES.find((h) => h.id === id).seedCost;
@@ -3347,12 +3358,12 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 空园：一次性补满所有空位
   const a = mk();
   const capA = gardenCapacity(a);
-  const beforeA = a.currencies['下品灵石'];
+  const beforeA = stones(a);
   const ra = plantHerbFill(a, 'lingcao');
   ok(ra.ok && ra.count === capA, `一键补种：空园补满 ${capA} 株（实得 ${ra.count}）`);
   ok(a.cave.garden.length === capA && a.cave.garden.every((h) => h.id === 'lingcao'), '一键补种：全部播上所选灵草');
   ok(ra.spent === capA * seedCost('lingcao'), '一键补种：花费 = 株数 × 种子价');
-  ok(a.currencies['下品灵石'] === beforeA - ra.spent, '一键补种：灵石如实扣除');
+  ok(stones(a) === beforeA - ra.spent, '一键补种：灵石如实扣除');
 
   // 满园：拒绝补种
   const rb = plantHerbFill(a, 'huoqing');
@@ -3369,15 +3380,15 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   // 灵石不足：种到负担不起为止，不透支
   const d = mk();
   const capD = gardenCapacity(d);
-  d.currencies['下品灵石'] = seedCost('lingcao') * 2 + 3;
+  setStones(d, seedCost('lingcao') * 2 + 3);
   const rd = plantHerbFill(d, 'lingcao');
   ok(rd.ok && rd.count === 2, `一键补种：灵石不足时只种负担得起的 2 株（实得 ${rd.count}）`);
-  ok(d.currencies['下品灵石'] === 3, '一键补种：不会透支灵石');
+  ok(stones(d) === 3, '一键补种：不会透支灵石');
   ok(d.cave.garden.length === 2 && capD > 2, '一键补种：灵田未填满但已尽力');
 
   // 一株都种不起：明确失败且不扣费
   const e = mk();
-  e.currencies['下品灵石'] = 0;
+  setStones(e, 0);
   const re = plantHerbFill(e, 'lingcao');
   ok(!re.ok && re.count === 0 && e.cave.garden.length === 0, '一键补种：一株都种不起时失败且不扣费');
   ok(re.logs.some((l) => l.includes('灵石不足')), '一键补种：灵石不足给出明确提示');

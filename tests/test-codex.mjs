@@ -1,12 +1,24 @@
+import { CURRENCIES } from '../public/js/data.js';
 /**
  * test-codex.mjs - 图鉴与新增玩法专项测试
  */
-import { createNewGame, cultivate, performAction, resolveBattle, makeEnemy, useItem, buyItem, equipGear, tameBeast, exploreMysticRealm, joinSect, doSectTask, openAuction, placeBid, calcPower, powerBreakdown } from '../public/js/systems.js';
+import { createNewGame, cultivate, performAction, resolveBattle, makeEnemy, useItem, buyItem, equipGear, tameBeast, exploreMysticRealm, joinSect, doSectTask, openAuction, placeBid, calcPower, powerBreakdown, totalStones, addStones } from '../public/js/systems.js';
 import { ensureCodexState, discoverItem, codexEntries, codexStats, activeSetBonuses, setBonusFlags, realmGuide, rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState, achievementView, checkAchievements, claimAchievement, claimAllAchievements, ACHIEVEMENTS } from '../public/js/codex.js';
 import { ensureLifeState, storeItem, ART_RECIPES } from '../public/js/life.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
+
+/* 分层货币辅助：货币分 5 档、1:100 递进，收入/支出都会重新分档，
+ * 故「下品灵石」单档账面恒 < 100。测试一律以总资产（下品单位）存取，
+ * 避免用单档账面断言——那正是历史 bug 的潜伏方式。 */
+const stones = (st) => totalStones(st);
+function setStones(st, n) {
+  st.currencies = st.currencies || {};
+  for (const c of CURRENCIES) st.currencies[c] = 0;
+  addStones(st, n);
+}
+
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log(`FAIL: ${name}`); } }
 
 // 1. 创建角色并初始化图鉴
@@ -154,16 +166,16 @@ ok('丹药使用返回logs', Array.isArray(useLogs) && useLogs.length > 0);
   ensureLifeState(s);
   ensureCodexState(s);
   s.currencies = s.currencies || {};
-  s.currencies['下品灵石'] = 0;
+  setStones(s, 0);
   checkAchievements(s); // 'start' 必然解锁
   const startView = achievementView(s).find((a) => a.id === 'start');
   ok('start 成就解锁且带奖励', startView.unlocked && startView.reward && startView.reward.stones === 100);
-  const before = s.currencies['下品灵石'];
+  const before = stones(s);
   const r1 = claimAchievement(s, 'start');
-  ok('领取成功且灵石+100', r1.ok && s.currencies['下品灵石'] === before + 100);
+  ok('领取成功且灵石+100', r1.ok && stones(s) === before + 100);
   ok('领取后标记 claimed', achievementView(s).find((a) => a.id === 'start').claimed === true);
   const r2 = claimAchievement(s, 'start');
-  ok('重复领取被拒绝', !r2.ok && s.currencies['下品灵石'] === before + 100);
+  ok('重复领取被拒绝', !r2.ok && stones(s) === before + 100);
   const r3 = claimAchievement(s, 'phoenix'); // 未解锁
   ok('未解锁成就不可领取', !r3.ok);
   // 存档往返后 claimed 持久化
@@ -171,12 +183,12 @@ ok('丹药使用返回logs', Array.isArray(useLogs) && useLogs.length > 0);
   ok('领取状态存读档持久化', achievementView(reS).find((a) => a.id === 'start').claimed === true);
   // 一键领取：reS 中 start 已领取；mainTech（选定主修功法）与富甲一方为未领，合计发放
   reS.achievements.push({ id: 'rich', name: '富甲一方', icon: '💰', time: '测试' });
-  const stonesBeforeAll = reS.currencies['下品灵石'];
+  const stonesBeforeAll = stones(reS);
   const unclaimedRewards = reS.achievements
     .filter((a) => !a.claimed)
     .reduce((sum, a) => sum + (ACHIEVEMENTS.find((x) => x.id === a.id)?.reward?.stones || 0), 0);
   const ra = claimAllAchievements(reS);
-  ok('一键领取发放剩余未领奖励(含mainTech+富甲一方)', ra.ok && ra.total === unclaimedRewards && reS.currencies['下品灵石'] === stonesBeforeAll + unclaimedRewards);
+  ok('一键领取发放剩余未领奖励(含mainTech+富甲一方)', ra.ok && ra.total === unclaimedRewards && stones(reS) === stonesBeforeAll + unclaimedRewards);
   ok('一键领取后均标记claimed', achievementView(reS).find((a) => a.id === 'rich').claimed === true);
   const ra2 = claimAllAchievements(reS);
   ok('无未领奖励时一键领取返回ok=false', !ra2.ok);

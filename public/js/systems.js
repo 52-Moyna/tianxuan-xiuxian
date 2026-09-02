@@ -18,7 +18,7 @@ import {
   RACES, AGE_GROUPS, SPIRIT_ROOTS, ROOT_ELEMENTS, ROOT_ELEMENTS_YI,
   REGIONS, START_PACKS, DAO_YUNS, REALMS, BOTTLENECKS, DAO_BASES, DAO_BASE_EXP, getDaoBaseMilestoneBonus,
   TECHNIQUE_GRADES, TECHNIQUE_NAMES, ARTIFACT_LEVELS, ARTIFACT_NAMES,
-  CAVE_LEVELS, CURRENCIES, ARTS, FATE_DICE, WIN_RATE_FEEDBACK, DIVINATION,
+  CAVE_LEVELS, CURRENCIES, CURRENCY_RATE, ARTS, FATE_DICE, WIN_RATE_FEEDBACK, DIVINATION,
   DESTINY_LINES, NPC_SURNAMES, NPC_GIVEN, NPC_TRAITS, NPC_JOBS, NPC_SKILLS,
   DAOYUAN_LEVELS, FACTIONS, WORLD_EVENTS, BEASTS, RELATION_RULES, DEEP_NPC_EVENTS, COMMISSION_TASKS,
   SAVE_VERSION, GAME_START_YEAR, SAVE_CODE_CHARS, EQUIP_SLOTS, EQUIP_GRADES, rollEquipGrade, getEquipGradeByLevel, makeEquipName, getEquipGrade, MATERIAL_TYPES, PILL_GRADES, rollPillGrade, calcEquipPower, bagGradeOf, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_UPGRADE_BASE, BEAST_WINRATE, BEAST_SKILL_EFFECTS,
@@ -325,13 +325,13 @@ export function addLog(state, type, text) {
  * ========================================================== */
 /** 统一折算为「下品灵石」的最小单位处理 */
 export function totalStones(state) {
-  return CURRENCIES.reduce((sum, c, i) => sum + (state.currencies[c] || 0) * Math.pow(100, i), 0);
+  return CURRENCIES.reduce((sum, c, i) => sum + (state.currencies[c] || 0) * Math.pow(CURRENCY_RATE, i), 0);
 }
 /** 按「总量（下品单位）± 变动」后重新分档：保证账面永远正确 */
 function redistribute(state, totalUnits) {
   let rest = Math.max(0, Math.round(totalUnits));
   for (let i = CURRENCIES.length - 1; i >= 0; i--) {
-    const unit = Math.pow(100, i);
+    const unit = Math.pow(CURRENCY_RATE, i);
     const c = Math.floor(rest / unit);
     state.currencies[CURRENCIES[i]] = c;
     rest -= c * unit;
@@ -3417,8 +3417,8 @@ export function upgradeBeast(state, idx) {
   const star = b.star || 1;
   if (star >= 5) return { ok: false, logs: [`「${b.name}」已达五星巅峰，无法继续升星。`] };
   const cost = 200 * star * star; // 一星→二星 200，二→三 800，三→四 1800，四→五 3200
-  if ((state.currencies?.['下品灵石'] || 0) < cost) return { ok: false, logs: [`升星需 ${cost} 下品灵石，灵石不足。`] };
-  state.currencies['下品灵石'] -= cost;
+  if (!canAfford(state, cost)) return { ok: false, logs: [`升星需 ${cost} 下品灵石，灵石不足。`] };
+  spendStones(state, cost);
   b.star = star + 1;
   b.power = Math.round((b.power || 0) * 1.2);
   refreshDerived(state);

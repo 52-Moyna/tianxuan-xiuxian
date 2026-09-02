@@ -3081,7 +3081,7 @@ function alchemyCatalystBlock(st) {
             <div class="herb-info"><b>${h.name}</b><span>播种于 ${h.planted || '?'}</span><span class="herb-q">${herbQuality(st).label}灵田${herbSpringBonus(st) > 0 ? ' · 💧灵泉' : ''}${(h.irrigated||0) > 0 ? ` · 💧浸润${h.irrigated}（收获+${Math.min(h.irrigated, HERB_IRRIGATE_YIELD_CAP)}）` : ''}</span></div>
             <div class="herb-grow"><i style="width:${Math.min(100, Math.round(h.progress / h.grow * 100))}%"></i><span>${h.progress}/${h.grow} 月${mature ? ' · 可收获' : ` · 约 ${Math.max(1, Math.ceil((h.grow - h.progress) / Math.max(1, herbMonthlyGrowth(st))))} 月后熟`}${(atCap && !mature) ? ' · 本月浇灌已满' : ''}</span></div>
             <button class="btn btn-sm btn-gold" data-harvest="${i}" ${mature ? '' : 'disabled'}>${mature ? '收获' : '未熟'}</button>
-            <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
+            <button class="btn btn-sm btn-gold" data-irrigate="${i}" ${mature || atCap || !S.canAfford(st, HERB_IRRIGATE_COST) ? 'disabled' : ''}>浇灌（${HERB_IRRIGATE_COST}灵石）·剩${HERB_IRRIGATE_CAP_PER_MONTH - (h.irrigatedThisMonth || 0)}</button>
           </div>`;
         }).join('') : '<div class="opt-desc">灵田空置，挑选一株灵草播下灵种吧。</div>'}
         ${(() => {
@@ -3102,8 +3102,8 @@ function alchemyCatalystBlock(st) {
             <div class="herb-seed">
               <div class="herb-seed-info"><b>${hb.name}</b><span>${hb.desc} ｜ ${hb.grow}月熟 ｜ 产出 ${hb.yield.名称}×${hb.yield.数量 || 1}</span></div>
               <div class="herb-seed-acts">
-                <button class="btn btn-sm btn-gold" data-plant="${hb.id}" ${garden.length >= gardenCapacity(st) ? 'disabled' : ''}>播种（${hb.seedCost}灵石）</button>
-                ${garden.length < gardenCapacity(st) ? `<button class="btn btn-sm" data-plantfill="${hb.id}" title="把剩余 ${gardenCapacity(st) - garden.length} 个空位全部播上「${hb.name}」">补满 ${gardenCapacity(st) - garden.length} 株（${(gardenCapacity(st) - garden.length) * hb.seedCost}灵石）</button>` : ''}
+                <button class="btn btn-sm btn-gold" data-plant="${hb.id}" ${garden.length >= gardenCapacity(st) || !S.canAfford(st, hb.seedCost) ? 'disabled' : ''}>播种（${hb.seedCost}灵石）</button>
+                ${garden.length < gardenCapacity(st) ? `<button class="btn btn-sm" data-plantfill="${hb.id}" ${S.canAfford(st, (gardenCapacity(st) - garden.length) * hb.seedCost) ? '' : 'disabled'} title="把剩余 ${gardenCapacity(st) - garden.length} 个空位全部播上「${hb.name}」">补满 ${gardenCapacity(st) - garden.length} 株（${(gardenCapacity(st) - garden.length) * hb.seedCost}灵石）</button>` : ''}
               </div>
             </div>`).join('')}
         </div>
@@ -3114,7 +3114,7 @@ function alchemyCatalystBlock(st) {
           ${D.HERB_HYBRIDS.map((hy) => {
             const ca = (st.items.find((x) => x.名称 === hy.a)?.数量) || 0;
             const cb = (st.items.find((x) => x.名称 === hy.b)?.数量) || 0;
-            const can = ca >= 1 && cb >= 1 && (st.currencies['下品灵石'] || 0) >= D.HERB_HYBRID_COST;
+            const can = ca >= 1 && cb >= 1 && S.canAfford(st, D.HERB_HYBRID_COST);
             return `<div class="herb-seed">
               <div class="herb-seed-info"><b>${hy.out.名称}</b><span>${hy.a} + ${hy.b} → ${hy.out.名称}（价值 ${hy.out.价值}）</span><span class="herb-q">持有：${ca}/${cb}</span></div>
               <button class="btn btn-sm btn-gold" data-cross="${hy.a}|${hy.b}" ${can ? '' : 'disabled'}>杂交</button>
@@ -3420,7 +3420,7 @@ function renderBeastsPanel(box) {
           const star = b.star || 1;
           const starCost = 200 * star * star;
           const maxed = star >= 5;
-          const canAfford = (st.currencies?.['下品灵石'] || 0) >= starCost;
+          const canAfford = S.canAfford(st, starCost);
           return `
           <div class="beast-card ${isActive ? 'active' : ''}">
             <div class="beast-icon">${elemIcon(b.element)} ${b.name}${isActive ? ' <span class="beast-active-tag">出战</span>' : ''}</div>

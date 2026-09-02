@@ -9,7 +9,7 @@
  *   - 灵兽、宗门、拍卖、秘境等新玩法的静态数据与判定函数
  * 玩法系统只调用这里的判定函数，不直接读取原始数组。
  */
-import { EQUIP_GRADES, calcEquipPower, CURRENCIES } from './data.js';
+import { EQUIP_GRADES, calcEquipPower, CURRENCIES, CURRENCY_RATE } from './data.js';
 import { ensureLifeState } from './life.js';
 
 /* ============================================================
@@ -500,7 +500,7 @@ export function claimAchievement(state, id) {
   if (rec.claimed) return { ok: false, msg: '奖励已领取。' };
   const rw = def.reward || { stones: 0 };
   state.currencies = state.currencies || {};
-  state.currencies['下品灵石'] = (state.currencies['下品灵石'] || 0) + (rw.stones || 0);
+  codexAddStones(state, rw.stones || 0);
   const logs = [`领取成就「${def.name}」奖励：${rw.stones || 0} 下品灵石`];
   if (Array.isArray(rw.materials)) {
     state.items = state.items || [];
@@ -524,7 +524,7 @@ export function claimAllAchievements(state) {
     if (!rec || rec.claimed) continue;
     const rw = a.reward || { stones: 0 };
     state.currencies = state.currencies || {};
-    state.currencies['下品灵石'] = (state.currencies['下品灵石'] || 0) + (rw.stones || 0);
+    codexAddStones(state, rw.stones || 0);
     total += rw.stones || 0;
     rec.claimed = true;
     logs.push(`领取「${a.name}」：${rw.stones || 0} 下品灵石`);
@@ -532,7 +532,22 @@ export function claimAllAchievements(state) {
   return { ok: total > 0, total, logs };
 }
 function totalStonesOf(s) {
-  return CURRENCIES.reduce((sum, c, i) => sum + (s.currencies?.[c] || 0) * Math.pow(100, i), 0);
+  return CURRENCIES.reduce((sum, c, i) => sum + (s.currencies?.[c] || 0) * Math.pow(CURRENCY_RATE, i), 0);
+}
+/** 按总量重新分档（成就奖励发放后账面自动进位，避免出现「5000 下品」） */
+function codexRedistribute(state, totalUnits) {
+  let rest = Math.max(0, Math.round(totalUnits));
+  for (let i = CURRENCIES.length - 1; i >= 0; i--) {
+    const unit = Math.pow(CURRENCY_RATE, i);
+    const c = Math.floor(rest / unit);
+    state.currencies[CURRENCIES[i]] = c;
+    rest -= c * unit;
+  }
+}
+/** 分层发放灵石奖励 */
+export function codexAddStones(state, amount) {
+  state.currencies = state.currencies || {};
+  codexRedistribute(state, totalStonesOf(state) + Math.max(0, Math.round(amount || 0)));
 }
 export function ensureAchievements(state) {
   state.achievements = Array.isArray(state.achievements) ? state.achievements : [];

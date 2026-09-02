@@ -1,5 +1,5 @@
 import { ensureCodexState, discoverItem, ensureBeastState, ensureSectState, ensureAuctionState, setBonusFlags, rollPillQuality } from './codex.js';
-import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES, REALMS, HERB_HYBRIDS, HERB_HYBRID_COST } from './data.js';
+import { EQUIP_SLOTS, EQUIP_GRADES, getEquipGradeByLevel, makeEquipName, rollEquipGrade, MATERIAL_TYPES, getDaoBaseMilestoneBonus, DAO_BASES, BAG_GRADES, bagGradeOf, calcEquipPower, BAG_UPGRADE_BASE, BAG_UPGRADE_STEP, CAVE_LEVELS, HERB_TYPES, HERB_GARDEN_MAX, PILL_RECIPES, CURRENCIES, REALMS, HERB_HYBRIDS, HERB_HYBRID_COST, CURRENCY_RATE } from './data.js';
 export { HERB_HYBRID_COST, HERB_HYBRIDS };
 
 
@@ -403,7 +403,7 @@ export function upgradeBag(state, method = 'storage') {
   const costs = { storage: BAG_UPGRADE_BASE, craft: 0, destiny: 0 };
   if (method === 'storage') {
     const cost = costs.storage + state.inventory.upgrades * BAG_UPGRADE_STEP;
-    if (!state.currencies || !spendStoneLike(state, cost)) return { ok: false, text: `需要灵石${cost}。` };
+    if (!state.currencies || !lifeSpendStones(state, cost)) return { ok: false, text: `需要灵石${cost}。` };
     state.inventory.capacity += 20;
     state.inventory.upgrades += 1;
     state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
@@ -429,11 +429,38 @@ export function bagGradeInfo(state) {
   return bagGradeOf(cap);
 }
 
-function spendStoneLike(state, amount) {
-  const total = state.currencies['下品灵石'] || 0;
-  if (total < amount) return false;
-  state.currencies['下品灵石'] = total - amount;
+/** 分层货币折算（下品灵石最小单位）——与 systems.totalStones 完全同口径。
+ *  独立实现是为避免 life ↔ systems 循环依赖（systems 才是引用 life 的一方）。
+ *
+ *  【重要】绝不可只扣「下品灵石」单档：分档后该档恒 < CURRENCY_RATE，
+ *  会导致玩家身家百万却处处判定「灵石不足」（旅行 / 扩容 / 升星 / 播种全线瘫痪）。
+ */
+export function lifeTotalStones(state) {
+  return CURRENCIES.reduce((s, c, i) => s + (state.currencies?.[c] || 0) * Math.pow(CURRENCY_RATE, i), 0);
+}
+/** 按总量重新分档，保证账面各档永远正确 */
+function lifeRedistribute(state, totalUnits) {
+  let rest = Math.max(0, Math.round(totalUnits));
+  for (let i = CURRENCIES.length - 1; i >= 0; i--) {
+    const unit = Math.pow(CURRENCY_RATE, i);
+    const c = Math.floor(rest / unit);
+    state.currencies[CURRENCIES[i]] = c;
+    rest -= c * unit;
+  }
+}
+/** 能否支付（按总资产判定，不受单档账面影响） */
+export function lifeCanAfford(state, amount) {
+  return lifeTotalStones(state) >= amount;
+}
+/** 分层扣款：先按总资产判定，再整体重新分档 */
+export function lifeSpendStones(state, amount) {
+  if (!lifeCanAfford(state, amount)) return false;
+  lifeRedistribute(state, lifeTotalStones(state) - Math.round(amount));
   return true;
+}
+/** 分层加款：同样重新分档，避免「5000 下品」这类未进位账面 */
+export function lifeAddStones(state, amount) {
+  lifeRedistribute(state, lifeTotalStones(state) + Math.max(0, Math.round(amount)));
 }
 
 export function canCraft(state, recipe) {
@@ -501,7 +528,7 @@ export function startTravel(state, regionId) {
   const quote = travelCost(state, regionId);
   const cost = quote.cost;
   const usedVoucher = quote.voucher;
-  if (!spendStoneLike(state, cost)) return { ok: false, text: `路费不足，需要下品灵石${cost}。` };
+  if (!lifeSpendStones(state, cost)) return { ok: false, text: `路费不足，需要下品灵石${cost}。` };
   if (usedVoucher) {
     usedVoucher.数量 -= 1;
     if (usedVoucher.数量 <= 0) state.items.splice(state.items.indexOf(usedVoucher), 1);
@@ -559,7 +586,7 @@ export function plantHerb(state, herbId) {
   const def = HERB_TYPES.find((h) => h.id === herbId);
   if (!def) return { ok: false, logs: ['未知灵草。'] };
   if (state.cave.garden.length >= gardenCapacity(state)) return { ok: false, logs: [`灵草园已满（最多 ${gardenCapacity(state)} 株），请先收获。`] };
-  if (!spendStoneLike(state, def.seedCost)) return { ok: false, logs: [`灵石不足（需 ${def.seedCost}）。`] };
+  if (!lifeSpendStones(state, def.seedCost)) return { ok: false, logs: [`灵石不足（需 ${def.seedCost}）。`] };
   state.cave.garden.push({ id: def.id, name: def.name, progress: 0, grow: def.grow, planted: `${state.world.year}年${state.world.month}月`, irrigatedThisMonth: 0, irrigated: 0 });
   // 播种即解锁对应灵草图鉴条目（玩家可感知的收集反馈）
   discoverItem(state, { 名称: def.name, 类型: '灵草' });
@@ -726,10 +753,10 @@ export function upgradeHerbSpring(state) {
     return { ok: false, logs: [`灵泉已臻「${HERB_SPRING_MAX}重涌动」之境，无需再引。`] };
   }
   const cost = HERB_SPRING_COST_BASE * (cur + 1);
-  if ((state.currencies?.['下品灵石'] || 0) < cost) {
+  if (!lifeCanAfford(state, cost)) {
     return { ok: false, logs: [`引泉需 ${cost} 下品灵石，灵石不足。`] };
   }
-  state.currencies['下品灵石'] -= cost;
+  lifeSpendStones(state, cost);
   state.cave.springLevel = cur + 1;
   return {
     ok: true,
@@ -771,7 +798,7 @@ export function irrigateHerb(state, idx) {
   if (!h) return { ok: false, logs: ['灵草不存在。'] };
   if (h.progress >= h.grow) return { ok: false, logs: [`「${h.name}」已成熟，无需浇灌。`] };
   if ((h.irrigatedThisMonth || 0) >= HERB_IRRIGATE_CAP_PER_MONTH) return { ok: false, logs: [`「${h.name}」本月浇灌已达上限（${HERB_IRRIGATE_CAP_PER_MONTH} 次），静待自然生长吧。`] };
-  if (!spendStoneLike(state, HERB_IRRIGATE_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_IRRIGATE_COST}）。`] };
+  if (!lifeSpendStones(state, HERB_IRRIGATE_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_IRRIGATE_COST}）。`] };
   h.progress = Math.min(h.grow, h.progress + 1);
   h.irrigatedThisMonth = (h.irrigatedThisMonth || 0) + 1;
   h.irrigated = (h.irrigated || 0) + 1;
@@ -845,7 +872,7 @@ export function crossbreedHerbs(state, aName, bName) {
   if (!canStore(state, outItem)) {
     return { ok: false, logs: ['储物袋空间不足，奇珍灵材无处安放；请先出售杂物或扩容储物袋再行杂交。'] };
   }
-  if (!spendStoneLike(state, HERB_HYBRID_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_HYBRID_COST}）。`] };
+  if (!lifeSpendStones(state, HERB_HYBRID_COST)) return { ok: false, logs: [`灵石不足（需 ${HERB_HYBRID_COST}）。`] };
   storeItem(state, outItem);
   itemA.数量 -= 1; if (itemA.数量 <= 0) state.items.splice(state.items.indexOf(itemA), 1);
   itemB.数量 -= 1; if (itemB.数量 <= 0) state.items.splice(state.items.indexOf(itemB), 1);
@@ -866,28 +893,9 @@ export function crossbreedHerbs(state, aName, bName) {
  *     此处提供月度自然衰减 decayPillToxicity。
  * ========================================================== */
 
-/** 分层货币折算（下品灵石最小单位），与 systems.totalStones 同口径 */
-function alchemyTotalStones(state) {
-  return CURRENCIES.reduce((s, c, i) => s + (state.currencies?.[c] || 0) * Math.pow(100, i), 0);
-}
-function alchemyRedistribute(state, total) {
-  let rest = Math.max(0, Math.round(total));
-  for (let i = CURRENCIES.length - 1; i >= 0; i--) {
-    const unit = Math.pow(100, i);
-    const c = Math.floor(rest / unit);
-    state.currencies[CURRENCIES[i]] = c;
-    rest -= c * unit;
-  }
-}
-function alchemyCanAfford(state, amt) { return alchemyTotalStones(state) >= amt; }
-function alchemySpendStones(state, amt) {
-  if (!alchemyCanAfford(state, amt)) return false;
-  alchemyRedistribute(state, alchemyTotalStones(state) - Math.round(amt));
-  return true;
-}
-function alchemyAddStones(state, amt) {
-  alchemyRedistribute(state, alchemyTotalStones(state) + Math.max(0, Math.round(amt)));
-}
+/* 炼丹的扣款 / 退款统一复用文件顶部分层货币工具
+ * （lifeCanAfford / lifeSpendStones / lifeAddStones），
+ * 与 systems.totalStones 同口径，不再各自维护一份折算实现。 */
 
 /** 初始化丹炉状态（丹炉并行炼制队列 + 统计） */
 export function ensureAlchemyState(state) {
@@ -960,7 +968,7 @@ export function refinePill(state, recipeId, opts = {}) {
     }
   }
   // 灵石校验（分层）
-  if (r.stoneCost && !alchemyCanAfford(state, r.stoneCost)) return { ok: false, logs: [`灵石不足（需 ${r.stoneCost} 下品灵石）。`] };
+  if (r.stoneCost && !lifeCanAfford(state, r.stoneCost)) return { ok: false, logs: [`灵石不足（需 ${r.stoneCost} 下品灵石）。`] };
   // 扣材料
   for (const [name, count] of Object.entries(r.need)) {
     const it = state.items.find((x) => x.名称 === name);
@@ -968,7 +976,7 @@ export function refinePill(state, recipeId, opts = {}) {
     if (it.数量 <= 0) state.items.splice(state.items.indexOf(it), 1);
   }
   // 扣灵石（分层）
-  if (r.stoneCost) alchemySpendStones(state, r.stoneCost);
+  if (r.stoneCost) lifeSpendStones(state, r.stoneCost);
   // 炼丹催化：自动消耗持有的催化材料，提升本次成丹率（确定性、无 RNG）
   let catalystBonus = 0;
   const usedCatalysts = [];
@@ -1049,7 +1057,7 @@ export function settleRefine(state, logs = [], force) {
         // 却不知道本该退回的半份材料也没了（静默双重损失）。
         if (refund > 0) storeItemOrNote(state, { 名称: name, 类型: '材料', 数量: refund, 描述: '废丹回收的残余材料。', 价值: 10 }, logs);
       }
-      if (r.stoneCost) alchemyAddStones(state, Math.floor(r.stoneCost * 0.3));
+      if (r.stoneCost) lifeAddStones(state, Math.floor(r.stoneCost * 0.3));
     }
     removeFromAlchemy(state, p);
   }

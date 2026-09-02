@@ -1,8 +1,20 @@
+import { CURRENCIES } from '../public/js/data.js';
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, storeItem, inventoryUsed, ART_RECIPES, startTravel } from '../public/js/life.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
+
+/* 分层货币辅助：货币分 5 档、1:100 递进，收入/支出都会重新分档，
+ * 故「下品灵石」单档账面恒 < 100。测试一律以总资产（下品单位）存取，
+ * 避免用单档账面断言——那正是历史 bug 的潜伏方式。 */
+const stones = (st) => S.totalStones(st);
+function setStones(st, n) {
+  st.currencies = st.currencies || {};
+  for (const c of CURRENCIES) st.currencies[c] = 0;
+  S.addStones(st, n);
+}
+
 const ok = (condition, name) => condition ? pass++ : (fail++, console.error('FAIL:', name));
 
 const state = S.createNewGame({
@@ -24,7 +36,7 @@ ok(S.equipItem(state, 0) && state.equipment.weapon?.名称 === '备用剑', '普
 ok(S.equipItem(state, 0) && state.equipment.artifact?.名称 === '秘境法宝', '法宝独立替换');
 ok(state.player.power === S.calcPower(state), '装备法宝计入战力');
 
-state.currencies['下品灵石'] = 1000;
+setStones(state, 1000);
 const travel = startTravel(state, 'nanming');
 ok(travel.ok && state.world.travel.destination === 'nanming', '地图开始旅行');
 S.nextMonth(state);
