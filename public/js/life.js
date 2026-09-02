@@ -398,22 +398,36 @@ export function organizeBag(state) {
   return merged.length;
 }
 
+/** 行囊扩容的唯一真源：容量 +add、扩容计数 +1、按新容量重算袋名。
+ *
+ *  背景（2026-09-02 监督发现）：扩容逻辑曾经散落三处各写一份
+ *  「capacity += / upgrades += / bagName = 」，其中 life.upgradeBag 那份还是
+ *  彻底的死代码（外部零引用、只被测试调用）。任一方漏改就会出现
+ *  「容量涨了但袋名与后续价格档没跟上」的分叉。现在三条玩家路径全部收敛到这里：
+ *    ① 坊市购买「储物袋扩容契」服务（systems.buyItem）
+ *    ② 服用「扩容储物袋」道具（systems.useItem 的 effect.bag 分支）
+ *    ③ life.upgradeBag 自助付费扩容
+ *
+ *  【注意】本函数只加容量，绝不扣灵石 —— 扣款由各自入口负责
+ *  （坊市已在 buyItem 里扣过货款，这里再扣一次就是重复收费）。
+ */
+export function growBag(state, add = 20) {
+  ensureLifeState(state);
+  const n = Math.max(0, Math.round(Number(add) || 0));
+  state.inventory.capacity = (state.inventory.capacity || 100) + n;
+  state.inventory.upgrades = (state.inventory.upgrades || 0) + 1;
+  state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
+  return { capacity: state.inventory.capacity, upgrades: state.inventory.upgrades, bagName: state.inventory.bagName };
+}
+
+/** 自助付费扩容（不经坊市货架）：按已扩容次数计价，扣款后走 growBag。 */
 export function upgradeBag(state, method = 'storage') {
   ensureLifeState(state);
-  const costs = { storage: BAG_UPGRADE_BASE, craft: 0, destiny: 0 };
   if (method === 'storage') {
-    const cost = costs.storage + state.inventory.upgrades * BAG_UPGRADE_STEP;
+    const cost = BAG_UPGRADE_BASE + (state.inventory.upgrades || 0) * BAG_UPGRADE_STEP;
     if (!state.currencies || !lifeSpendStones(state, cost)) return { ok: false, text: `需要灵石${cost}。` };
-    state.inventory.capacity += 20;
-    state.inventory.upgrades += 1;
-    state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
-    return { ok: true, text: `储物袋扩容成功，容量变为 ${state.inventory.capacity} 格。` };
-  }
-  if (method === 'craft') {
-    state.inventory.capacity += 15;
-    state.inventory.upgrades += 1;
-    state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '百艺缝制的储物袋');
-    return { ok: true, text: `你用百艺缝制储物袋，容量变为 ${state.inventory.capacity} 格。` };
+    const r = growBag(state, 20);
+    return { ok: true, text: `储物袋扩容成功，容量变为 ${r.capacity} 格。` };
   }
   return { ok: false, text: '尚未找到对应的扩容机缘。' };
 }

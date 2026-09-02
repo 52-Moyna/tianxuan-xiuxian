@@ -12,8 +12,8 @@
  */
 import * as S from '../public/js/systems.js';
 import {
-  ensureLifeState, upgradeBag, startTravel, travelCost, upgradeHerbSpring,
-  plantHerb, crossbreedHerbs, lifeCanAfford, lifeSpendStones, lifeTotalStones,
+  ensureLifeState, upgradeBag, growBag, startTravel, travelCost, upgradeHerbSpring,
+  plantHerb, crossbreedHerbs, lifeCanAfford, lifeSpendStones, lifeTotalStones, bagNameByCapacity,
   HERB_SPRING_COST_BASE, REGION_TRAVEL,
 } from '../public/js/life.js';
 import { CURRENCY_RATE, CURRENCIES, HERB_HYBRID_COST } from '../public/js/data.js';
@@ -54,6 +54,49 @@ function richState() {
   // 精确断言：扣款额 = 扩容前 (BASE + upgrades*STEP)
   ok(S.totalStones(st) === before - (300 + (st.inventory.upgrades - 1) * 250), '扣款额与扩容费公式一致');
   ok(Object.values(st.currencies).every((v) => v >= 0), '分档扣款后无负数档');
+}
+
+/* ---------- ①b 坊市扩容契 / 扩容储物袋（玩家的真实扩容路径） ----------
+ * 上面 ① 测的是 life.upgradeBag 这条自助 API；但玩家实际扩容是去坊市买服务、
+ * 或服用「扩容储物袋」道具。三条路径必须口径一致：容量、扩容计数、袋名同步更新，
+ * 否则会出现「容量涨了但袋名与后续价格档没跟上」的分叉。 */
+{
+  // 坊市服务：buyItem 已在函数内按总价扣款，扩容本身不得再扣一次
+  const st = richState();
+  const goods = { 名称: '储物袋扩容契', 类型: '服务', 价格: 300 + (st.inventory.upgrades || 0) * 250, 价值: 0, 描述: '购买后行囊容量+20格。', effect: { bagUpgrade: 20 } };
+  const cap0 = st.inventory.capacity, up0 = st.inventory.upgrades || 0, before = S.totalStones(st);
+  const msg = S.buyItem(st, goods);
+  ok(!String(msg).includes('灵石不足'), '坊市买扩容契：资产在中上品档也能成交');
+  ok(st.inventory.capacity === cap0 + 20, '坊市扩容后容量 +20');
+  ok((st.inventory.upgrades || 0) === up0 + 1, '坊市扩容后扩容计数 +1（后续报价随之递增）');
+  ok(S.totalStones(st) === before - goods.价格, '坊市扩容只扣一次货款（扩容实现不得重复扣款）');
+  ok(st.inventory.bagName === bagNameByCapacity(st.inventory.capacity, '乾坤储物袋'), '坊市扩容后袋名按新容量重算');
+
+  // 道具路径：服用「扩容储物袋」
+  const st2 = richState();
+  st2.items.push({ 名称: '扩容储物袋', 类型: '道具', 数量: 1, 描述: '服用后行囊容量 +20 格。', effect: { bag: 20 } });
+  const cap2 = st2.inventory.capacity, up2 = st2.inventory.upgrades || 0;
+  S.useItem(st2, st2.items.length - 1);
+  ok(st2.inventory.capacity === cap2 + 20, '服用「扩容储物袋」容量 +20');
+  ok((st2.inventory.upgrades || 0) === up2 + 1, '服用扩容后扩容计数 +1');
+  ok(st2.inventory.bagName === bagNameByCapacity(st2.inventory.capacity, '乾坤储物袋'), '服用扩容后袋名同步');
+
+  // 三条路径口径一致：同一初始状态分别走一遍，结果必须完全相同
+  const mk = () => { const s = richState(); s.inventory.capacity = 100; s.inventory.upgrades = 0; return s; };
+  const viaApi = mk(); upgradeBag(viaApi, 'storage');
+  const viaSvc = mk(); S.buyItem(viaSvc, { 名称: '储物袋扩容契', 类型: '服务', 价格: 300, 价值: 0, 描述: 'x', effect: { bagUpgrade: 20 } });
+  const viaItem = mk(); viaItem.items.push({ 名称: '扩容储物袋', 类型: '道具', 数量: 1, 描述: 'x', effect: { bag: 20 } }); S.useItem(viaItem, viaItem.items.length - 1);
+  ok(viaApi.inventory.capacity === viaSvc.inventory.capacity && viaSvc.inventory.capacity === viaItem.inventory.capacity, '三条扩容路径容量结果一致');
+  ok(viaApi.inventory.upgrades === viaSvc.inventory.upgrades && viaSvc.inventory.upgrades === viaItem.inventory.upgrades, '三条扩容路径扩容计数一致');
+  ok(viaApi.inventory.bagName === viaSvc.inventory.bagName && viaSvc.inventory.bagName === viaItem.inventory.bagName, '三条扩容路径袋名一致');
+
+  // growBag 是纯加容量，绝不碰灵石（防止入口重复扣款）
+  const st3 = richState();
+  const stones3 = S.totalStones(st3);
+  const cap3 = st3.inventory.capacity, up3 = st3.inventory.upgrades || 0;
+  growBag(st3, 20);
+  ok(S.totalStones(st3) === stones3, 'growBag 只加容量、不扣灵石');
+  ok(st3.inventory.capacity === cap3 + 20 && (st3.inventory.upgrades || 0) === up3 + 1, 'growBag 容量与扩容计数同步');
 }
 
 /* ---------- ② 跨域旅行路费 ---------- */

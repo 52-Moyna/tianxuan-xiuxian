@@ -25,7 +25,7 @@ import {
   TITLES, TITLE_MAP, MYSTIC_DEPTH, AUCTION_RIVAL,
 } from './data.js';
 import { GameState, bus, Rng } from './state.js';
-import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, regionSellBonus, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, itemSpace, normalizeEquip, equipSlotName, bagNameByCapacity, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
+import { ensureLifeState, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_UPGRADE_BASE, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbArrayGrowth, herbMonthlyGrowth, storeItem, storeItemOrNote, canStore, regionSellBonus, craftRecipe, canCraft, relationIndex, relationBenefit, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, startTravel, completeTravel, makeChronicle, gearPower, artifactPower, inventoryUsed, itemSpace, normalizeEquip, equipSlotName, bagNameByCapacity, growBag, growHerbs, omenMul, omenAdd, omenActive, refinePill, settleRefine, decayPillToxicity, beastLevelRange, beastPowerOfLevel, ALCHEMY_CATALYSTS } from './life.js';
 import {
   ensureCodexState, discoverItem, activeSetBonuses, setBonusFlags, realmGuide, CODEX_ITEMS,
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
@@ -2440,9 +2440,8 @@ export function buyItem(state, goods) {
   }
   if (!spendStones(state, goods.价格)) return '灵石不足，交易未成。';
   if (goods.类型 === '服务' && goods.effect?.bagUpgrade) {
-    state.inventory.capacity += goods.effect.bagUpgrade;
-    state.inventory.upgrades += 1;
-    state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
+    // 与服用「扩容储物袋」、自助付费扩容共用 growBag：只加容量，货款已在上方 spendStones 扣过
+    growBag(state, goods.effect.bagUpgrade);
   } else if (goods.类型 === '装备') {
     // 优先发放货架锁定的那一件（展示即所得）；无 _equip 时回退原随机生成（兼容兑换所/其它来源）
     const item = goods._equip || generateEquip(state, goods.部位 || guessEquipSlot({ 名称: goods.名称, 类型: '装备' }), goods.等级 || 1, goods.名称);
@@ -2732,10 +2731,8 @@ export function useItem(state, idx) {
   // 扩容储物袋：服用直接拓展行囊容量（容量 +N 格），与坊市「储物袋扩容契」服务并行的另一种扩容途径
   if (it.effect.bag) {
     const add = Number(it.effect.bag) || 20;
-    state.inventory.capacity += add;
-    state.inventory.upgrades = (state.inventory.upgrades || 0) + 1;
-    state.inventory.bagName = bagNameByCapacity(state.inventory.capacity, '乾坤储物袋');
-    logs.push(`施法展开「${it.名称}」，行囊容量 +${add} 格（现 ${state.inventory.capacity} 格）。`);
+    const grown = growBag(state, add);
+    logs.push(`施法展开「${it.名称}」，行囊容量 +${add} 格（现 ${grown.capacity} 格）。`);
   }
   // 解毒丹：服用降低丹毒（与 codex 承诺「丹毒 -30」一致），是丹毒危机唯一主动恢复途径
   if (it.effect.detox) {
