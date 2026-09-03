@@ -701,10 +701,19 @@ export function pillQuota(it) {
   const q = PILL_QUOTA[it?.名称];
   return q ? { max: q.max, reason: q.reason, counter: q.counter } : null;
 }
+/** 按丹名查服用额度（纯函数）：非额度类丹返回 null。
+ *  【为何存在】丹炉丹方卡与拍卖会拍品都要在「付出代价之前」告诉玩家还剩几颗额度，
+ *  此前只有行囊物品卡显示，玩家常花几百灵石炼出 / 拍下早已服满的丹，服用时才被告知无效。
+ *  传丹名而非物品对象，是因为丹方 id 与拍品 name 都是纯名称、没有物品对象。 */
+export function pillQuotaByName(state, name) {
+  const q = PILL_QUOTA[name];
+  if (!q) return null;
+  const taken = Number(state?.player?.[q.counter] || 0);
+  return { taken, max: q.max, left: Math.max(0, q.max - taken), full: taken >= q.max, reason: q.reason };
+}
 /** 该丹药在当前轮回已服几颗（纯函数）：非额度类丹恒为 0。 */
 export function pillQuotaTaken(state, it) {
-  const q = PILL_QUOTA[it?.名称];
-  return q ? Number(state?.player?.[q.counter] || 0) : 0;
+  return pillQuotaByName(state, it?.名称)?.taken ?? 0;
 }
 /** 该段药效之外别无其它药效（纯函数）。
  *  【为何存在】某段失效（无伤/无丹毒/额度满）时，若丹药还兼有其它药效就应当继续服用、

@@ -954,6 +954,8 @@ export function isRecipeUnlocked(state, recipeId) {
     case '玉华丹': return lvl >= 40 || sectRank >= 3;
     case '露华丹': return lvl >= 60 || sectRank >= 3;
     case '狂战丹': return lvl >= 21 || artLv >= 2;
+    // 延寿丹门槛与 data.js PILL_UNLOCK_HINT 文案成对维护，改一处必须同步另一处
+    case '延寿丹': return lvl >= 40 || sectRank >= 2 || (state.flags?.refinedPills || 0) >= 20;
     default: return false;
   }
 }

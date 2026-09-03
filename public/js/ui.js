@@ -1877,7 +1877,12 @@ async function flowAuction() {
     if (stonesEl) stonesEl.textContent = S.formatStones(st);
     listEl.innerHTML = st.auction.items.length ? st.auction.items.map((it, i) => `
       <div class="auction-item ${it._flash ? 'auction-rise' : ''}" data-i="${i}">
-        <div class="codex-name"><b>${it.name}</b> <span class="codex-rarity ${it.rarity}">${it.rarity}</span></div>
+        <div class="codex-name"><b>${it.name}</b> <span class="codex-rarity ${it.rarity}">${it.rarity}</span>${(() => {
+          // 额度类丹（延寿丹 3 / 洗髓丹 2）落槌前就摆明还剩几颗额度：
+          // 这类拍品动辄上千灵石，拍下才发现服不了是最贵的一种白扔。
+          const qh = S.pillQuotaByName(st, it.name);
+          return qh ? `<span class="auc-quota${qh.full ? ' full' : ''}" title="${qh.full ? qh.reason : `一生至多可服 ${qh.max} 颗`}">${qh.full ? `已服满 ${qh.taken}/${qh.max} · 再买无用` : `可再服 ${qh.left} 颗（已服 ${qh.taken}/${qh.max}）`}</span>` : '';
+        })()}</div>
         <div class="codex-effect">${it.desc}</div>
         <div class="codex-source">起拍价：${it.basePrice} 灵石 ｜ 当前价：<span class="auc-price">${it.currentBid}</span>（${it.bidder}）</div>
         <div class="auction-rival">对手「${it.rivalName}」心理价位约 <b>${it.rivalBudget}</b> 灵石${it.buyout ? ` ｜ 一口价 <b class="auc-buyout">${it.buyout}</b>` : ''}</div>
@@ -3124,9 +3129,15 @@ function alchemyCatalystBlock(st) {
             const stoneOk = !r.stoneCost || S.totalStones(st) >= r.stoneCost;
             const full = cave.alchemy.length >= alchemySlots(st);
             const cls = !unlocked ? 'locked' : (!matsOk || !stoneOk || full ? 'lacking' : 'ready');
+            // 额度类丹（延寿丹 3 / 洗髓丹 2）在开炉前就说清还剩几颗额度：
+            // 否则玩家攒齐稀有材料、耗 5 个月炼出一颗，服用时才发现额度已满、白忙一场。
+            const qh = S.pillQuotaByName(st, r.id);
+            const quotaHtml = qh
+              ? `<span class="ar-quota${qh.full ? ' full' : ''}" title="${qh.full ? qh.reason : `一生至多可服 ${qh.max} 颗`}">${qh.full ? `已服满 ${qh.taken}/${qh.max} · 再炼无益` : `已服 ${qh.taken}/${qh.max}`}</span>`
+              : '';
             return `
             <div class="alchemy-recipe ${cls}">
-              <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span></div>
+              <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span>${quotaHtml}</div>
               <div class="ar-meta">耗时 ${r.months}月 ｜ 期望成丹 <b class="ar-rate">${pr.rate}%</b><span class="ar-bonus">（基础${pr.baseRate}${pr.caveBonus ? `＋丹炉${pr.caveBonus}` : ""}${pr.catalystBonus ? `＋催化${pr.catalystBonus}` : ""}${pr.arrayBonus ? `＋聚灵阵${pr.arrayBonus}` : ""}）</span>${pr.catalystBonus ? `<span class="ar-cat-ready">🔥催化就绪</span>` : ""}</div>
               <div class="ar-need">
                 ${Object.entries(r.need).map(([n, c]) => {

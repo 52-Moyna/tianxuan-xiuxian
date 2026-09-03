@@ -1039,6 +1039,9 @@ button { font-family: inherit; }
 .auction-rise { box-shadow: 0 0 0 2px var(--danger) inset; border-radius: 10px; transition: box-shadow .2s; }
 .auction-hammer { position: relative; overflow: hidden; }
 .auction-hammer::after { content: '🔨 落槌成交'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--gold); background: rgba(20,15,8,.82); animation: hammerDrop .7s ease both; }
+/* 拍品额度角标：延寿丹/洗髓丹动辄上千灵石，落槌前先看还剩几颗额度 */
+.auc-quota { font-size: .68rem; color: var(--jade); border: 1px solid var(--jade-soft); border-radius: 999px; padding: 0 7px; margin-left: auto; }
+.auc-quota.full { color: #d98a82; border-color: rgba(190,80,70,.5); text-decoration: line-through; }
 @keyframes feedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes aucIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes priceFlash { 0% { color: var(--danger); transform: scale(1.25); } 100% { color: inherit; transform: scale(1); } }
@@ -1768,9 +1771,12 @@ button { font-family: inherit; }
 .alchemy-recipe.locked { opacity: .55; filter: grayscale(.4); }
 .alchemy-recipe.lacking { border-color: rgba(190,80,70,.5); }
 .alchemy-recipe.ready { border-color: var(--jade-soft); }
-.ar-head { display: flex; align-items: center; justify-content: space-between; }
-.ar-head b { font-size: .92rem; color: var(--text); }
+.ar-head { display: flex; align-items: center; gap: 6px; }
+.ar-head b { font-size: .92rem; color: var(--text); margin-right: auto; }
 .ar-tier { font-size: .68rem; color: var(--gold); border: 1px solid var(--gold-soft); border-radius: 999px; padding: 0 7px; }
+/* 丹方卡额度角标：与行囊物品卡「已服 X/N」同口径，满额转红划掉，避免攒齐材料炼出服不了的丹 */
+.ar-quota { font-size: .68rem; color: var(--jade); border: 1px solid var(--jade-soft); border-radius: 999px; padding: 0 7px; }
+.ar-quota.full { color: #d98a82; border-color: rgba(190,80,70,.5); text-decoration: line-through; }
 .ar-meta { font-size: .72rem; color: var(--text-dim); }
 .ar-need { display: flex; flex-wrap: wrap; gap: 5px; }
 .ar-mat { font-size: .68rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-soft); color: var(--text-faint); }

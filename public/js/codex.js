@@ -233,7 +233,8 @@ export const CODEX_ITEMS = [
   { id: 'pill_ningyuan', category: '丹药', name: '凝元丹', rarity: '消耗品', source: '百艺炼丹（妖兽灵草）', effect: '服用后修为 +100；连续服用会产生丹毒。', toxicity: 8 },
   { id: 'pill_shougu', category: '丹药', name: '兽骨续命丹', rarity: '消耗品', source: '百艺炼丹（妖兽兽骨）', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
   { id: 'pill_foundation', category: '丹药', name: '筑基丹', rarity: '关键丹药', source: '坊市、炼丹、天命', effect: '筑基渡劫成功率 +20%；仅在对应瓶颈消耗。', toxicity: 3 },
-  { id: 'pill_lifespan', category: '丹药', name: '延寿丹', rarity: '珍贵丹药', source: '炼丹（金丹期以上）、秘境、拍卖会', effect: '服用后寿元上限 +20 年；一生最多服用 3 颗。', toxicity: 15 },
+  // source 只写真实存在的产出路径：此前写的「秘境」在秘境奖励池中查无此物，玩家照图鉴去刷会白跑
+  { id: 'pill_lifespan', category: '丹药', name: '延寿丹', rarity: '珍贵丹药', source: '丹炉炼制（金丹期以上，需露华玉液）、拍卖会', effect: '服用后寿元上限 +20 年；一生最多服用 3 颗。', toxicity: 15 },
   { id: 'pill_marrow', category: '丹药', name: '洗髓丹', rarity: '珍贵丹药', source: '炼丹（筑基期以上）、天命', effect: '服用后随机提升「根骨/道心」之一 5~10 级；一生最多服用 2 颗。', toxicity: 20 },
   { id: 'pill_breakthrough', category: '丹药', name: '破境丹', rarity: '关键丹药', source: '炼丹（金丹期以上）、秘境', effect: '服用后立即获得大量修为经验，可能直接突破一级。', toxicity: 25 },
   { id: 'pill_mind', category: '丹药', name: '神识丹', rarity: '消耗品', source: '炼丹、坊市（元婴期以上）', effect: '服用后悟性经验增加；连续服用会产生丹毒。', toxicity: 10 },
