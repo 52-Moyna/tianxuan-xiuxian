@@ -689,6 +689,32 @@ export function healAmount(eff) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** 「一生 N 颗」额度丹药登记表：max 为上限，counter 为 player 上的已服计数字段。
+ *  【为何存在】额度判定此前在 useItem / itemUsePreview 两处各写一遍「名称 === '洗髓丹' / '延寿丹'」，
+ *  加第三个展示位就要复制第三次。改登记表后三处共用，改上限只改这一行。 */
+const PILL_QUOTA = {
+  洗髓丹: { max: 2, counter: 'marrowPillsTaken', reason: '骨髓再难重塑' },
+  延寿丹: { max: 3, counter: 'lifespanPillsTaken', reason: '经脉难承更多药力' },
+};
+/** 该丹药的服用额度（纯函数）：非额度类丹返回 null。 */
+export function pillQuota(it) {
+  const q = PILL_QUOTA[it?.名称];
+  return q ? { max: q.max, reason: q.reason, counter: q.counter } : null;
+}
+/** 该丹药在当前轮回已服几颗（纯函数）：非额度类丹恒为 0。 */
+export function pillQuotaTaken(state, it) {
+  const q = PILL_QUOTA[it?.名称];
+  return q ? Number(state?.player?.[q.counter] || 0) : 0;
+}
+/** 该段药效之外别无其它药效（纯函数）。
+ *  【为何存在】某段失效（无伤/无丹毒/额度满）时，若丹药还兼有其它药效就应当继续服用、
+ *  只跳过失效那一段；只有「失效段就是全部」时才整个 early return 不消耗。
+ *  此前每处各写一遍 Object.keys 过滤，口径易漂移，统一收在这里。 */
+export function soloEffect(eff, key) {
+  if (!eff) return false;
+  return Object.keys(eff).filter((k) => k !== key).length === 0;
+}
+
 /** 行囊中的疗伤药清单（纯函数）：按效力从强到弱排序，全清类优先。
  *  【为何存在】危机横幅此前把解药名硬编码为「凝血丹」，玩家身上只有疗伤丹 /
  *  兽骨续命丹 / 露华丹时按钮直接消失 —— 明明有药却无处可点。现按实际持有列单。 */
@@ -706,12 +732,13 @@ export function woundCureItems(state) {
  *  指引等于空话；已服满「一生 3 颗」上限的延寿丹服下也无效（useItem 会 early return
  *  不消耗），故不计入可用解药，免得玩家点了才发现白搭。 */
 export function lifespanCureItems(state) {
-  const taken = Number(state?.player?.lifespanPillsTaken || 0);
   const list = [];
   (state?.items || []).forEach((it, idx) => {
     const years = Number(it?.effect?.lifespan) || 0;
     if (years <= 0) return;
-    if (it.名称 === '延寿丹' && taken >= 3) return;
+    // 额度类丹（延寿丹一生 3 颗）服满后 useItem 会 early return，服了也白搭，故不算解药
+    const q = pillQuota(it);
+    if (q && pillQuotaTaken(state, it) >= q.max) return;
     list.push({ idx, 名称: it.名称, years });
   });
   return list.sort((a, b) => b.years - a.years);
@@ -2790,8 +2817,14 @@ export function useItem(state, idx) {
   // 无伤势时服用「纯疗伤丹」毫无收益，此前仍照扣一颗（45 灵石白扔）。
   // 若丹药除疗伤外另有药效（如露华丹兼补悟性），则允许继续服用，仅跳过疗伤那一段。
   if (healAmount(it.effect) > 0 && (state.flags?.wounded || 0) <= 0
-      && Object.keys(it.effect).filter((k) => k !== 'heal').length === 0) {
+      && soloEffect(it.effect, 'heal')) {
     return [`身无伤势，「${it.名称}」无处着力，留待受伤后再服（未被消耗）。`];
+  }
+  // 丹毒已清时服用「纯解毒丹」同样无处着力（此前 unconditional 执行，白白消耗一颗）。
+  // 兼有其它药效则只跳过解毒段 —— 与疗伤段同口径。
+  if (it.effect.detox && Number(state.flags?.pillToxicity || 0) <= 0
+      && soloEffect(it.effect, 'detox')) {
+    return [`体内丹毒已清，「${it.名称}」无处着力，留待中毒后再服（未被消耗）。`];
   }
   const setFlags = setBonusFlags(state);
   // 瓶颈专属丹（筑基丹等）与渡劫丹：留待突破 / 渡劫时由 attemptBreakthrough 自动消耗，不可直接服用
@@ -2841,19 +2874,22 @@ export function useItem(state, idx) {
   // 图鉴承诺「洗髓丹一生最多服用 2 颗」：仅对洗髓丹按当前轮回计数，满 2 则药力无从着落，
   // 本次服用失效（不消耗、不加道基），与延寿丹同口径；炎玉丹/玉华丹不受此限。
   if (it.effect.daoBase) {
-    if (it.名称 === '洗髓丹') {
-      const mTaken = state.player.marrowPillsTaken || 0;
-      if (mTaken >= 2) {
-        return [`「洗髓丹」一生至多可服 2 颗，你已服满（${mTaken} 颗），骨髓再难重塑，此丹暂难生效（留于储物袋即可）。`];
-      }
-      state.player.marrowPillsTaken = mTaken + 1;
-    }
     const kb = it.effect.daoBase;
-    const key = kb.keys[Rng.int(0, kb.keys.length - 1)];
-    const amt = Rng.int(kb.min, kb.max);
-    if (state.player.daoBase[key]) {
-      state.player.daoBase[key].level += amt;
-      logs.push(`洗髓伐毛，「${key}」道基 +${amt} 级。`);
+    const q = pillQuota(it);
+    // 额度满时跳过「洗髓」这一段；若该丹还兼有其它药效则继续服用，只有「别无他用」才整颗不消耗
+    const usedUp = q && pillQuotaTaken(state, it) >= q.max;
+    if (usedUp) {
+      const msg = `「${it.名称}」一生至多可服 ${q.max} 颗，你已服满（${pillQuotaTaken(state, it)} 颗），${q.reason}`;
+      if (soloEffect(it.effect, 'daoBase')) return [`${msg}，此丹暂难生效（留于储物袋即可）。`];
+      logs.push(`${msg}，其余药效照常生效。`);
+    } else {
+      if (q) state.player[q.counter] = pillQuotaTaken(state, it) + 1;
+      const key = kb.keys[Rng.int(0, kb.keys.length - 1)];
+      const amt = Rng.int(kb.min, kb.max);
+      if (state.player.daoBase[key]) {
+        state.player.daoBase[key].level += amt;
+        logs.push(`洗髓伐毛，「${key}」道基 +${amt} 级。`);
+      }
     }
   }
   // 聚灵丹药力：未来若干月修炼效率提升
@@ -2876,17 +2912,19 @@ export function useItem(state, idx) {
   // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖。
   // 图鉴承诺「一生最多服用 3 颗」：对延寿丹按当前轮回计数，满 3 则经脉难承、本次服用失效（不消耗、不累加）。
   if (it.effect.lifespan) {
-    if (it.名称 === '延寿丹') {
-      const taken = state.player.lifespanPillsTaken || 0;
-      if (taken >= 3) {
-        return [`「延寿丹」一生至多可服 3 颗，你已服满（${taken} 颗），经脉难承更多药力，此丹暂难生效（留于储物袋即可）。`];
-      }
-      state.player.lifespanPillsTaken = taken + 1;
+    const q = pillQuota(it);
+    const usedUp = q && pillQuotaTaken(state, it) >= q.max;
+    if (usedUp) {
+      const msg = `「${it.名称}」一生至多可服 ${q.max} 颗，你已服满（${pillQuotaTaken(state, it)} 颗），${q.reason}`;
+      if (soloEffect(it.effect, 'lifespan')) return [`${msg}，此丹暂难生效（留于储物袋即可）。`];
+      logs.push(`${msg}，其余药效照常生效。`);
+    } else {
+      if (q) state.player[q.counter] = pillQuotaTaken(state, it) + 1;
+      const yrs = it.effect.lifespan;
+      state.player.lifeBonus = (state.player.lifeBonus || 0) + yrs;
+      refreshDerived(state);
+      logs.push(`服之延寿，寿元上限 +${yrs} 年（现 ${state.player.lifespan} 岁）。`);
     }
-    const yrs = it.effect.lifespan;
-    state.player.lifeBonus = (state.player.lifeBonus || 0) + yrs;
-    refreshDerived(state);
-    logs.push(`服之延寿，寿元上限 +${yrs} 年（现 ${state.player.lifespan} 岁）。`);
   }
   // 灵兽契约：服用拓宽灵兽栏（上限 +1，至多 6 栏）
   if (it.effect.beastSlot) {
@@ -2904,9 +2942,14 @@ export function useItem(state, idx) {
   // 解毒丹：服用降低丹毒（与 codex 承诺「丹毒 -30」一致），是丹毒危机唯一主动恢复途径
   if (it.effect.detox) {
     const cur = Number(state.flags?.pillToxicity || 0);
-    const after = Math.max(0, cur - it.effect.detox);
-    state.flags.pillToxicity = after;
-    logs.push(`服下「${it.名称}」，丹毒 ${cur} → ${after}（－${cur - after}）。`);
+    if (cur <= 0) {
+      // 无丹毒时该段空转（此前照样写回并播报「丹毒 0 → 0」，纯噪音）；多效丹则只跳这一段
+      logs.push(`体内丹毒已清，「${it.名称}」的解毒药力无从着力（其余药效照常生效）。`);
+    } else {
+      const after = Math.max(0, cur - it.effect.detox);
+      state.flags.pillToxicity = after;
+      logs.push(`服下「${it.名称}」，丹毒 ${cur} → ${after}（－${cur - after}）。`);
+    }
   }
   // 法力丹：服用后下次战斗胜率提升（战斗后失效，由 resolveBattle 在战后清零）
   if (it.effect.battleBuff) {
@@ -2976,19 +3019,21 @@ export function itemUsePreview(state, it) {
   if (eff.daoBase) {
     const kb = eff.daoBase || {};
     const base = `随机提升「${(kb.keys || []).join('/')}」之一 +${kb.min}~${kb.max} 级`;
-    if (it.名称 === '洗髓丹') {
-      const mTaken = (state && state.player && state.player.marrowPillsTaken) || 0;
-      if (mTaken >= 2) D(`${base}（一生限 2 颗，已服满 ${mTaken}/2，此丹暂难生效）`);
-      else A(`${base}（一生限 2 颗，已服 ${mTaken}/2）`);
+    const q = pillQuota(it);
+    if (q) {
+      const tk = pillQuotaTaken(state, it);
+      if (tk >= q.max) D(`${base}（一生限 ${q.max} 颗，已服满 ${tk}/${q.max}，此丹暂难生效）`);
+      else A(`${base}（一生限 ${q.max} 颗，已服 ${tk}/${q.max}）`);
     } else A(base);
   }
   if (eff.cultivateBoostMonths) A(`未来 ${eff.cultivateBoostMonths} 月修炼效率 +15%`);
   if (eff.power) A(`战力临时 +${eff.power}（持续 ${eff.powerMonths || 1} 月）`);
   if (eff.lifespan) {
-    if (it.名称 === '延寿丹') {
-      const taken = (state && state.player && state.player.lifespanPillsTaken) || 0;
-      if (taken >= 3) D(`寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服满 ${taken}/3，此丹暂难生效）`);
-      else A(`寿元上限 +${eff.lifespan} 年（一生限 3 颗，已服 ${taken}/3）`);
+    const q = pillQuota(it);
+    if (q) {
+      const tk = pillQuotaTaken(state, it);
+      if (tk >= q.max) D(`寿元上限 +${eff.lifespan} 年（一生限 ${q.max} 颗，已服满 ${tk}/${q.max}，此丹暂难生效）`);
+      else A(`寿元上限 +${eff.lifespan} 年（一生限 ${q.max} 颗，已服 ${tk}/${q.max}）`);
     } else A(`寿元上限 +${eff.lifespan} 年`);
   }
   if (eff.beastSlot) {
@@ -2997,14 +3042,21 @@ export function itemUsePreview(state, it) {
     else A(`灵兽栏上限 +1（现 ${cur}/6 栏）`);
   }
   if (eff.bag) A(`行囊容量 +${eff.bag} 格`);
-  if (eff.detox) A(`丹毒 -${eff.detox}`);
+  if (eff.detox) {
+    const tox0 = Number(state?.flags?.pillToxicity || 0);
+    if (tox0 <= 0) D(`丹毒 -${eff.detox}（当前无丹毒，服用无效）`);
+    else A(`丹毒 -${eff.detox}（现 ${tox0}，服后余 ${Math.max(0, tox0 - eff.detox)}）`);
+  }
   if (eff.battleBuff) A(`下次战斗胜率 +${eff.battleBuff}%`);
   if (!parts.length) return none;
   const tox = (typeof it.toxicity === 'number') ? it.toxicity : 0;
   if (tox > 0) parts.push(`丹毒 +${tox}`);
   // usable=false：所有药效段均失效，与 useItem 的 early return 口径一致（服用不消耗、无效果）
   const usable = !(alive === 0 && dead > 0);
-  return { mode: 'use', label: it.类型 === '丹药' ? '服用' : '使用', text: parts.join('，'), usable };
+  // 额度进度（「一生 N 颗」类丹药）：此前只写在 hover title 里，玩家不点开就不知道还剩几颗
+  const q = pillQuota(it);
+  const quota = q ? { taken: pillQuotaTaken(state, it), max: q.max } : null;
+  return { mode: 'use', label: it.类型 === '丹药' ? '服用' : '使用', text: parts.join('，'), usable, quota };
 }
 /** 重新计算已穿戴戒指（空间戒）带来的储物袋加成，写入 inventory.ringBonus。
  *  优先读装备的 capBonus 字段，旧档/名称匹配兜底，避免容量漂移。 */

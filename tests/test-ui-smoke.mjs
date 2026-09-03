@@ -408,6 +408,31 @@ try {
     const btnB = rowB ? rowB.querySelector('[data-use]') : null;
     ok(!!btnB && !btnB.disabled, '带伤时疗伤丹按钮恢复可用');
     st7.flags.wounded = 0; UI.renderAll(); await sleep(120);
+    // 同族：无丹毒时解毒丹亦应置灰（effect.detox 此前无条件执行，点了白白消耗一颗）
+    st7.items = st7.items.filter((i) => i.名称 !== '解毒丹');
+    LX.storeItem(st7, { 名称: '解毒丹', 类型: '丹药', 数量: 1, 描述: '解毒', effect: { detox: 30 } });
+    st7.flags.pillToxicity = 0;
+    UI.renderAll(); await sleep(180);
+    const btnD = (rowOf('解毒丹') || {}).querySelector ? rowOf('解毒丹').querySelector('[data-use]') : null;
+    ok(!!btnD && btnD.disabled, '无丹毒时解毒丹「服用」按钮置灰（点了无效、不消耗）');
+    st7.flags.pillToxicity = 40; UI.renderAll(); await sleep(180);
+    const btnD2 = (rowOf('解毒丹') || {}).querySelector ? rowOf('解毒丹').querySelector('[data-use]') : null;
+    ok(!!btnD2 && !btnD2.disabled, '有丹毒时解毒丹按钮恢复可用');
+    st7.flags.pillToxicity = 0;
+    st7.items = st7.items.filter((i) => i.名称 !== '解毒丹');
+    // 「一生 N 颗」额度角标：直接写在物品卡上，不必点开 hover 才知道还剩几颗
+    st7.items = st7.items.filter((i) => i.名称 !== '延寿丹');
+    LX.storeItem(st7, { 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 } });
+    st7.player.lifespanPillsTaken = 1;
+    UI.renderAll(); await sleep(180);
+    const qEl = (rowOf('延寿丹') || {}).querySelector ? rowOf('延寿丹').querySelector('.item-quota') : null;
+    ok(!!qEl && qEl.textContent.includes('1/3'), '延寿丹物品卡直接显示「已服 1/3」额度角标');
+    st7.player.lifespanPillsTaken = 3; UI.renderAll(); await sleep(180);
+    const qEl2 = (rowOf('延寿丹') || {}).querySelector ? rowOf('延寿丹').querySelector('.item-quota') : null;
+    ok(!!qEl2 && qEl2.className.includes('full'), '额度服满时角标加 full 样式（划掉提示失效）');
+    st7.player.lifespanPillsTaken = 0;
+    st7.items = st7.items.filter((i) => i.名称 !== '延寿丹');
+    UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `行囊失效按钮: ${e.message}`); }
 
 } catch (e) {

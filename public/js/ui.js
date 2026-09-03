@@ -2774,6 +2774,11 @@ function renderCenter() {
     // 延寿丹、灵兽契约、聚灵阵旗等已实现效果的物品在行囊中无按钮、玩家根本无法服用。
     const usePreviewOf = (it) => S.itemUsePreview(st, it);
     const attr = (v) => String(v || '').replace(/"/g, '&quot;');
+    // 「一生 N 颗」类丹药的额度角标（延寿丹 3 / 洗髓丹 2）：此前只藏在 hover title 里，
+    // 玩家不点开就不知道还剩几颗，常到最后一颗才发现服满无效。服满时划掉以示失效。
+    const quotaBadge = (pv) => (pv && pv.quota
+      ? `<span class="item-quota${pv.quota.taken >= pv.quota.max ? ' full' : ''}" title="此丹一生至多可服 ${pv.quota.max} 颗，当前轮回已服 ${pv.quota.taken} 颗">已服 ${pv.quota.taken}/${pv.quota.max}</span>`
+      : '');
     const isEquipable = (it) => !!(it._equip || it.部位 || it.类型 === '装备' || it.类型 === '法宝');
     const itemFilter = box.dataset.itemFilter || '全部';
 
@@ -2830,7 +2835,7 @@ function renderCenter() {
               return `
               <div class="item-row">
                 <div class="item-icon">${TYPE_ICONS[t] || '📦'}</div>
-                <div class="item-main"><b>${it.名称}</b><span>${itemDescOf(it)}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span>${pv.mode === 'use' ? `<span class="item-eff">服用效果：${pv.text}</span>` : ''}</div>
+                <div class="item-main"><b>${it.名称}</b>${quotaBadge(pv)}<span>${itemDescOf(it)}${it.价值 ? ` · 价值${it.价值}灵石` : ''}</span>${pv.mode === 'use' ? `<span class="item-eff">服用效果：${pv.text}</span>` : ''}</div>
                 ${it.数量 > 1 ? `<div class="item-qty">×${it.数量}</div>` : ''}
                 <div class="item-acts">
                   ${pv.mode === 'equip' ? `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">装备</button>` : ''}

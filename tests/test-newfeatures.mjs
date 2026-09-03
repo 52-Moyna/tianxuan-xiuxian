@@ -3875,6 +3875,89 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   }
 }
 
+/* ---------- 丹药「无效则不消耗」收口：解毒丹空转 + 额度类丹多效分叉（2026-09-03） ---------- */
+// 【为何补】effect.detox 分支此前无条件执行 —— 丹毒为 0 时服解毒丹照样扣一颗，
+// 与上一轮修掉的「无伤服疗伤丹白扔」是同一族；额度类丹（延寿 3 / 洗髓 2）满额时
+// 也无条件 return，将来出现多效丹会「预览可点、点了无效」。此处一并钉死。
+{
+  const st = S.createNewGame({ name: '解毒空', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.flags.pillToxicity = 0;
+  st.items = [mkPill('解毒丹', { detox: 30 })];
+  const logs = S.useItem(st, 0);
+  ok(st.items.length === 1 && st.items[0].数量 === 1, '无丹毒时服解毒丹不消耗（此前白扔一颗）');
+  ok(logs.some((l) => /丹毒已清/.test(l)), '无丹毒时给出「无处着力」提示');
+  const pv0 = S.itemUsePreview(st, st.items[0]);
+  ok(pv0.usable === false, '无丹毒时解毒丹预览标记不可用（与结算同口径）');
+  ok(/服用无效/.test(pv0.text), '无丹毒时预览写明服用无效');
+}
+// 有丹毒时照常生效（回归护栏：别把修好的功能改坏）
+{
+  const st = S.createNewGame({ name: '解毒实', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.flags.pillToxicity = 40;
+  st.items = [mkPill('解毒丹', { detox: 30 })];
+  ok(S.itemUsePreview(st, st.items[0]).usable === true, '有丹毒时解毒丹预览可用');
+  ok(/服后余 10/.test(S.itemUsePreview(st, st.items[0]).text), '预览写明服后余毒 10');
+  S.useItem(st, 0);
+  ok(st.flags.pillToxicity === 10, '有丹毒时正常解毒 40 → 10');
+  ok(st.items.length === 0, '有丹毒时解毒丹照常消耗');
+}
+// 多效丹：兼有其它药效时只跳过失效那一段，整颗仍消耗
+{
+  const st = S.createNewGame({ name: '双效', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.flags.pillToxicity = 0;
+  st.items = [mkPill('双效解毒丹', { detox: 30, exp: 5 })];
+  const e0 = Number(st.player.exp || 0);
+  const logs = S.useItem(st, 0);
+  ok(st.items.length === 0, '多效丹（解毒+修为）无丹毒时整颗照常消耗');
+  ok(Number(st.player.exp) >= e0 + 5, '多效丹的修为药效照常生效');
+  ok(logs.some((l) => /解毒药力无从着力/.test(l)), '多效丹跳过解毒段并说明原因');
+}
+// 额度满 + 单效：整颗不消耗、计数不增（既有口径回归）
+{
+  const st = S.createNewGame({ name: '满髓', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.player.marrowPillsTaken = 2;
+  st.items = [mkPill('洗髓丹', { daoBase: { keys: ['根骨', '道心'], min: 5, max: 10 } })];
+  S.useItem(st, 0);
+  ok(st.items.length === 1, '洗髓丹额度已满且别无药效：不消耗');
+  ok(st.player.marrowPillsTaken === 2, '洗髓丹额度已满：计数不再增长');
+  ok(S.itemUsePreview(st, st.items[0]).usable === false, '洗髓丹满额预览置灰（与结算同口径）');
+}
+// 额度满 + 多效：只跳过该段（此前无条件 return 会吞掉其它药效）
+{
+  const st = S.createNewGame({ name: '满寿', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.player.lifespanPillsTaken = 3;
+  st.items = [mkPill('延寿丹', { lifespan: 20, exp: 5 })];
+  const e0 = Number(st.player.exp || 0);
+  const logs = S.useItem(st, 0);
+  ok(st.items.length === 0, '延寿丹满额但兼有修为药效：整颗照常消耗（只跳过延寿段）');
+  ok(Number(st.player.exp) >= e0 + 5, '延寿丹满额时修为药效照常生效');
+  ok(st.player.lifespanPillsTaken === 3, '延寿丹满额时不再累加额度计数');
+  ok(logs.some((l) => /其余药效照常生效/.test(l)), '延寿丹满额时说明其余药效照常生效');
+}
+// 额度登记表与判定纯函数（三处共用同一口径：useItem 拦截 / 预览置灰 / 行囊角标）
+{
+  const q1 = S.pillQuota({ 名称: '延寿丹' });
+  const q2 = S.pillQuota({ 名称: '洗髓丹' });
+  ok(q1 && q1.max === 3 && q2 && q2.max === 2 && !S.pillQuota({ 名称: '疗伤丹' }), '额度登记表：延寿丹 3 / 洗髓丹 2 / 其它无额度');
+  ok(S.pillQuotaTaken({ player: { lifespanPillsTaken: 2 } }, { 名称: '延寿丹' }) === 2, 'pillQuotaTaken 读取已服计数');
+  ok(S.pillQuotaTaken({}, { 名称: '延寿丹' }) === 0, 'pillQuotaTaken 缺省为 0');
+  ok(S.soloEffect({ detox: 30 }, 'detox') === true, 'soloEffect：单效丹判定为真');
+  ok(S.soloEffect({ detox: 30, exp: 5 }, 'detox') === false, 'soloEffect：多效丹判定为假（只跳过该段）');
+}
+// 预览给出额度进度（供行囊角标直接显示，不必点开 hover）
+{
+  const st = S.createNewGame({ name: '角标', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.player.lifespanPillsTaken = 1;
+  const pv = S.itemUsePreview(st, mkPill('延寿丹', { lifespan: 20 }));
+  ok(pv.quota && pv.quota.taken === 1 && pv.quota.max === 3, '预览给出额度进度（已服 1/3）');
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

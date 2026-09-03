@@ -1315,6 +1315,15 @@ button { font-family: inherit; }
    注意：.item-main span 默认 nowrap+省略号，效果文案需换行显示，故此处覆盖。 */
 .item-main .item-eff { font-size: .7rem; color: var(--jade); line-height: 1.35;
   white-space: normal; overflow: visible; text-overflow: clip; }
+/* 行囊物品·「一生 N 颗」额度角标：已服满置灰加删除线，避免玩家点了才发现无效 */
+/* 选择器需压过 .item-main span（0,1,1）的默认字号/颜色，故写成 .item-main .item-quota */
+.item-main .item-quota { display: inline-block; margin-left: 6px; padding: 1px 7px;
+  border-radius: 999px; font-size: .66rem; font-weight: 600; letter-spacing: .2px;
+  vertical-align: middle; white-space: nowrap; overflow: visible; text-overflow: clip;
+  color: var(--jade); border: 1px solid rgba(122, 214, 168, .35);
+  background: linear-gradient(135deg, rgba(122, 214, 168, .16), rgba(122, 214, 168, .04)); }
+.item-main .item-quota.full { color: var(--text-dim); border-style: dashed;
+  border-color: var(--line); background: rgba(127, 127, 127, .1); text-decoration: line-through; }
 /* 自动消耗类物品（瓶颈丹/渡劫丹/护身符/驯兽口粮/地火引）：不给按钮，改以标记说明生效时机 */
 .item-auto-note { font-size: .7rem; color: var(--text-dim); align-self: center;
   padding: 2px 9px; border-radius: 999px; white-space: nowrap; cursor: help;
