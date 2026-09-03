@@ -216,6 +216,18 @@ export const BEAST_TEMPLATES = [
   { id: 'phoenix', name: '幼凰', element: '火', minLevel: 50, power: 40, skill: '涅槃残焰', desc: '极稀有，渡劫失败时可保住一次修为。' },
 ];
 
+/** 灵兽「可寻访门槛」等级（纯函数）：比推荐等级低 10 级就可前往，只是成功率低。
+ *  【为何抽成函数】此前收服界面按 `minLevel - 10` 过滤、图鉴却写「minLevel 级后可遇」，
+ *  同一件事两处口径，必有一处骗人 —— 玩家 10 级就能去收服九尾灵狐（推荐 20 级），
+ *  图鉴却说要 20 级，白白劝退；反过来写松了又害玩家白跑。现图鉴与界面共用此函数。 */
+export function beastGateLevel(b) {
+  return Math.max(1, (Number(b?.minLevel) || 1) - 10);
+}
+/** 当前等级下可寻访的灵兽清单（纯函数）：与收服界面、图鉴文案同口径。 */
+export function beastCandidates(level) {
+  return BEAST_TEMPLATES.filter((b) => (Number(level) || 1) >= beastGateLevel(b));
+}
+
 /* ============================================================
  * 三、图鉴物品数据
  * ========================================================== */
@@ -352,11 +364,11 @@ export const CODEX_ITEMS = [
   // ================================================================
   ...BEAST_TEMPLATES.map((b) => ({
     id: `beast_${b.id}`, category: '灵兽', name: b.name,
-    rarity: `${b.element}系·${b.minLevel}级可收服`,
+    rarity: `${b.element}系·推荐 ${b.minLevel} 级`,
     // 收服入口唯一：罗盘「前往灵兽栖息地」（灵兽栏有空位即可前往，与地域/秘境无关）。
     // 此前按等级硬编码「东荒妖域 / 中州秘境 / 上古遗府、终局」三档，全都指错了路 ——
     // 秘境里的妖兽是敌人、不是可收服对象；幼凰被写成「终局」更会让玩家以为要通关才拿得到。
-    source: `罗盘·灵兽栖息地（${b.minLevel} 级后可遇，需灵兽栏有空位）`,
+    source: `罗盘·灵兽栖息地（${beastGateLevel(b)} 级起可寻访，需灵兽栏有空位）`,
     effect: `${b.desc} 战力加成：+${b.power}。技能：${b.skill}。`,
   })),
   // ================================================================

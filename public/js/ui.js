@@ -1997,7 +1997,8 @@ async function chooseSectDepth() {
 /* ---------------- 灵兽收服 ---------------- */
 async function flowTameBeast() {
   const st = GameState.data;
-  const beasts = CX.BEAST_TEMPLATES.filter((b) => st.player.level >= b.minLevel - 10);
+  // 与图鉴文案共用 beastCandidates（门槛口径单一真源），避免两处各算一套
+  const beasts = CX.beastCandidates(st.player.level);
   const hasIncense = st.items.some((i) => i.名称 === '驭兽香');
   const m = openModal(`
     <div class="choice-intro">你前往灵兽栖息地。御兽等级越高，收服成功率越高；下方为各灵兽预估收服率。当前灵兽栏：${st.beasts?.slots?.length || 0}/${st.beasts?.maxSlots || 1}。</div>

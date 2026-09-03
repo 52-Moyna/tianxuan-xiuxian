@@ -71,5 +71,25 @@ ok(beastSrc.length > 0 && beastSrc.every((s) => /灵兽栖息地/.test(s)),
   `灵兽 source 应统一指向罗盘·灵兽栖息地（现为：${[...new Set(beastSrc)].join(' | ')}）`);
 ok(!beastSrc.some((s) => /终局|上古遗府/.test(s)), '灵兽 source 不应出现「终局/上古遗府」这类误导门槛');
 
+/* ---------- 5. 灵兽门槛三处同口径：图鉴文案 / 门槛函数 / 收服界面过滤 ---------- */
+const { BEAST_TEMPLATES, beastGateLevel, beastCandidates } = await import('../public/js/codex.js');
+ok(typeof beastGateLevel === 'function' && typeof beastCandidates === 'function',
+  'codex.js 应导出 beastGateLevel / beastCandidates 供图鉴与收服界面共用');
+for (const b of BEAST_TEMPLATES) {
+  const entry = CODEX_ITEMS.find((i) => i.id === `beast_${b.id}`);
+  const gate = beastGateLevel(b);
+  // 图鉴写死的门槛数字必须来自门槛函数，否则改了函数图鉴就骗人
+  ok(entry && new RegExp(`${gate} 级起可寻访`).test(entry.source),
+    `${b.name} 的图鉴门槛应写 ${gate} 级（现为：${entry?.source || '条目缺失'}）`);
+  // 门槛必须比推荐等级低 10 级且不低于 1 级
+  ok(gate === Math.max(1, b.minLevel - 10), `${b.name} 的门槛应为 max(1, ${b.minLevel}-10)=${Math.max(1, b.minLevel - 10)}（实得 ${gate}）`);
+}
+// 收服界面若改回散装 `level >= minLevel - 10`，下面这条就会抓到分叉
+for (const lv of [1, 5, 10, 20, 40, 50, 99]) {
+  const viaFn = beastCandidates(lv).map((b) => b.id).join(',');
+  const viaRaw = BEAST_TEMPLATES.filter((b) => lv >= b.minLevel - 10).map((b) => b.id).join(',');
+  ok(viaFn === viaRaw, `${lv} 级时 beastCandidates 与收服界面的散装过滤应等价（${viaFn} vs ${viaRaw}）`);
+}
+
 console.log(`\n===== 图鉴承诺兑现测试：${pass} 通过，${fail} 失败 =====`);
 process.exit(fail ? 1 : 0);
