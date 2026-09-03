@@ -723,10 +723,49 @@ export const BEAST_SLOT_CAP = 6;
 /** 该段药效之外别无其它药效（纯函数）。
  *  【为何存在】某段失效（无伤/无丹毒/额度满）时，若丹药还兼有其它药效就应当继续服用、
  *  只跳过失效那一段；只有「失效段就是全部」时才整个 early return 不消耗。
- *  此前每处各写一遍 Object.keys 过滤，口径易漂移，统一收在这里。 */
-export function soloEffect(eff, key) {
+ *  此前每处各写一遍 Object.keys 过滤，口径易漂移，统一收在这里。
+ *  extra 为「与 key 同属一段药效的附属参数键」（如 power 的 powerMonths）：它们不是
+ *  独立药效，不算「别无他用」的反例 —— 否则带参数的单效丹永远判不出 solo，
+ *  失效时仍会被吃掉。 */
+export function soloEffect(eff, key, extra = []) {
   if (!eff) return false;
-  return Object.keys(eff).filter((k) => k !== key).length === 0;
+  const skip = new Set([key].concat(extra));
+  return Object.keys(eff).filter((k) => !skip.has(k)).length === 0;
+}
+
+/** 聚灵增益（修炼效率 +15%，flags.cultivateBoostMonths）的服用收益（纯函数）。
+ *  【为何存在】useItem 用 Math.max 覆盖写入：已有 3 月增益时服 1 月的聚灵阵旗，
+ *  数值纹丝不动却照扣一件 —— 与「无伤服疗伤丹白扔一颗」同族。
+ *  gain 为「服用后能把增益撑到几个月相对现在的增量」，0 即零收益（应不消耗）。 */
+export function boostGain(eff, state) {
+  const months = Number(eff?.cultivateBoostMonths) || 0;
+  const cur = Number(state?.flags?.cultivateBoostMonths) || 0;
+  if (months <= 0) return { months: 0, cur, gain: 0 };
+  return { months, cur, gain: Math.max(0, months - cur) };
+}
+
+/** 临时战力增益丹（state.buffs）的服用收益（纯函数，不消耗 RNG、不改动 state）。
+ *  【为何存在】useItem 对 state.buffs 的两处都取 Math.max，埋着两个坑：
+ *  ① 已持有更强增益时服弱丹，战力面板毫无变化却照扣一颗；
+ *  ② 增益已过期后再服弱丹，power 仍与「过期残值」取 max，战力反而虚高到旧值（真 bug）。
+ *  现统一用「能否提升数值 / 能否延长到期」判定，两者皆无即零收益（无效则不消耗）；
+ *  expired 供结算侧在过期时重置残值，不再与旧 buff 取 max。
+ *  过期口径与 activeBuffPower 严格一致：now < expireMonth 才算未过期。 */
+export function powerBuffGain(eff, state) {
+  const power = Number(eff?.power) || 0;
+  const months = Number(eff?.powerMonths) || 1;
+  const now = (Number(state?.world?.year) || 0) * 12 + (Number(state?.world?.month) || 0);
+  const b = state?.buffs || {};
+  const exp0 = Number(b.expireMonth) || 0;
+  const expired = !(exp0 > now);
+  const curPower = expired ? 0 : (Number(b.power) || 0);
+  const curExpire = expired ? 0 : exp0;
+  if (power <= 0) {
+    return { power: 0, months, now, expired: true, curPower: 0, curExpire: 0, gainPower: 0, gainTime: 0, useful: false };
+  }
+  const gainPower = Math.max(0, power - curPower);
+  const gainTime = Math.max(0, now + months - curExpire);
+  return { power, months, now, expired, curPower, curExpire, gainPower, gainTime, useful: gainPower > 0 || gainTime > 0 };
 }
 
 /** 行囊中的疗伤药清单（纯函数）：按效力从强到弱排序，全清类优先。
@@ -2906,22 +2945,44 @@ export function useItem(state, idx) {
       }
     }
   }
-  // 聚灵丹药力：未来若干月修炼效率提升
+  // 聚灵丹药力：未来若干月修炼效率提升。
+  // 已持有等长/更长的增益时，短效聚灵物无处着力 —— 与 heal / detox / 额度丹同口径：
+  // 别无他用则整件不消耗，否则只跳过这一段（此前 Math.max 覆盖写入，照样扣一件）。
   if (it.effect.cultivateBoostMonths) {
-    const m = it.effect.cultivateBoostMonths;
-    state.flags.cultivateBoostMonths = Math.max(state.flags.cultivateBoostMonths || 0, m);
-    logs.push(`灵力充盈，未来 ${m} 月修炼效率提升。`);
+    const bg = boostGain(it.effect, state);
+    if (bg.gain > 0) {
+      state.flags.cultivateBoostMonths = bg.months;
+      logs.push(bg.cur > 0
+        ? `灵力充盈，修炼效率增益 ${bg.cur} → ${bg.months} 月。`
+        : `灵力充盈，未来 ${bg.months} 月修炼效率提升。`);
+    } else {
+      const msg = `聚灵增益尚余 ${bg.cur} 月，「${it.名称}」的 ${bg.months} 月药力无从着力`;
+      if (soloEffect(it.effect, 'cultivateBoostMonths')) return [`${msg}（未被消耗，可待增益散去后再服）。`];
+      logs.push(`${msg}，其余药效照常生效。`);
+    }
   }
   // 临时战力增益：服用后未来若干月战力临时提升（state.buffs.power），过期自动失效。
   // 此前该字段在 calcPower 中恒为 0（死字段），现接入真实丹药效果（如狂战丹），
   // 让「丹药增益」战力拆解项与英雄卡不再恒显「无」。
   if (it.effect.power) {
-    const months = it.effect.powerMonths || 1;
-    const cur = state.world.year * 12 + state.world.month;
-    state.buffs = state.buffs || { power: 0, expireMonth: 0 };
-    state.buffs.power = Math.max(state.buffs.power || 0, it.effect.power);
-    state.buffs.expireMonth = Math.max(state.buffs.expireMonth || 0, cur + months);
-    logs.push(`药力激荡，未来 ${months} 月战力临时 +${it.effect.power}。`);
+    const pb = powerBuffGain(it.effect, state);
+    if (pb.useful) {
+      state.buffs = state.buffs || { power: 0, expireMonth: 0 };
+      // 过期残值必须先清掉：否则 +20 的弱丹与已失效的 +50 取 max，战力反而虚高
+      if (pb.expired) state.buffs.power = 0;
+      state.buffs.power = Math.max(state.buffs.power || 0, pb.power);
+      state.buffs.expireMonth = Math.max(pb.expired ? 0 : (state.buffs.expireMonth || 0), pb.now + pb.months);
+      logs.push(pb.gainPower > 0
+        ? (pb.curPower > 0
+          ? `药力激荡，战力临时增益 +${pb.curPower} → +${pb.power}（持续 ${pb.months} 月）。`
+          : `药力激荡，未来 ${pb.months} 月战力临时 +${pb.power}。`)
+        : `药力续接，战力增益仍为 +${pb.power}，到期顺延 ${pb.gainTime} 月。`);
+    } else {
+      const msg = `体内药力正盛（+${pb.curPower}，尚余 ${pb.curExpire - pb.now} 月），「${it.名称}」难再添分毫`;
+      // powerMonths 只是 power 的持续参数，不是另一段药效
+      if (soloEffect(it.effect, 'power', ['powerMonths'])) return [`${msg}（未被消耗，可待药力散去后再服）。`];
+      logs.push(`${msg}，其余药效照常生效。`);
+    }
   }
   // 延寿：提升寿元上限（延寿丹）——叠加持久加成 lifeBonus，避免被 refreshDerived 重算覆盖。
   // 图鉴承诺「一生最多服用 3 颗」：对延寿丹按当前轮回计数，满 3 则经脉难承、本次服用失效（不消耗、不累加）。
@@ -3047,8 +3108,28 @@ export function itemUsePreview(state, it) {
       else A(`${base}（一生限 ${q.max} 颗，已服 ${tk}/${q.max}）`);
     } else A(base);
   }
-  if (eff.cultivateBoostMonths) A(`未来 ${eff.cultivateBoostMonths} 月修炼效率 +15%`);
-  if (eff.power) A(`战力临时 +${eff.power}（持续 ${eff.powerMonths || 1} 月）`);
+  if (eff.cultivateBoostMonths) {
+    const bg = boostGain(eff, state);
+    if (bg.gain > 0) {
+      A(bg.cur > 0
+        ? `修炼效率 +15%，持续 ${bg.cur} → ${bg.months} 月`
+        : `未来 ${bg.months} 月修炼效率 +15%`);
+    } else {
+      D(`修炼效率 +15% ${bg.months} 月（已有 ${bg.cur} 月增益未散，服用无效）`);
+    }
+  }
+  if (eff.power) {
+    const pb = powerBuffGain(eff, state);
+    if (pb.gainPower > 0) {
+      A(pb.curPower > 0
+        ? `战力临时 +${pb.curPower} → +${pb.power}（持续 ${pb.months} 月）`
+        : `战力临时 +${pb.power}（持续 ${pb.months} 月）`);
+    } else if (pb.gainTime > 0) {
+      A(`战力不增（现 +${pb.power}），到期顺延 ${pb.gainTime} 月`);
+    } else {
+      D(`战力临时 +${pb.power}（现已有 +${pb.curPower} 且到期更晚，服用无效）`);
+    }
+  }
   if (eff.lifespan) {
     const q = pillQuota(it);
     if (q) {

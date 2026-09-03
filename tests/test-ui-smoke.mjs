@@ -432,6 +432,28 @@ try {
     ok(!!qEl2 && qEl2.className.includes('full'), '额度服满时角标加 full 样式（划掉提示失效）');
     st7.player.lifespanPillsTaken = 0;
     st7.items = st7.items.filter((i) => i.名称 !== '延寿丹');
+    // 同族：增益已满时聚灵阵旗 / 狂战丹按钮置灰（此前点了面板纹丝不动却照扣一件）
+    st7.items = st7.items.filter((i) => i.名称 !== '聚灵阵旗');
+    LX.storeItem(st7, { 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, 描述: '聚灵', effect: { cultivateBoostMonths: 1 } });
+    st7.flags.cultivateBoostMonths = 3;
+    UI.renderAll(); await sleep(180);
+    const btnJ = (rowOf('聚灵阵旗') || {}).querySelector ? rowOf('聚灵阵旗').querySelector('[data-use]') : null;
+    ok(!!btnJ && btnJ.disabled, '聚灵增益已满：聚灵阵旗「使用」按钮置灰（点了无效、不消耗）');
+    st7.flags.cultivateBoostMonths = 0; UI.renderAll(); await sleep(180);
+    const btnJ2 = (rowOf('聚灵阵旗') || {}).querySelector ? rowOf('聚灵阵旗').querySelector('[data-use]') : null;
+    ok(!!btnJ2 && !btnJ2.disabled, '聚灵增益散去：聚灵阵旗按钮恢复可用');
+    st7.items = st7.items.filter((i) => i.名称 !== '聚灵阵旗');
+    // 战力增益：已持有更强增益且到期更晚时，弱丹无处着力，同样置灰
+    st7.items = st7.items.filter((i) => i.名称 !== '狂战丹');
+    LX.storeItem(st7, { 名称: '狂战丹', 类型: '丹药', 数量: 1, 描述: '战力', effect: { power: 20, powerMonths: 1 } });
+    st7.buffs = { power: 50, expireMonth: st7.world.year * 12 + st7.world.month + 3 };
+    UI.renderAll(); await sleep(180);
+    const btnK = (rowOf('狂战丹') || {}).querySelector ? rowOf('狂战丹').querySelector('[data-use]') : null;
+    ok(!!btnK && btnK.disabled, '药力正盛且到期更晚：狂战丹「服用」按钮置灰（点了战力不涨）');
+    st7.buffs = { power: 0, expireMonth: 0 }; UI.renderAll(); await sleep(180);
+    const btnK2 = (rowOf('狂战丹') || {}).querySelector ? rowOf('狂战丹').querySelector('[data-use]') : null;
+    ok(!!btnK2 && !btnK2.disabled, '药力散尽：狂战丹按钮恢复可用');
+    st7.items = st7.items.filter((i) => i.名称 !== '狂战丹');
     // —— 连续服用：同一格攒了一堆丹药时可一键连服，下肚前先弹确认把丹毒代价摊开 ——
     st7.inventory.capacity = 500;
     st7.items = st7.items.filter((i) => i.名称 !== '聚气丹');

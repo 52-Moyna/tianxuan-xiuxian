@@ -3991,6 +3991,109 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
     '契约满栏：预览 usable=false 与结算「不消耗」同口径');
 }
 
+/* ---------- 增益类丹药「无效则不消耗」 ----------
+ * 聚灵阵旗(cultivateBoostMonths) 与狂战丹(power) 此前一律 Math.max 覆盖写入：
+ * 已持有更长/更强的增益时服用，面板纹丝不动却照扣一件 —— 与「无伤服疗伤丹白扔一颗」同族。
+ * 同时修掉「增益过期后服弱丹，power 仍与过期残值取 max，战力反而虚高到旧值」的真 bug。 */
+{
+  const mkSt = (nm) => {
+    const st = S.createNewGame({ name: nm, gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(st);
+    st.inventory.capacity = 1000;
+    st.buffs = { power: 0, expireMonth: 0 };
+    return st;
+  };
+  const nowM = (st) => st.world.year * 12 + st.world.month;
+  // —— 聚灵增益：已有更长增益时短效阵旗不消耗 ——
+  {
+    const st = mkSt('聚灵已满');
+    st.flags.cultivateBoostMonths = 3;
+    st.items.push({ 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, 描述: '聚灵', effect: { cultivateBoostMonths: 1 } });
+    const r = S.useItem(st, st.items.findIndex((i) => i.名称 === '聚灵阵旗'));
+    ok(st.items.some((i) => i.名称 === '聚灵阵旗'), '聚灵增益已满：短效阵旗不被消耗（此前白扔一件）');
+    ok(st.flags.cultivateBoostMonths === 3, '聚灵增益已满：月数不变');
+    ok(Array.isArray(r) && /未被消耗/.test(r[0]), '聚灵增益已满：明说「未被消耗」');
+  }
+  // —— 聚灵增益：增益更短时照常生效 ——
+  {
+    const st = mkSt('聚灵续期');
+    st.flags.cultivateBoostMonths = 1;
+    st.items.push({ 名称: '聚灵阵旗', 类型: '消耗品', 数量: 1, 描述: '聚灵', effect: { cultivateBoostMonths: 4 } });
+    S.useItem(st, st.items.findIndex((i) => i.名称 === '聚灵阵旗'));
+    ok(st.flags.cultivateBoostMonths === 4 && !st.items.some((i) => i.名称 === '聚灵阵旗'), '聚灵增益更短：服用生效并被消耗');
+  }
+  // —— 多效丹（聚灵丹 = 修为 + 聚灵）：增益段失效但修为照常 ——
+  {
+    const st = mkSt('多效聚灵');
+    st.flags.cultivateBoostMonths = 5;
+    st.items.push({ 名称: '聚灵丹', 类型: '丹药', 数量: 1, 描述: '聚灵', effect: { exp: 200, cultivateBoostMonths: 2 } });
+    const exp0 = st.player.exp;
+    const lv0 = st.player.level;
+    S.useItem(st, st.items.findIndex((i) => i.名称 === '聚灵丹'));
+    // 修为到账可能触发升级而重算 exp，故「等级提升」与「exp 增长」二者居其一即算到账
+    ok((st.player.level > lv0 || st.player.exp > exp0) && !st.items.some((i) => i.名称 === '聚灵丹'),
+      '多效聚灵：增益段失效但修为照常到账（不被整颗吞掉）');
+    ok(st.flags.cultivateBoostMonths === 5, '多效聚灵：更长增益不被短效覆盖');
+  }
+  // —— 战力增益：已有更强增益且到期更晚时，弱丹不消耗 ——
+  {
+    const st = mkSt('药力正盛');
+    st.buffs = { power: 50, expireMonth: nowM(st) + 3 };
+    st.items.push({ 名称: '狂战丹', 类型: '丹药', 数量: 1, 描述: '战力', effect: { power: 20, powerMonths: 1 } });
+    const r = S.useItem(st, st.items.findIndex((i) => i.名称 === '狂战丹'));
+    ok(st.items.some((i) => i.名称 === '狂战丹'), '药力正盛：弱效狂战丹不被消耗（此前白扔一颗）');
+    ok(st.buffs.power === 50 && st.buffs.expireMonth === nowM(st) + 3, '药力正盛：战力与到期月均不变');
+    ok(Array.isArray(r) && /未被消耗/.test(r[0]), '药力正盛：明说「未被消耗」');
+  }
+  // —— 战力增益：能延后到期则算有效（消耗，但明说不提升战力） ——
+  {
+    const st = mkSt('药力顺延');
+    st.buffs = { power: 50, expireMonth: nowM(st) + 2 };
+    st.items.push({ 名称: '狂战丹', 类型: '丹药', 数量: 1, 描述: '战力', effect: { power: 20, powerMonths: 5 } });
+    S.useItem(st, st.items.findIndex((i) => i.名称 === '狂战丹'));
+    ok(!st.items.some((i) => i.名称 === '狂战丹'), '能顺延到期：狂战丹被消耗');
+    ok(st.buffs.power === 50 && st.buffs.expireMonth === nowM(st) + 5, '能顺延到期：战力不变、到期顺延 3 月');
+  }
+  // —— 战力增益：更强的丹照常提升 ——
+  {
+    const st = mkSt('药力更盛');
+    st.buffs = { power: 20, expireMonth: nowM(st) + 2 };
+    st.items.push({ 名称: '霸体丹', 类型: '丹药', 数量: 1, 描述: '战力', effect: { power: 80, powerMonths: 2 } });
+    S.useItem(st, st.items.findIndex((i) => i.名称 === '霸体丹'));
+    ok(st.buffs.power === 80 && !st.items.some((i) => i.名称 === '霸体丹'), '更强增益：战力提升到 +80 并消耗');
+  }
+  // —— 战力增益：过期后服弱丹不再虚高到旧值（真 bug） ——
+  {
+    const st = mkSt('药力已散');
+    st.buffs = { power: 50, expireMonth: nowM(st) - 1 };
+    st.items.push({ 名称: '狂战丹', 类型: '丹药', 数量: 1, 描述: '战力', effect: { power: 20, powerMonths: 2 } });
+    S.useItem(st, st.items.findIndex((i) => i.名称 === '狂战丹'));
+    ok(st.buffs.power === 20, '增益过期后服弱丹：战力取本次 +20（此前与过期残值取 max 虚高到 +50）');
+    ok(S.activeBuffPower(st) === 20, '增益过期后服弱丹：生效战力为 +20');
+  }
+  // —— 预览与结算同口径 ——
+  ok(S.itemUsePreview({ flags: { cultivateBoostMonths: 3 } }, { 名称: '聚灵阵旗', 类型: '消耗品', effect: { cultivateBoostMonths: 1 } }).usable === false,
+    '聚灵增益已满：预览 usable=false 与结算「不消耗」同口径');
+  ok(S.itemUsePreview({ flags: { cultivateBoostMonths: 1 } }, { 名称: '聚灵阵旗', 类型: '消耗品', effect: { cultivateBoostMonths: 3 } }).usable === true,
+    '聚灵增益未满：预览 usable=true');
+  {
+    const st = mkSt('预览战力');
+    st.buffs = { power: 50, expireMonth: nowM(st) + 3 };
+    ok(S.itemUsePreview(st, { 名称: '狂战丹', 类型: '丹药', effect: { power: 20, powerMonths: 1 } }).usable === false,
+      '药力正盛且到期更晚：预览 usable=false 与结算「不消耗」同口径');
+    ok(/顺延/.test(S.itemUsePreview(st, { 名称: '狂战丹', 类型: '丹药', effect: { power: 20, powerMonths: 6 } }).text || ''),
+      '能顺延到期：预览明说「战力不增、到期顺延」');
+  }
+  // —— 连服：吃到增益上限自动停手，剩下的留在行囊 ——
+  {
+    const st = mkSt('连服聚灵');
+    st.items.push({ 名称: '聚灵阵旗', 类型: '消耗品', 数量: 4, 描述: '聚灵', effect: { cultivateBoostMonths: 2 } });
+    const res = S.useItemBatch(st, st.items.findIndex((i) => i.名称 === '聚灵阵旗'));
+    ok(res && res.count === 1, '连服聚灵阵旗：第二面起不再增益，只服 1 面即停手');
+    ok(st.items.find((i) => i.名称 === '聚灵阵旗').数量 === 3, '连服聚灵阵旗：余下 3 面留在行囊');
+  }
+}
+
 /* ---------- 连续服用（同一格丹药批量下肚） ---------- */
 {
   const newSt = (nm) => {
