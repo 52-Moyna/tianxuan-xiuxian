@@ -3179,6 +3179,23 @@ export function useBatchPreview(state, it) {
   };
 }
 
+/** 坊市商品「此刻买了能否起效」提示（纯函数，不消耗 RNG、不改动 state）。
+ *  【为何存在】行囊侧早已按 itemUsePreview 对失效药品置灰，但**购买页不显示这一口径**：
+ *  玩家花几百灵石买下延寿丹（一生限 3 颗且已服满）、解毒丹（当前无丹毒）、凝血丹（当前无伤），
+ *  回去一服 —— 不生效、不消耗，钱白花。本函数直接复用 itemUsePreview，与 useItem 结算
+ *  严格同口径（不另写一套判定），在货架上就把「买了也白搭」说在前面。
+ *  返回 null 表示无需提示（材料 / 装备 / 法宝 / 服务 / 无 effect 商品等）。
+ *  kind: 'dead' 此刻服用无效（强警示） / 'quota' 一生限额已消耗（提示余量） / 'auto' 自动消耗类。 */
+export function marketItemHint(state, g) {
+  if (!g || !g.effect) return null;
+  const pv = itemUsePreview(state, g);
+  if (pv.mode === 'auto') return { kind: 'auto', tag: '时机自动', text: pv.text, warn: false };
+  if (pv.mode !== 'use') return null;
+  if (pv.usable === false) return { kind: 'dead', tag: '此刻服用无效', text: pv.text, warn: true };
+  if (pv.quota && pv.quota.taken > 0) return { kind: 'quota', tag: `已服 ${pv.quota.taken}/${pv.quota.max}`, text: pv.text, warn: false };
+  return null;
+}
+
 /** 连续服用同一格物品，直到服完或「这一颗已无用」为止（真实改动 state）。
  *  【为何存在】批量最容易犯的错是「失效的那颗也被吃掉」—— 伤势已清还继续嗑疗伤丹、
  *  额度已满还继续服延寿丹、灵兽栏已满还继续吞契约。故这里逐颗走 useItem，

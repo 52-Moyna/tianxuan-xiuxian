@@ -1227,6 +1227,17 @@ button { font-family: inherit; }
 .shop-item-poor { opacity: .5; }
 .shop-item-poor .si-price.poor { color: var(--text-faint); text-decoration: line-through; }
 .si-lack { display: block; font-style: normal; font-size: .72rem; color: var(--text-faint); text-decoration: none; }
+/* 坊市「买了此刻也白搭」的货：额度已满 / 无伤无丹毒的丹药，购买前先警示（口径同行囊置灰） */
+.shop-item-warn { border-left: 2px solid rgba(214,120,72,.65); background: rgba(214,120,72,.05); }
+.si-hint { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+  font-size: .7rem; font-style: normal; vertical-align: middle; border: 1px solid var(--line-soft); }
+.si-hint-dead { color: #e0916b; border-color: rgba(224,145,107,.55); background: rgba(224,145,107,.12); cursor: help; }
+.si-hint-quota { color: var(--gold); border-color: rgba(200,168,106,.45); background: rgba(200,168,106,.1); }
+.si-hint-auto { color: var(--text-dim); border-color: var(--line-soft); background: rgba(255,255,255,.03); }
+/* 满仓：占格货品在购买页直接置灰，顶部横幅说明腾挪办法（装备/功法/服务不占格，不受影响） */
+.shop-item-full { opacity: .55; }
+.shop-full-warn { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: .82rem;
+  color: #e0b06b; background: rgba(214,160,72,.1); border: 1px solid rgba(214,160,72,.35); }
 /* 路线不可达（灵石不足）：置灰且不可点击 */
 .route-row-poor { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
 .route-row-poor small { color: var(--text-faint); }

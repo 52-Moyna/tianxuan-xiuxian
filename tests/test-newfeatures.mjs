@@ -4159,6 +4159,97 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   }
 }
 
+/* ---------- 坊市「买了此刻也白搭」提示 marketItemHint（2026-09-04）---------- */
+{
+  const { readFileSync } = await import('node:fs');
+  const mkSt = () => {
+    const st = S.createNewGame({ name: '坊市提示', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(st);
+    st.flags = st.flags || {};
+    st.flags.wounded = 0;
+    st.flags.pillToxicity = 0;
+    return st;
+  };
+  // ① 额度已满：买了服下去不生效也不消耗 —— 货架必须先说清楚
+  {
+    const st = mkSt();
+    st.player.lifespanPillsTaken = 3;
+    const h = S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } });
+    ok(h && h.kind === 'dead' && h.warn === true, '延寿丹已服满：坊市标「此刻服用无效」并强警示');
+    ok(h && h.text.includes('已服满 3/3'), '无效提示写明额度已满 3/3');
+  }
+  // ② 无伤 / 无丹毒
+  {
+    const st = mkSt();
+    ok(S.marketItemHint(st, { 名称: '凝血丹', 类型: '丹药', effect: { heal: true } })?.kind === 'dead', '无伤时坊市凝血丹标无效');
+    ok(S.marketItemHint(st, { 名称: '解毒丹', 类型: '丹药', effect: { detox: 30 } })?.kind === 'dead', '无丹毒时坊市解毒丹标无效');
+    st.flags.wounded = 2; st.flags.pillToxicity = 40;
+    ok(S.marketItemHint(st, { 名称: '凝血丹', 类型: '丹药', effect: { heal: true } }) === null, '有伤时凝血丹不再警示');
+    ok(S.marketItemHint(st, { 名称: '解毒丹', 类型: '丹药', effect: { detox: 30 } }) === null, '有丹毒时解毒丹不再警示');
+  }
+  // ③ 额度未满：只提示余量，不当作无效
+  {
+    const st = mkSt();
+    st.player.lifespanPillsTaken = 1;
+    const h = S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } });
+    ok(h && h.kind === 'quota' && h.warn === false && h.tag === '已服 1/3', '额度未满：只标余量不警示');
+    st.player.lifespanPillsTaken = 0;
+    ok(S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } }) === null, '一颗未服：无需提示');
+  }
+  // ④ 自动消耗类：说清时机，别让玩家以为买了能主动嗑
+  {
+    const st = mkSt();
+    const h = S.marketItemHint(st, { 名称: '渡劫丹', 类型: '丹药', effect: { tribulation: 15 } });
+    ok(h && h.kind === 'auto' && h.warn === false, '渡劫丹标为时机自动消耗类');
+    ok(h && h.text.includes('渡劫时自动消耗'), '自动消耗类写明触发时机');
+  }
+  // ⑤ 不该提示的品类：装备 / 材料 / 服务 / 常规丹
+  {
+    const st = mkSt();
+    ok(S.marketItemHint(st, { 名称: '青锋剑', 类型: '装备', effect: {}, _equip: { 战力: 30 } }) === null, '装备不显示服用提示');
+    ok(S.marketItemHint(st, { 名称: '星砂', 类型: '材料' }) === null, '无 effect 材料不提示');
+    ok(S.marketItemHint(st, { 名称: '储物袋扩容契', 类型: '服务', effect: { bagUpgrade: 20 } }) === null, '服务类不提示');
+    ok(S.marketItemHint(st, { 名称: '聚气丹', 类型: '丹药', effect: { exp: 80 } }) === null, '常规丹药无需提示');
+  }
+  // ⑥ 元断言（最关键）：提示说「无效」的商品，真买回来服下去必须确实不消耗
+  //    —— 否则货架就是在谎报，玩家照样白花灵石。
+  {
+    const st = mkSt();
+    st.player.lifespanPillsTaken = 3;
+    const g = { 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 } };
+    ok(S.marketItemHint(st, g)?.warn === true, '前置：延寿丹被判定为买了无效');
+    st.items.push({ ...g });
+    S.useItem(st, st.items.length - 1);
+    const left = st.items.find((i) => i.名称 === '延寿丹');
+    ok(left && left.数量 === 1, '标无效的延寿丹买回服用确实不被消耗（提示与结算同口径）');
+  }
+  // ⑦ 满仓置灰的口径必须与 buyItem 实测一致：占格货品买不下，装备/功法/服务不占格仍可成交
+  {
+    const st = mkSt();
+    st.items = [{ 名称: '星砂', 类型: '材料', 数量: 1, 描述: '砂' }];
+    st.inventory.capacity = inventoryUsed(st); // 精确塞满（不能用 0，内部 ||100 会归一）
+    setStones(st, 100000);
+    ok(/空间不足/.test(S.buyItem(st, { 名称: '聚气丹', 类型: '丹药', 价格: 10, 描述: '修为', effect: { exp: 80 } })),
+      '满仓时买丹药被拒（占行囊格）');
+    ok(!/空间不足|灵石不足/.test(S.buyItem(st, { 名称: '基础吐纳术', 类型: '功法', 价格: 10, 描述: '功法', 品级: '凡品' })),
+      '满仓时买功法照常成交（入功法栏，不占行囊格）');
+    ok(!/空间不足|灵石不足/.test(S.buyItem(st, { 名称: '储物袋扩容契', 类型: '服务', 价格: 10, 描述: '扩容', effect: { bagUpgrade: 20 } })),
+      '满仓时买扩容服务照常成交');
+    // UI 侧必须与上面三条实测同口径：购物页满仓横幅 + 占格货品置灰
+    const src = readFileSync(new URL('../public/js/ui.js', import.meta.url), 'utf8');
+    ok(/shop-item-full/.test(src) && /needsRoom\(g\)/.test(src), '坊市购买页已按「是否需要空格」逐行置灰');
+    ok(/inventoryUsed\(st\)/.test(src) && /needsRoom = \(g\) => g\.类型 !== '服务' && !\['装备', '功法'\]/.test(src),
+      '置灰判定与 buyItem 的占格豁免集合一致（装备/功法/服务豁免）');
+  }
+  // ⑧ 静态防线：坊市货架渲染必须接上 marketItemHint，否则以后重写 UI 又会丢掉这个提示
+  {
+    const src = readFileSync(new URL('../public/js/ui.js', import.meta.url), 'utf8');
+    ok(/marketItemHint\(/.test(src), 'ui.js 已接入 marketItemHint（购买页会显示服用提示）');
+    const css = readFileSync(new URL('../public/css/main.css', import.meta.url), 'utf8');
+    ok(/\.si-hint-dead\b/.test(css), '样式表已定义 .si-hint-dead 警示徽标');
+  }
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

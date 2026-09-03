@@ -22,6 +22,11 @@ import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listB
 import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, travelOptions, bagGradeInfo, nextBagGrade, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
+// HTML 属性转义：任何插进 title="..." 的动态文本都必须过这一层，否则文案里的引号会截断属性。
+// 此前只有行囊作用域内有一份副本，坊市货架要写动态提示时会拿不到，故提到模块级共用。
+function attr(v) {
+  return String(v || '').replace(/"/g, '&quot;');
+}
 // 品阶 / 好感颜色集中管理：避免在多处渲染重复硬编码与散落的 EQUIP_GRADES 查找
 function gradeColor(item) {
   if (!item) return '';
@@ -1674,6 +1679,13 @@ async function flowMarket() {
       const order = ['丹药', '法宝', '装备', '功法', '材料', '消耗品', '服务', '线索'];
       const catLabel = { 丹药: '丹药', 法宝: '法宝', 装备: '装备（六部位细分）', 功法: '功法', 材料: '材料', 消耗品: '消耗品', 服务: '服务', 线索: '线索' };
       const gradeName = (id) => D.PILL_GRADES.find((x) => x.id === id)?.name || id;
+      // 满仓判定：储物袋塞满时，除装备/功法（入 stash / techniques，不占格）与服务外，
+      // 其余货品买下即触发「空间不足」。此前货架照常亮着，玩家付完钱才吃一句拒绝 ——
+      // 先在这里算准，横幅与逐行置灰共用同一口径（与 buyItem 的占格判定一致）。
+      const capNow = st.inventory.capacity || 100;
+      const usedNow = inventoryUsed(st);
+      const bagFull = usedNow >= capNow;
+      const needsRoom = (g) => g.类型 !== '服务' && !['装备', '功法'].includes(g.类型);
 
       // ---- 购买页 HTML ----
       const buyHtml = order.filter((t) => groups[t]).map((t) => `
@@ -1685,11 +1697,21 @@ async function flowMarket() {
             // 买不起就当场说清楚：整行置灰 + 标明还差多少，别让玩家点了才吃一句「灵石不足」
             const lack = g.价格 - S.totalStones(st);
             const poor = lack > 0;
+            // 买了也白搭就当场说清楚：额度已满/无伤无丹毒的丹药，此刻服下不生效也不消耗 ——
+            // 口径直接取行囊置灰用的那一份（marketItemHint → itemUsePreview → useItem），不另写判定。
+            const hint = S.marketItemHint(st, g);
+            const hintHtml = hint
+              ? `<span class="si-hint si-hint-${hint.kind}" title="${attr(hint.text)}">${hint.tag}</span>`
+              : '';
+            // 满仓时占格货品直接置灰并写明「装不下」，别让玩家点了才知道白跑一趟
+            const noRoom = bagFull && needsRoom(g);
+            const blocked = poor || noRoom;
+            const disTitle = poor ? '灵石不足' : noRoom ? `储物袋已满（${usedNow}/${capNow} 格），先清理或扩容` : '';
             return `
-            <div class="shop-item${poor ? ' shop-item-poor' : ''}" data-buy="${i}">
-              <div class="si-body"><b>${g.名称}${g.品阶 ? ` <em class="grade-${g.品阶}">${gradeName(g.品阶)}</em>` : ''}${g.品级 ? ` <em class="grade-tag">${g.品级}</em>` : ''}</b><span>${g.描述}</span>${cmpHtml}</div>
-              <div class="si-price${poor ? ' poor' : ''}">${g.价格} 灵石${poor ? `<em class="si-lack">尚缺 ${lack}</em>` : ''}</div>
-              <button class="btn btn-sm ${poor ? '' : 'btn-gold'} shop-buy-btn" ${poor ? 'disabled title="灵石不足"' : ''}>购买</button>
+            <div class="shop-item${poor ? ' shop-item-poor' : ''}${hint && hint.warn ? ' shop-item-warn' : ''}${noRoom ? ' shop-item-full' : ''}" data-buy="${i}">
+              <div class="si-body"><b>${g.名称}${g.品阶 ? ` <em class="grade-${g.品阶}">${gradeName(g.品阶)}</em>` : ''}${g.品级 ? ` <em class="grade-tag">${g.品级}</em>` : ''}</b><span>${g.描述}</span>${cmpHtml}${hintHtml}</div>
+              <div class="si-price${poor ? ' poor' : ''}">${g.价格} 灵石${poor ? `<em class="si-lack">尚缺 ${lack}</em>` : ''}${noRoom ? '<em class="si-lack">装不下</em>' : ''}</div>
+              <button class="btn btn-sm ${blocked ? '' : 'btn-gold'} shop-buy-btn" ${blocked ? `disabled title="${attr(disTitle)}"` : ''}>购买</button>
             </div>`;
           }).join('')}
         </div>`).join('') || '<div class="opt-desc">今日坊市无货。</div>';
@@ -1719,8 +1741,13 @@ async function flowMarket() {
           : `<button class="btn btn-sm" data-batch="${t}" disabled title="行囊中没有此类物品">全部${t} <em class="batch-est">无</em></button>`;
       }).join('');
 
+      const fullBanner = bagFull
+        ? `<div class="shop-full-warn">储物袋已满（${usedNow}/${capNow} 格），除扩容服务外的货品暂时买不下 —— 可先在「出售行囊」页清理，或直接购入下方的储物袋扩容契。</div>`
+        : '';
+
       const m = openModal(`
         <div class="shop-money">随身灵石（折下品）：<b>${S.totalStones(st)}</b></div>
+        ${fullBanner}
         <div class="shop-book">
           <div class="shop-tabs">
             <button class="shop-tab ${marketTab === 'buy' ? 'on' : ''}" data-stab="buy">🛒 购买货品</button>
@@ -2807,7 +2834,6 @@ function renderCenter() {
     // 旧判定只认 effect.exp / effect.heal，导致凝神丹、洗髓丹、炎玉丹、玉华丹、狂战丹、
     // 延寿丹、灵兽契约、聚灵阵旗等已实现效果的物品在行囊中无按钮、玩家根本无法服用。
     const usePreviewOf = (it) => S.itemUsePreview(st, it);
-    const attr = (v) => String(v || '').replace(/"/g, '&quot;');
     // 「一生 N 颗」类丹药的额度角标（延寿丹 3 / 洗髓丹 2）：此前只藏在 hover title 里，
     // 玩家不点开就不知道还剩几颗，常到最后一颗才发现服满无效。服满时划掉以示失效。
     const quotaBadge = (pv) => (pv && pv.quota
