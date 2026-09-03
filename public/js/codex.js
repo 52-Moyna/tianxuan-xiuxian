@@ -236,7 +236,7 @@ export const CODEX_ITEMS = [
   // source 只写真实存在的产出路径：此前写的「秘境」在秘境奖励池中查无此物，玩家照图鉴去刷会白跑
   { id: 'pill_lifespan', category: '丹药', name: '延寿丹', rarity: '珍贵丹药', source: '丹炉炼制（金丹期以上，需露华玉液）、拍卖会', effect: '服用后寿元上限 +20 年；一生最多服用 3 颗。', toxicity: 15 },
   { id: 'pill_marrow', category: '丹药', name: '洗髓丹', rarity: '珍贵丹药', source: '炼丹（筑基期以上）、天命', effect: '服用后随机提升「根骨/道心」之一 5~10 级；一生最多服用 2 颗。', toxicity: 20 },
-  { id: 'pill_breakthrough', category: '丹药', name: '破境丹', rarity: '关键丹药', source: '炼丹（金丹期以上）、秘境', effect: '服用后立即获得大量修为经验，可能直接突破一级。', toxicity: 25 },
+  { id: 'pill_breakthrough', category: '丹药', name: '破境丹', rarity: '关键丹药', source: '丹炉炼制（金丹期以上）', effect: '服用后立即获得大量修为经验，可能直接突破一级。', toxicity: 25 },
   { id: 'pill_mind', category: '丹药', name: '神识丹', rarity: '消耗品', source: '炼丹、坊市（元婴期以上）', effect: '服用后悟性经验增加；连续服用会产生丹毒。', toxicity: 10 },
   { id: 'pill_mana', category: '丹药', name: '法力丹', rarity: '消耗品', source: '炼丹、坊市', effect: '服用后下次战斗胜率 +5%；战斗后失效。', toxicity: 6 },
   { id: 'pill_detox', category: '丹药', name: '解毒丹', rarity: '消耗品', source: '炼丹、岭南百越坊市', effect: '服用后丹毒 -30；是连续嗑药的必备解药。', toxicity: -30 },
@@ -257,13 +257,13 @@ export const CODEX_ITEMS = [
   // ================================================================
   // 三、道具（消耗品 / 功能性物品）
   // ================================================================
-  { id: 'item_ward', category: '道具', name: '护身符', rarity: '消耗品', source: '制符、坊市、秘境', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
+  { id: 'item_ward', category: '道具', name: '护身符', rarity: '消耗品', source: '百艺制符；西极玄冰域坊市售「低阶护身符」', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
   { id: 'item_pelt_talisman', category: '道具', name: '兽皮护符', rarity: '消耗品', source: '百艺制符（妖兽皮毛）', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
-  { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '阵法、秘境', effect: '下次修炼效率提升（+15%，持续1月）。' },
+  { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '百艺阵法、拍卖会', effect: '下次修炼效率提升（+15%，持续1月）。' },
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
   { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
   { id: 'item_sea_pass', category: '道具', name: '海岛通行令', rarity: '消耗品', source: '北冥瀚海坊市', effect: '降低海外遗府探索的费用 20%。' },
-  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后获赠；东荒机缘、秘境、拍卖会亦有流传', effect: '服用可拓宽灵兽栏（上限 +1，至多 6 栏）；亦是收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。' },
+  { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后自动获赠；拍卖会亦有出售', effect: '服用可拓宽灵兽栏（上限 +1，至多 6 栏）；亦是收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。' },
   { id: 'item_travel_pass', category: '道具', name: '旅行凭证', rarity: '消耗品', source: '坊市、宗门任务奖励', effect: '下次跨域旅行费用减半。' },
   { id: 'item_ward_low', category: '道具', name: '低阶护身符', rarity: '消耗品', source: '西极玄冰域坊市', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
   { id: 'item_ward_talisman', category: '道具', name: '低阶符箓', rarity: '消耗品', source: '符师道友敬赠、百艺制符', effect: '下一次战斗失败时减轻损失（效果弱于护身符）。' },
@@ -276,8 +276,8 @@ export const CODEX_ITEMS = [
   // 四、容器（储物袋系列）
   // ================================================================
   { id: 'item_bag', category: '容器', name: '扩容储物袋', rarity: '容器', source: '坊市（可购道具）、服用即生效', effect: '服用后行囊容量 +20 格，与坊市「储物袋扩容契」服务同效，可囤积备用，缓解满仓丢物之忧。' },
-  { id: 'bag_small', category: '容器', name: '小型储物袋', rarity: '容器', source: '开局（坊市学徒）、坊市', effect: '初始容量容器，决定行囊格数。' },
-  { id: 'bag_medium', category: '容器', name: '下品储物袋', rarity: '容器', source: '开局（天生道体、没落血脉）、坊市', effect: '中等容量容器，比小型储物袋更宽敞。' },
+  { id: 'bag_small', category: '容器', name: '小型储物袋', rarity: '容器', source: '开局（坊市学徒）', effect: '初始容量容器，决定行囊格数。' },
+  { id: 'bag_medium', category: '容器', name: '下品储物袋', rarity: '容器', source: '开局（天生道体、没落血脉）', effect: '中等容量容器，比小型储物袋更宽敞。' },
 
   // ================================================================
   // 五、材料（通用类型 + 区域特产 + 战利品）
@@ -296,7 +296,7 @@ export const CODEX_ITEMS = [
   { id: 'mat_yaodan', category: '材料', name: '妖丹', rarity: '材料', source: '妖兽战利品（各妖兽掉落专属内丹，如青风狼内丹；通用妖丹为旧称，现已不再掉落）', effect: '妖兽精华内丹，可出售。' },
   { id: 'mat_kuangshi', category: '材料', name: '矿石', rarity: '材料', source: '妖兽战利品（概率）、百艺炼器消耗', effect: '炼器基础材料，可用于灵脉石饰等配方。' },
   { id: 'mat_xianyuan', category: '材料', name: '仙缘', rarity: '稀有材料', source: '高阶妖兽战利品（极低概率）', effect: '罕见机缘之物，可于罗盘「仙缘兑换」换得道途助益：修为+200、道韵+15、悟性+20、下品灵石+300。' },
-  { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '上古遗府/秘境深处隐藏奇遇（极稀有）', effect: '传说中的仙界之气，可遇不可求。持此物者可于罗盘「太初仙缘」处寻上古仙缘使者兑换绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并赠天品功法《太虚剑经》。价值连城。' },
+  { id: 'mat_xianyuan_taichu', category: '材料', name: '仙缘·太初之气', rarity: '传说材料', source: '海外游历·仙岛奇遇（海外机缘概率更高，极稀有）', effect: '传说中的仙界之气，可遇不可求。持此物者可于罗盘「太初仙缘」处寻上古仙缘使者兑换绝世机缘：修为+2000、道韵+40、悟性+25、下品灵石+800，并赠天品功法《太虚剑经》。价值连城。' },
   { id: 'mat_year_herb', category: '材料', name: '年份灵草', rarity: '稀有材料', source: '道友深谈（灵植师）、道友委托酬谢', effect: '灵植师精心培育的年份灵草，灵气醇厚，炼丹上品。开炉炼丹时若持有可自动催化，成丹率 +8%。' },
   { id: 'mat_danfang_scroll', category: '材料', name: '私藏丹方·残卷', rarity: '稀有材料', source: '道友深谈（炼丹师）', effect: '炼丹师相赠的丹方心得残卷，研习可助炼丹。开炉炼丹时若持有可自动催化，成丹率 +15%。' },
   // 妖兽材料子类（generateBeastDrops 动态名）
@@ -353,7 +353,10 @@ export const CODEX_ITEMS = [
   ...BEAST_TEMPLATES.map((b) => ({
     id: `beast_${b.id}`, category: '灵兽', name: b.name,
     rarity: `${b.element}系·${b.minLevel}级可收服`,
-    source: b.minLevel <= 15 ? '东荒妖域、御兽百艺' : b.minLevel <= 30 ? '中州秘境、天命机缘' : '上古遗府、终局',
+    // 收服入口唯一：罗盘「前往灵兽栖息地」（灵兽栏有空位即可前往，与地域/秘境无关）。
+    // 此前按等级硬编码「东荒妖域 / 中州秘境 / 上古遗府、终局」三档，全都指错了路 ——
+    // 秘境里的妖兽是敌人、不是可收服对象；幼凰被写成「终局」更会让玩家以为要通关才拿得到。
+    source: `罗盘·灵兽栖息地（${b.minLevel} 级后可遇，需灵兽栏有空位）`,
     effect: `${b.desc} 战力加成：+${b.power}。技能：${b.skill}。`,
   })),
   // ================================================================
