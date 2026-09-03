@@ -3958,6 +3958,104 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
   ok(pv.quota && pv.quota.taken === 1 && pv.quota.max === 3, '预览给出额度进度（已服 1/3）');
 }
 
+/* ---------- 灵兽栏已满时不白扔「灵兽契约」 ----------
+ * 契约来自收服赠礼与拍卖会，属稀有道具。此前满栏服用照样扣一件、只回一句「契约暂存」，
+ * 与预览侧「服用无效、按钮置灰」的口径不一致（预览说无效，实际却消耗掉了）。 */
+{
+  const st = S.createNewGame({ name: '满栏契约', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st);
+  st.beasts = { slots: [], maxSlots: S.BEAST_SLOT_CAP, tamedCount: 0, activeIdx: -1 };
+  st.items.push({ 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '驯兽凭证', effect: { beastSlot: 1 } });
+  const r = S.useItem(st, st.items.findIndex((i) => i.名称 === '灵兽契约'));
+  ok(Array.isArray(r) && st.items.some((i) => i.名称 === '灵兽契约'), '灵兽栏满：服用契约不被消耗（此前白扔一件稀有道具）');
+  ok(Array.isArray(r) && /未被消耗/.test(r[0]), '灵兽栏满：明说「未被消耗、可待放归后再服」');
+  ok(st.beasts.maxSlots === S.BEAST_SLOT_CAP, '灵兽栏满：栏位上限不变');
+  // 未满时照常生效
+  const st2 = S.createNewGame({ name: '未满栏', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st2);
+  st2.beasts = { slots: [], maxSlots: 2, tamedCount: 0, activeIdx: -1 };
+  st2.items.push({ 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '驯兽凭证', effect: { beastSlot: 1 } });
+  S.useItem(st2, st2.items.findIndex((i) => i.名称 === '灵兽契约'));
+  ok(st2.beasts.maxSlots === 3 && !st2.items.some((i) => i.名称 === '灵兽契约'), '灵兽栏未满：服用契约生效并被消耗');
+  // 多效道具（兼补修为）满栏时只跳过扩栏段，不整件吞掉
+  const st3 = S.createNewGame({ name: '多效契约', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+  ensureLifeState(st3);
+  st3.beasts = { slots: [], maxSlots: S.BEAST_SLOT_CAP, tamedCount: 0, activeIdx: -1 };
+  st3.items.push({ 名称: '古兽契', 类型: '道具', 数量: 1, 描述: '兼补修为', effect: { beastSlot: 1, exp: 30 } });
+  const expBefore = st3.player.exp;
+  const r3 = S.useItem(st3, st3.items.findIndex((i) => i.名称 === '古兽契'));
+  ok(st3.player.exp === expBefore + 30, '多效道具满栏：扩栏段失效但修为照常生效（不被整件吞掉）');
+  ok(Array.isArray(r3) && !st3.items.some((i) => i.名称 === '古兽契'), '多效道具满栏：仍被正常消耗（别无他用时才不消耗）');
+  // 结算与预览口径一致：满栏时预览 usable=false
+  ok(S.itemUsePreview({ beasts: { maxSlots: S.BEAST_SLOT_CAP } }, { 名称: '灵兽契约', 类型: '道具', effect: { beastSlot: 1 } }).usable === false,
+    '契约满栏：预览 usable=false 与结算「不消耗」同口径');
+}
+
+/* ---------- 连续服用（同一格丹药批量下肚） ---------- */
+{
+  const newSt = (nm) => {
+    const st = S.createNewGame({ name: nm, gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(st);
+    st.inventory.capacity = 1000;
+    return st;
+  };
+  // 纯修为丹：整格吃完
+  {
+    const st = newSt('连服修为');
+    st.items.push({ 名称: '聚气丹', 类型: '丹药', 数量: 5, 描述: '修为', effect: { exp: 80 }, toxicity: 8 });
+    const idx = st.items.findIndex((i) => i.名称 === '聚气丹');
+    const pv = S.useBatchPreview(st, st.items[idx]);
+    ok(pv && pv.count === 5 && pv.toxAdd === 40, '连服预览：给出份数与丹毒合计（5 份 · 丹毒 +40）');
+    const lv0 = st.player.level;
+    const res = S.useItemBatch(st, idx);
+    ok(res && res.count === 5 && !st.items.some((i) => i.名称 === '聚气丹'), '连服：5 份修为丹全部服下');
+    // 400 点修为会连升数级，故看「等级或当前修为」任一增长即可（exp 会因升级被清零重算）
+    ok(st.player.level > lv0 || st.player.exp >= 400, `连服：修为累计入账（Lv.${lv0}→${st.player.level}，exp ${st.player.exp}）`);
+    ok(st.flags.pillToxicity === 40, `连服：丹毒按份数累加（${st.flags.pillToxicity}）`);
+  }
+  // 伤势有限：服到失效自动停手，剩下的留在行囊（不会白扔）
+  {
+    const st = newSt('连服疗伤');
+    st.flags.wounded = 2;
+    st.items.push({ 名称: '疗伤丹', 类型: '丹药', 数量: 4, 描述: '清 1 月伤势', effect: { heal: 1 }, toxicity: 0 });
+    const idx = st.items.findIndex((i) => i.名称 === '疗伤丹');
+    const res = S.useItemBatch(st, idx);
+    const left = st.items.find((i) => i.名称 === '疗伤丹');
+    ok(res && res.count === 2 && st.flags.wounded === 0, '连服：伤势清完即停手（只服 2 份）');
+    ok(left && left.数量 === 2, '连服：剩余 2 份留在行囊，没有白扔');
+    ok(res.logs.some((l) => /未被消耗|无处着力/.test(l)), '连服：把「为何停下」的原因回传给玩家');
+  }
+  // 额度类丹：服到额度上限即停
+  {
+    const st = newSt('连服延寿');
+    st.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 5, 描述: '延寿', effect: { lifespan: 20 }, toxicity: 15 });
+    const idx = st.items.findIndex((i) => i.名称 === '延寿丹');
+    const res = S.useItemBatch(st, idx);
+    const left = st.items.find((i) => i.名称 === '延寿丹');
+    ok(res && res.count === 3 && st.player.lifespanPillsTaken === 3, '连服：延寿丹服满 3 颗额度即停手');
+    ok(left && left.数量 === 2, '连服：超额 2 颗留在行囊');
+  }
+  // 不可服用 / 服用无效 / 只剩一份 → 不提供批量入口（避免误点白扣）
+  {
+    const st = newSt('连服边界');
+    ok(S.useBatchPreview(st, { 名称: '聚气丹', 类型: '丹药', 数量: 1, effect: { exp: 80 } }) === null, '只剩 1 份：无连服入口');
+    ok(S.useBatchPreview(st, { 名称: '护身符', 类型: '消耗品', 数量: 3, effect: { ward: true } }) === null, '自动消耗类：无连服入口');
+    ok(S.useBatchPreview({ flags: { wounded: 0 } }, { 名称: '疗伤丹', 类型: '丹药', 数量: 3, effect: { heal: 1 } }) === null, '当前服用无效：无连服入口');
+    ok(S.useBatchPreview(st, { 名称: '星砂', 类型: '材料', 数量: 9 }) === null, '无 effect 材料：无连服入口');
+  }
+  // 第一颗就失效时不消耗任何一份
+  {
+    const st = newSt('连服首颗失效');
+    st.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 3, 描述: '延寿', effect: { lifespan: 20 }, toxicity: 15 });
+    st.player.lifespanPillsTaken = 3;
+    const idx = st.items.findIndex((i) => i.名称 === '延寿丹');
+    const res = S.useItemBatch(st, idx);
+    const left = st.items.find((i) => i.名称 === '延寿丹');
+    ok(res && res.count === 0 && left && left.数量 === 3, '额度已满：连服一份都不消耗');
+    ok(res.logs[0] && /留于储物袋|未被消耗/.test(res.logs[0]), '额度已满：连服给出明确说明');
+  }
+}
+
 console.log(`
 ===== 本轮新功能专项测试：${pass} 通过，${fail} 失败 =====`);
 

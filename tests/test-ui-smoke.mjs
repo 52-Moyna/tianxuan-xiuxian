@@ -432,6 +432,39 @@ try {
     ok(!!qEl2 && qEl2.className.includes('full'), '额度服满时角标加 full 样式（划掉提示失效）');
     st7.player.lifespanPillsTaken = 0;
     st7.items = st7.items.filter((i) => i.名称 !== '延寿丹');
+    // —— 连续服用：同一格攒了一堆丹药时可一键连服，下肚前先弹确认把丹毒代价摊开 ——
+    st7.inventory.capacity = 500;
+    st7.items = st7.items.filter((i) => i.名称 !== '聚气丹');
+    LX.storeItem(st7, { 名称: '聚气丹', 类型: '丹药', 数量: 3, 描述: '修为+80。', effect: { exp: 80 }, toxicity: 8 });
+    st7.flags.pillToxicity = 0;
+    UI.renderAll(); await sleep(180);
+    let rowC = rowOf('聚气丹');
+    const btnBatch = rowC ? rowC.querySelector('[data-usebatch]') : null;
+    ok(!!btnBatch && btnBatch.textContent.includes('×3'), '同格 3 份丹药出现「连服 ×3」按钮');
+    if (btnBatch) {
+      btnBatch.click(); await sleep(180);
+      const bModal = $('#modal-root .modal');
+      ok(!!bModal && bModal.textContent.includes('共 3 份'), '连服前弹确认框并写明份数');
+      ok(!!bModal && /丹毒 0 → 24/.test(bModal.textContent), '确认框摊开丹毒代价（0 → 24）');
+      const okBtn = bModal ? bModal.querySelector('#batch-ok') : null;
+      if (okBtn) okBtn.click();
+      await sleep(260);
+    }
+    ok(!st7.items.some((i) => i.名称 === '聚气丹'), '确认后 3 份聚气丹一次服下');
+    ok(st7.flags.pillToxicity === 24, `连服按份数累加丹毒（${st7.flags.pillToxicity}）`);
+    // 只剩 1 份 → 不给连服入口（避免误点）
+    LX.storeItem(st7, { 名称: '聚气丹', 类型: '丹药', 数量: 1, 描述: '修为+80。', effect: { exp: 80 } });
+    UI.renderAll(); await sleep(180);
+    rowC = rowOf('聚气丹');
+    ok(!!rowC && !rowC.querySelector('[data-usebatch]'), '只剩 1 份时不给连服入口');
+    st7.items = st7.items.filter((i) => i.名称 !== '聚气丹');
+    // 当前服用无效（无伤疗伤丹）→ 不给连服入口
+    LX.storeItem(st7, { 名称: '疗伤丹', 类型: '丹药', 数量: 3, 描述: '清除 1 个月伤势。', effect: { heal: 1 } });
+    st7.flags.wounded = 0;
+    UI.renderAll(); await sleep(180);
+    const rowD = rowOf('疗伤丹');
+    ok(!!rowD && !rowD.querySelector('[data-usebatch]'), '服用无效时不给连服入口（不会白扔）');
+    st7.items = st7.items.filter((i) => i.名称 !== '疗伤丹');
     UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `行囊失效按钮: ${e.message}`); }
 

@@ -715,6 +715,11 @@ export function pillQuotaByName(state, name) {
 export function pillQuotaTaken(state, it) {
   return pillQuotaByName(state, it?.名称)?.taken ?? 0;
 }
+/** 灵兽栏总数上限（收服位 + 服用「灵兽契约」可拓宽到的最大值）。
+ *  【为何抽常量】此前 6 这个数字在 useItem 结算与 itemUsePreview 预览各写一遍，
+ *  两边一旦漂移就会出现「按钮可点、点了没用」或「明明还有空间却说已满」。 */
+export const BEAST_SLOT_CAP = 6;
+
 /** 该段药效之外别无其它药效（纯函数）。
  *  【为何存在】某段失效（无伤/无丹毒/额度满）时，若丹药还兼有其它药效就应当继续服用、
  *  只跳过失效那一段；只有「失效段就是全部」时才整个 early return 不消耗。
@@ -2938,9 +2943,16 @@ export function useItem(state, idx) {
   // 灵兽契约：服用拓宽灵兽栏（上限 +1，至多 6 栏）
   if (it.effect.beastSlot) {
     state.beasts = state.beasts || { slots: [], maxSlots: 1, tamedCount: 0 };
-    const cap = 6;
-    if (state.beasts.maxSlots >= cap) logs.push(`灵兽栏已至上限（${cap} 栏），契约暂存。`);
-    else { state.beasts.maxSlots += 1; logs.push(`契约生效，灵兽栏上限提升至 ${state.beasts.maxSlots} 栏。`); }
+    // 灵兽栏已满时契约无处着力 —— 与 heal / detox / 额度丹同口径：别无他用则整件不消耗，
+    // 否则只跳过这一段。此前满栏照样扣一件（契约来自收服赠礼与拍卖，属稀有道具，白扔最心疼）。
+    if (state.beasts.maxSlots >= BEAST_SLOT_CAP) {
+      const msg = `灵兽栏已至上限（${BEAST_SLOT_CAP} 栏），「${it.名称}」暂无用武之地`;
+      if (soloEffect(it.effect, 'beastSlot')) return [`${msg}（未被消耗，可待放归一兽后再服）。`];
+      logs.push(`${msg}，其余药效照常生效。`);
+    } else {
+      state.beasts.maxSlots += 1;
+      logs.push(`契约生效，灵兽栏上限提升至 ${state.beasts.maxSlots}/${BEAST_SLOT_CAP} 栏。`);
+    }
   }
   // 扩容储物袋：服用直接拓展行囊容量（容量 +N 格），与坊市「储物袋扩容契」服务并行的另一种扩容途径
   if (it.effect.bag) {
@@ -3047,8 +3059,8 @@ export function itemUsePreview(state, it) {
   }
   if (eff.beastSlot) {
     const cur = (state && state.beasts && state.beasts.maxSlots) || 1;
-    if (cur >= 6) D(`灵兽栏上限 +1（已达上限 ${cur}/6，服用无效）`);
-    else A(`灵兽栏上限 +1（现 ${cur}/6 栏）`);
+    if (cur >= BEAST_SLOT_CAP) D(`灵兽栏上限 +1（已达上限 ${cur}/${BEAST_SLOT_CAP}，服用无效）`);
+    else A(`灵兽栏上限 +1（现 ${cur}/${BEAST_SLOT_CAP} 栏）`);
   }
   if (eff.bag) A(`行囊容量 +${eff.bag} 格`);
   if (eff.detox) {
@@ -3066,6 +3078,53 @@ export function itemUsePreview(state, it) {
   const q = pillQuota(it);
   const quota = q ? { taken: pillQuotaTaken(state, it), max: q.max } : null;
   return { mode: 'use', label: it.类型 === '丹药' ? '服用' : '使用', text: parts.join('，'), usable, quota };
+}
+
+/** 同一格物品「连续服用」前的预览（纯函数、不消耗 RNG、不改动 state）。
+ *  【为何存在】行囊里攒了几十颗聚气丹时，玩家只能一颗颗点，纯体力活；
+ *  而批量最容易踩的坑是「一口气嗑到丹毒深重」，所以下肚之前必须先把
+ *  颗数与丹毒代价摆出来。每份效果文本直接复用 itemUsePreview，与结算同口径。
+ *  不可服用 / 当前服用无效 / 只剩一份时返回 null（无需批量入口）。 */
+export function useBatchPreview(state, it) {
+  const pv = itemUsePreview(state, it);
+  if (!pv || pv.mode !== 'use' || pv.usable === false) return null;
+  const count = Math.max(1, Number(it?.数量) || 1);
+  if (count < 2) return null;
+  const toxPer = (typeof it.toxicity === 'number') ? it.toxicity : 0;
+  const toxNow = Number(state?.flags?.pillToxicity || 0);
+  return {
+    count, per: pv.text, label: pv.label,
+    toxPer, toxAdd: toxPer * count, toxNow, toxAfter: toxNow + toxPer * count,
+  };
+}
+
+/** 连续服用同一格物品，直到服完或「这一颗已无用」为止（真实改动 state）。
+ *  【为何存在】批量最容易犯的错是「失效的那颗也被吃掉」—— 伤势已清还继续嗑疗伤丹、
+ *  额度已满还继续服延寿丹、灵兽栏已满还继续吞契约。故这里逐颗走 useItem，
+ *  完整复用它所有的 early return 守卫：只要某一颗没有被消耗掉，立刻停手，
+ *  剩下的份数原样留在行囊，并把它「为何停下」的说明回传给玩家。 */
+export function useItemBatch(state, idx) {
+  const it = state.items[idx];
+  if (!it) return null;
+  const logs = [];
+  let used = 0;
+  let stopMsg = '';
+  const total = Math.max(1, Number(it.数量) || 1);
+  for (let k = 0; k < total; k += 1) {
+    const curIdx = state.items.indexOf(it);
+    if (curIdx < 0) break;
+    const before = it.数量 || 1;
+    const one = useItem(state, curIdx);
+    if (!one) break;
+    // 没被消耗即 useItem 判定「服用无效」：再点下去就是白扔，停手
+    if ((state.items[curIdx] ? state.items[curIdx].数量 : 0) >= before) { stopMsg = one[0] || ''; break; }
+    used += 1;
+    one.forEach((l) => logs.push(l));
+  }
+  if (!used) return { count: 0, logs: [stopMsg || `「${it.名称}」当前服用无效，未被消耗。`] };
+  if (stopMsg) logs.push(stopMsg);
+  if (used > 1) logs.unshift(`连续服用「${it.名称}」${used} 份。`);
+  return { count: used, logs };
 }
 /** 重新计算已穿戴戒指（空间戒）带来的储物袋加成，写入 inventory.ringBonus。
  *  优先读装备的 capBonus 字段，旧档/名称匹配兜底，避免容量漂移。 */

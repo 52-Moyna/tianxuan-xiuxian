@@ -2666,6 +2666,34 @@ function closeCodexModal() {
   if (m) m.hidden = true;
 }
 
+/** 连续服用确认框：批量最怕「一口气嗑到丹毒深重」，
+ *  故在下肚前把份数、每份效果与丹毒代价一次性摊开，服到失效会自动停手。 */
+function confirmBatchUse(st, idx, pv) {
+  const it = st.items[idx];
+  if (!it) return;
+  const toxHtml = pv.toxPer > 0
+    ? `<div class="batch-tox${pv.toxAfter >= 60 ? ' danger' : ''}">丹毒 ${pv.toxNow} → <b>${pv.toxAfter}</b>（每份 +${pv.toxPer}${pv.toxAfter >= 60 ? ' · 越过 60 警戒线，修炼效率将大降' : ''}）</div>`
+    : '<div class="batch-tox ok">此物不积丹毒</div>';
+  const m = openModal(`
+    <div class="choice-intro">连续服用「${it.名称}」共 <b>${pv.count}</b> 份？</div>
+    <div class="batch-line">每份：${pv.per}</div>
+    ${toxHtml}
+    <div class="batch-tip">服到失效会自动停手，剩余份数留在行囊里，不会白扔。</div>
+    <div class="modal-actions">
+      <button class="btn" id="batch-cancel">再想想</button>
+      <button class="btn btn-gold" id="batch-ok">连服 ${pv.count} 份</button>
+    </div>`, { title: '💊 连续服用', lock: true });
+  m.querySelector('#batch-cancel').addEventListener('click', closeModal);
+  m.querySelector('#batch-ok').addEventListener('click', () => {
+    const res = S.useItemBatch(st, idx);
+    closeModal();
+    if (!res) return;
+    res.logs.forEach((l) => pushLog(l));
+    toast(res.count ? `连续服用「${it.名称}」${res.count} 份。` : res.logs[0], 'gold');
+    renderAll();
+  });
+}
+
 /** 整页渲染中央区：点击左导航即整页跳转（替代旧版右抽屉分页） */
 function renderCenter() {
   const st = GameState.data;
@@ -2848,6 +2876,7 @@ function renderCenter() {
                   ${pv.mode === 'use' ? (pv.usable === false
                     ? `<button class="btn btn-sm btn-useless" data-use="${i}" disabled title="${attr(pv.text)}（当前服用无效，不会消耗）">${pv.label}</button>`
                     : `<button class="btn btn-sm btn-gold" data-use="${i}" title="${attr(pv.text)}">${pv.label}</button>`) : ''}
+                  ${(pv.mode === 'use' && pv.usable !== false && it.数量 > 1) ? `<button class="btn btn-sm" data-usebatch="${i}" title="连续服用这一格的 ${it.数量} 份，服到失效自动停手">连服 ×${it.数量}</button>` : ''}
                   ${pv.mode === 'auto' ? `<span class="item-auto-note" title="${attr(pv.text)}">⚙ 自动生效</span>` : ''}
                   <button class="btn btn-sm" data-codex="${it.名称}">图鉴</button>
                 </div>
@@ -2890,6 +2919,14 @@ function renderCenter() {
       if (it && isEquipable(it)) { requestEquipFromBag(st, idx); return; }
       const logs = S.useItem(st, idx);
       if (logs) { logs.forEach((l) => pushLog(l)); toast(logs[0], 'gold'); renderAll(); }
+    }));
+    // 连服：同一格攒了一堆丹药时不必一颗颗点，先弹确认把代价摊开再下肚
+    box.querySelectorAll('[data-usebatch]').forEach((b) => b.addEventListener('click', () => {
+      const idx = Number(b.dataset.usebatch);
+      const it = st.items[idx];
+      if (!it || isEquipable(it)) return;
+      const pv = S.useBatchPreview(st, it);
+      if (pv) confirmBatchUse(st, idx, pv);
     }));
     box.querySelectorAll('[data-codex]').forEach((b) => b.addEventListener('click', () => {
       setSideTab('codex');

@@ -1331,6 +1331,16 @@ button { font-family: inherit; }
 .item-auto-note { font-size: .7rem; color: var(--text-dim); align-self: center;
   padding: 2px 9px; border-radius: 999px; white-space: nowrap; cursor: help;
   border: 1px dashed var(--line); background: rgba(127, 127, 127, .08); }
+/* 连续服用确认框：批量下肚前把份数与丹毒代价摊开，避免一口气嗑到丹毒深重 */
+.batch-line { font-size: .82rem; color: var(--text); line-height: 1.6;
+  padding: 8px 12px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line); }
+.batch-tox { margin-top: 8px; font-size: .8rem; color: var(--text-dim); line-height: 1.6;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); }
+.batch-tox b { color: var(--gold); font-size: .92rem; }
+.batch-tox.danger { color: #d98a82; border-color: rgba(190, 80, 70, .5); background: rgba(190, 80, 70, .1); }
+.batch-tox.danger b { color: #e8736a; }
+.batch-tox.ok { color: var(--jade); }
+.batch-tip { margin-top: 8px; font-size: .74rem; color: var(--text-dim); line-height: 1.55; }
 
 /* 日志面板（设置内） */
 .log-tab-bar { display: flex; gap: 0; margin-bottom: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
