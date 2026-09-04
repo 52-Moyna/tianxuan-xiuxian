@@ -2131,8 +2131,15 @@ async function flowSectTask() {
       const block = S.sectExchangeBlockReason(st, e.id);
       const ok = st.sect.contribution >= e.cost && !block;
       const warn = block ? `<div class="bag-block-warn">⚠ ${block}</div>` : '';
+      // 兑换所是第三个「付代价换物品」场景（坊市 / 拍卖 / 宗门）：贡献比灵石更难攒，
+      // 换回去才发现此刻服下不生效是最贵的一种白扔。口径同样走 marketItemHint，
+      // 与行囊置灰、useItem 结算严格同源，此处不另写判定。
+      const hint = S.sectExchangeItemHint(st, e.id);
+      const hintHtml = hint
+        ? `<span class="si-hint si-hint-${hint.kind}" title="${attr(hint.text)}">${hint.tag}</span>`
+        : '';
       return `<div class="sect-task">
-        <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div><div class="codex-effect">可得：${get}</div>${warn}</div>
+        <div class="codex-body"><b>${e.name}</b><div class="codex-source">${e.desc} ｜ 需贡献 ${e.cost}</div><div class="codex-effect">可得：${get}${hintHtml}</div>${warn}</div>
         <button class="btn btn-sm ${ok ? 'btn-gold' : 'btn-dim'}" data-exchange="${e.id}" ${ok ? '' : 'disabled'}>兑换</button>
       </div>`;
     }).join('')}
@@ -2730,13 +2737,32 @@ function closeCodexModal() {
 }
 
 /** 连续服用确认框：批量最怕「一口气嗑到丹毒深重」，
- *  故在下肚前把份数、每份效果与丹毒代价一次性摊开，服到失效会自动停手。 */
+ *  故在下肚前把份数、每份效果与丹毒代价一次性摊开，服到失效会自动停手。
+ *  另按 batchToxicityPlan 给出「只服到丹毒不越线」的安全份数 —— 玩家想要修为，
+ *  但不想要一口气把修炼效率打到 75%/55%，这里给他一个止损档。 */
 function confirmBatchUse(st, idx, pv) {
   const it = st.items[idx];
   if (!it) return;
-  const toxHtml = pv.toxPer > 0
-    ? `<div class="batch-tox${pv.toxAfter >= 60 ? ' danger' : ''}">丹毒 ${pv.toxNow} → <b>${pv.toxAfter}</b>（每份 +${pv.toxPer}${pv.toxAfter >= 60 ? ' · 越过 60 警戒线，修炼效率将大降' : ''}）</div>`
-    : '<div class="batch-tox ok">此物不积丹毒</div>';
+  // 警戒线与止损份数全部来自 codex.TOX_LEVELS（batchToxicityPlan），此处不写裸数字
+  const plan = S.batchToxicityPlan(st, it);
+  const safe = plan.safeCount;
+  let toxHtml;
+  if (pv.toxPer <= 0) {
+    toxHtml = '<div class="batch-tox ok">此物不积丹毒</div>';
+  } else {
+    // 越线后果照抄分档表原文（35 档只是效率 90%，60 档才是 75% ——
+    // 早期这里笼统写「修炼效率将大降」，把轻档说成重档，属谎报）
+    const lineTip = pv.overLine
+      ? (pv.nextMin == null
+        ? ' · 丹毒已在最高档，再服只会加深'
+        : ` · 越过 ${pv.nextMin} 警戒线：${String(pv.nextText).replace(/。$/, '')}`)
+      : '';
+    toxHtml = `<div class="batch-tox${pv.overLine ? ' danger' : ''}">丹毒 ${pv.toxNow} → <b>${pv.toxAfter}</b>（每份 +${pv.toxPer}${lineTip}）</div>`;
+  }
+  // 安全份数有意义才给按钮：不积丹毒 / 连一份就必越线 / 全服都不越线，都不需要它
+  const safeBtn = (pv.toxPer > 0 && safe > 0 && safe < pv.count)
+    ? `<button class="btn" id="batch-safe" title="丹毒停在 ${pv.toxNow + pv.toxPer * safe}，不越 ${pv.nextMin} 警戒线">只服 ${safe} 份 · 不越线</button>`
+    : '';
   const m = openModal(`
     <div class="choice-intro">连续服用「${it.名称}」共 <b>${pv.count}</b> 份？</div>
     <div class="batch-line">每份：${pv.per}</div>
@@ -2744,17 +2770,21 @@ function confirmBatchUse(st, idx, pv) {
     <div class="batch-tip">服到失效会自动停手，剩余份数留在行囊里，不会白扔。</div>
     <div class="modal-actions">
       <button class="btn" id="batch-cancel">再想想</button>
+      ${safeBtn}
       <button class="btn btn-gold" id="batch-ok">连服 ${pv.count} 份</button>
     </div>`, { title: '💊 连续服用', lock: true });
-  m.querySelector('#batch-cancel').addEventListener('click', closeModal);
-  m.querySelector('#batch-ok').addEventListener('click', () => {
-    const res = S.useItemBatch(st, idx);
+  const runBatch = (limit) => {
+    const res = S.useItemBatch(st, idx, limit);
     closeModal();
     if (!res) return;
     res.logs.forEach((l) => pushLog(l));
     toast(res.count ? `连续服用「${it.名称}」${res.count} 份。` : res.logs[0], 'gold');
     renderAll();
-  });
+  };
+  m.querySelector('#batch-cancel').addEventListener('click', closeModal);
+  const safeEl = m.querySelector('#batch-safe');
+  if (safeEl) safeEl.addEventListener('click', () => runBatch(safe));
+  m.querySelector('#batch-ok').addEventListener('click', () => runBatch(undefined));
 }
 
 /** 整页渲染中央区：点击左导航即整页跳转（替代旧版右抽屉分页） */

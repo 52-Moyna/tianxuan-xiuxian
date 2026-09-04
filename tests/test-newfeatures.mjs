@@ -1,7 +1,8 @@
 import * as S from '../public/js/systems.js';
 import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES, CURRENCIES } from '../public/js/data.js';
-import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, canTameBeast, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements } from '../public/js/codex.js';
+import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, canTameBeast, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements,
+  TOX_LEVELS, toxLevelOf, toxMul, toxWinPenalty, toxCrisisLevel } from '../public/js/codex.js';
 import { serialize, deserialize } from '../public/js/save.js';
 
 let pass = 0, fail = 0;
@@ -4342,6 +4343,151 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
     ok(!/pillQuotaByName\(st, it\.name\)/.test(src), '拍卖页不再按丹名硬匹配额度（旧口径只认延寿/洗髓两个名字）');
     const css = readFileSync(new URL('../public/css/main.css', import.meta.url), 'utf8');
     ok(/\.auc-hint-dead\b/.test(css), '样式表已定义 .auc-hint-dead 警示徽标');
+  }
+}
+
+/* ---------- 丹毒分档单一真源（TOX_LEVELS）----------
+ * 【为何单列一段】35/60/85 三个阈值曾散布在五处：图鉴副作用文案、修炼结算、修炼预览、
+ * 战斗结算、战斗预览，连服弹窗又写了一遍 60。本项目已两次发生「立了真源只改一半」——
+ * 结算改了、预览没改，而两边数值暂时一致所以测试全绿，玩家看到的却是谎报的预览。
+ * 故这里既做逐点相等，也做源码扫描（防第二套口径）+ 运行时断言（防只改一半）。 */
+{
+  const { readFileSync } = await import('node:fs');
+  const sysSrc = readFileSync(new URL('../public/js/systems.js', import.meta.url), 'utf8');
+  const uiSrc = readFileSync(new URL('../public/js/ui.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/css/main.css', import.meta.url), 'utf8');
+  const mkToxSt = () => {
+    const st = S.createNewGame({
+      name: '丹毒', gender: '男', raceId: 'human', ageId: 'young',
+      regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot(),
+    });
+    ensureLifeState(st);
+    st.flags = st.flags || {};
+    st.flags.wounded = 0;
+    st.flags.pillToxicity = 0;
+    return st;
+  };
+
+  // ① 表结构：降序、字段齐全、惩罚为负、系数在 (0,1]
+  ok(Array.isArray(TOX_LEVELS) && TOX_LEVELS.length >= 3, 'TOX_LEVELS 是丹毒分档表');
+  ok(TOX_LEVELS.every((l, i) => i === 0 || TOX_LEVELS[i - 1].min > l.min), 'TOX_LEVELS 按阈值降序（find 取首个命中档）');
+  ok(TOX_LEVELS.every((l) => typeof l.min === 'number' && typeof l.mul === 'number' && typeof l.win === 'number'
+    && typeof l.level === 'string' && typeof l.crisis === 'boolean' && typeof l.text === 'string'), '每档字段齐全（含 crisis 标记）');
+  ok(TOX_LEVELS.filter((l) => l.crisis).length >= 2, '至少 danger / warn 两档算危机');
+  ok(TOX_LEVELS.every((l) => l.win <= 0 && l.mul > 0 && l.mul <= 1), '胜率惩罚非正、修炼系数在 (0,1]');
+
+  // ② 纯函数逐点相等：每个阈值取 min-1 / min 两侧，外加 0 与超高档
+  const pts = [0];
+  for (const l of TOX_LEVELS) { pts.push(l.min - 1); pts.push(l.min); }
+  pts.push(TOX_LEVELS[0].min + 40);
+  for (const t of pts) {
+    if (t < 0) continue;
+    const lv = toxLevelOf(t);
+    ok(toxMul(t) === (lv ? lv.mul : 1), `丹毒 ${t} 的修炼系数取自分档表`);
+    ok(toxWinPenalty(t) === (lv ? lv.win : 0), `丹毒 ${t} 的胜率惩罚取自分档表`);
+    ok(toxCrisisLevel(t) === ((lv && lv.crisis) ? lv.level : 'ok'), `丹毒 ${t} 的危机等级取自分档表`);
+  }
+  ok(toxMul(-5) === 1 && toxCrisisLevel(-5) === 'ok', '异常负值按无丹毒处理');
+  ok(toxLevelOf(undefined) === null && toxMul(null) === 1, '空值按无丹毒处理');
+
+  // ③ 禁止第二套口径：结算侧与预览侧都不许再写裸阈值
+  ok(!/toxic >= \d+/.test(sysSrc), 'systems.js 不再硬编码丹毒阈值');
+  ok(!/pillToxicity >= \d+/.test(sysSrc), 'systems.js 不再硬编码 pillToxicity 阈值');
+  ok(!/toxAfter >= \d+/.test(uiSrc), '连服弹窗不再硬编码 60 警戒线');
+  ok((sysSrc.match(/toxMul\(/g) || []).length >= 2, 'cultivate 结算与 cultivateGainPreview 预览共用 toxMul');
+  ok((sysSrc.match(/toxWinPenalty\(/g) || []).length >= 2, 'resolveBattle 结算与 previewBattle 预览共用 toxWinPenalty');
+  ok(/toxCrisisLevel\(/.test(sysSrc), '危机预警走 toxCrisisLevel（不再自己判 85/60）');
+
+  // ④ 预览侧真的跟着表走 —— 防「只改结算不改预览」（本项目已犯两次）
+  {
+    const st = mkToxSt();
+    st.flags.cultivateBoostMonths = 0;
+    const top = TOX_LEVELS[0];
+    st.flags.pillToxicity = 0;
+    const g0 = S.cultivateGainPreview(st, 'normal').gain;
+    st.flags.pillToxicity = top.min;
+    const g1 = S.cultivateGainPreview(st, 'normal').gain;
+    ok(g0 > 0 && g1 < g0, '丹毒拉满后修炼预览收益确实下降');
+    ok(Math.abs(g1 / g0 - top.mul) < 0.03, `修炼预览降幅 = 分档表系数 ${top.mul}（读表，非另写一套）`);
+    // 危机预警阈值同样表驱动：改表即改预警，不写死 85/60
+    for (const l of TOX_LEVELS) {
+      st.flags.pillToxicity = l.min;
+      ok(S.toxicityWarning(st).level === (l.crisis ? l.level : 'ok'),
+        `丹毒 ${l.min} 时危机等级 = ${l.crisis ? l.level : 'ok'}（轻档只提示不算危机）`);
+    }
+    // 战斗预览的丹毒惩罚明细与结算同源
+    const foe = { name: '试炼妖兽', level: st.player.level, power: st.player.power };
+    st.flags.pillToxicity = 0;
+    const pv0 = S.previewBattle(st, foe, 'normal');
+    st.flags.pillToxicity = top.min;
+    const pv1 = S.previewBattle(st, foe, 'normal');
+    ok(pv0.breakdown.toxic === 0, '无丹毒时战斗预览无丹毒惩罚');
+    if (pv0.finalRate >= 20 && pv0.finalRate <= 80) {
+      ok(pv1.breakdown.toxic === top.win, `战斗预览丹毒惩罚 = 分档表 ${top.win}（读表，非硬编码 -10）`);
+    }
+    st.flags.pillToxicity = 0;
+  }
+
+  // ⑤ 连服丹毒预算：算出「服到第几份会越线」，给玩家一个止损档
+  {
+    const st = mkToxSt();
+    const pill = { 名称: '聚气丹', 类型: '丹药', 数量: 10, toxicity: 8, effect: { exp: 80 }, 描述: '测试丹' };
+    // 止损守的是「最近一条尚未跨过的线」：丹毒 0 时就是门槛最低的那一档（降序表末项）
+    const lowest = TOX_LEVELS[TOX_LEVELS.length - 1];
+    const p1 = S.batchToxicityPlan(st, pill);
+    ok(p1.nextMin === lowest.min, `丹毒 0 时下一条警戒线 = 最低档 ${lowest.min}`);
+    ok(p1.safeCount === Math.floor((lowest.min - 1) / 8), `安全份数 = ${p1.safeCount}`);
+    ok(p1.toxNow + p1.toxPer * p1.safeCount < lowest.min, '按安全份数服完确实不越线');
+    ok(p1.toxAfter === p1.toxPer * 10, '全服丹毒累计正确');
+    ok(p1.overLine === true, '全部服完会越线，故弹窗应给安全选项');
+    // 跨过最低档之后，下一条线顺延到上一档（防止永远守最低档）
+    const second = TOX_LEVELS[TOX_LEVELS.length - 2];
+    st.flags.pillToxicity = lowest.min;
+    const pMid = S.batchToxicityPlan(st, pill);
+    ok(pMid.nextMin === second.min, `丹毒已过 ${lowest.min} 后，下一条警戒线顺延到 ${second.min}`);
+    ok(pMid.toxNow + pMid.toxPer * pMid.safeCount < second.min, '中段安全份数同样不越线');
+    // 已在最高档：没有更高的线可守，安全份数归零
+    st.flags.pillToxicity = TOX_LEVELS[0].min;
+    const p2 = S.batchToxicityPlan(st, pill);
+    ok(p2.nextMin === null && p2.safeCount === 0, '丹毒已在最高档：无更高警戒线，安全份数 0');
+    // 解毒丹（负毒性）不积丹毒，全额安全
+    const p3 = S.batchToxicityPlan(st, { 名称: '解毒丹', 类型: '丹药', 数量: 3, toxicity: -30, effect: { detox: 30 }, 描述: '解' });
+    ok(p3.safeCount === 3 && p3.overLine === false, '解毒丹不积丹毒，全额安全');
+  }
+
+  // ⑥ 限份连服：按下「只服 N 份」就只消耗 N 份，剩余留在行囊
+  {
+    const st = mkToxSt();
+    st.items = [{ 名称: '聚气丹', 类型: '丹药', 数量: 10, toxicity: 8, effect: { exp: 80 }, 描述: '测试丹' }];
+    const res = S.useItemBatch(st, 0, 3);
+    ok(res && res.count === 3, '限份连服：只服 3 份');
+    ok(st.items[0] && st.items[0].数量 === 7, '限份连服：剩余 7 份留在行囊');
+    ok(st.flags.pillToxicity === 24, '限份连服：丹毒累加 3×8 = 24');
+    // 安全份数必须真的卡在警戒线下：按 safeCount 服完不应越线
+    const st2 = mkToxSt();
+    st2.items = [{ 名称: '聚气丹', 类型: '丹药', 数量: 10, toxicity: 8, effect: { exp: 80 }, 描述: '测试丹' }];
+    const plan = S.batchToxicityPlan(st2, st2.items[0]);
+    S.useItemBatch(st2, 0, plan.safeCount);
+    ok(st2.flags.pillToxicity < plan.nextMin, `按安全份数连服后丹毒 ${st2.flags.pillToxicity} 未越过 ${plan.nextMin}`);
+    // UI 已接线：弹窗读止损计划、按钮支持限份
+    ok(/batchToxicityPlan\(st, it\)/.test(uiSrc), '连服弹窗接入丹毒止损计划 batchToxicityPlan');
+    ok(/useItemBatch\(st, idx, limit\)/.test(uiSrc), '连服按钮支持限份服用（安全份数通道）');
+    ok(/只服 \$\{safe\} 份/.test(uiSrc), '连服弹窗给出「只服 N 份 · 不越线」按钮');
+    ok(/const safe = plan\.safeCount;/.test(uiSrc), '安全份数取自 batchToxicityPlan（不是拍脑袋的 pv.count）');
+    ok(/pv\.nextText/.test(uiSrc), '越线后果用分档表原文（早期笼统写「效率将大降」，把轻档说成重档）');
+  }
+
+  // ⑦ 宗门兑换所：第三个「付代价换物品」场景，兑换前同样要说清楚
+  {
+    const st = mkToxSt();
+    const h = S.sectExchangeItemHint(st, 'ex_heal');
+    ok(h && h.kind === 'dead' && h.warn === true, '无伤时兑换凝血丹会警示「此刻服用无效」');
+    st.flags.wounded = 2;
+    ok(S.sectExchangeItemHint(st, 'ex_heal') === null, '有伤时兑换凝血丹无警示');
+    ok(S.sectExchangeItemHint(st, 'ex_stones') === null, '灵石兑换非丹药，无服用提示');
+    ok(S.sectExchangeItemHint(st, 'not_exist') === null, '未知兑换条目返回 null');
+    ok(/sectExchangeItemHint\(st, e\.id\)/.test(uiSrc), '宗门兑换所已接入服用提示（与坊市/拍卖同口径）');
+    ok(/\.si-hint\b/.test(css), '样式表已定义 .si-hint 徽标（兑换所复用坊市同款）');
   }
 }
 

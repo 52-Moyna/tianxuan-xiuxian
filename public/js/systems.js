@@ -31,6 +31,7 @@ import {
   rollPillQuality, applyPillToxicity, pillSideEffect, beastPowerBonus, ensureBeastState,
   canTameBeast, BEAST_TEMPLATES, ensureSectState, SECT_RANKS, SECT_TASKS, SECT_STIPEND, sectCultivateBonus, SECT_EXCHANGE,
   ensureAuctionState, AUCTION_ITEMS_POOL, availableMysticRealms, MYSTIC_REALMS, SPECIAL_EVENTS,
+  TOX_LEVELS, toxMul, toxWinPenalty, toxLevelOf, toxCrisisLevel,
 } from './codex.js';
 
 /* ============================================================
@@ -541,9 +542,9 @@ export function cultivate(state, mode = 'normal') {
   const base = mode === 'seclusion' ? Rng.int(30, 55) : Rng.int(15, 30);
   // 宗门修炼加成
   const sectBonus = sectCultivateBonus(state);
-  // 丹毒影响修炼效率
+  // 丹毒影响修炼效率（系数单一真源 codex.TOX_LEVELS，禁止在此重写阈值）
   const toxic = Number(state.flags?.pillToxicity || 0);
-  const toxicMul = toxic >= 85 ? 0.55 : toxic >= 60 ? 0.75 : toxic >= 35 ? 0.9 : 1;
+  const toxicMul = toxMul(toxic);
   // 聚灵丹药力：未来若干月修炼效率提升（由 useItem 写入 flags.cultivateBoostMonths）
   const boostMul = (state.flags?.cultivateBoostMonths || 0) > 0 ? 1.15 : 1;
   const gain = Math.round(base * p.spiritRoot.speed * (1 + (state.cave.bonus || 0) + sectBonus) * grade.expMul * (1 + p.daoBase['根骨'].level / 200) * toxicMul * boostMul * arrayMul(state) * omenMul(state, 'cultivate'));
@@ -582,7 +583,7 @@ export function cultivateGainPreview(state, mode = 'normal') {
   const base = mode === 'seclusion' ? 42 : 22; // Rng.int(30,55)/Rng.int(15,30) 期望中点
   const sectBonus = sectCultivateBonus(state);
   const toxic = Number(state.flags?.pillToxicity || 0);
-  const toxicMul = toxic >= 85 ? 0.55 : toxic >= 60 ? 0.75 : toxic >= 35 ? 0.9 : 1;
+  const toxicMul = toxMul(toxic);   // 阈值与系数单一真源 codex.TOX_LEVELS，禁止在此重写
   const boostMul = (state.flags?.cultivateBoostMonths || 0) > 0 ? 1.15 : 1;
   const arrayMul = 1 + (state.cave?.arrayLevel || 0) * ARRAY_BONUS_PER_LEVEL;
   const rootMul = p.spiritRoot.speed;
@@ -649,13 +650,13 @@ export function lifespanWarning(state) {
 }
 
 /** 丹毒危机预警（纯函数，不修改状态；供状态卡展示）。
- *  level: 'danger' 剧毒攻心(≥85)、'warn' 丹毒累积(≥60)、'ok' 清净。
+ *  level: 'danger' 剧毒攻心、'warn' 丹毒累积、'ok' 清净。
+ *  阈值与「哪一档算危机」全部来自 codex.TOX_LEVELS（toxCrisisLevel），此处不写裸数字。
  *  hint 提醒减服毒性丹药，必要时服「解毒丹」化解丹毒。 */
 export function toxicityWarning(state) {
   const toxic = Number(state.flags?.pillToxicity || 0);
-  let level = 'ok', hint = '';
-  if (toxic >= 85) level = 'danger';
-  else if (toxic >= 60) level = 'warn';
+  const level = toxCrisisLevel(toxic);
+  let hint = '';
   const cures = level !== 'ok' ? detoxCureItems(state) : [];
   const best = cures[0] || null;
   if (level === 'danger') {
@@ -1338,9 +1339,10 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
     if (skill === '风刃突袭') apply(5, 'skill');
     else if (skill === '幻境迷心' && enemy && enemy.level > state.player.level) apply(8, 'skill');
   }
-  // 丹毒 / 伤势 惩罚
+  // 丹毒 / 伤势 惩罚（阈值与惩罚量单一真源 codex.TOX_LEVELS，与 resolveBattle 同口径）
   const toxic = Number(state.flags?.pillToxicity || 0);
-  if (toxic >= 85) apply(-10, 'toxic');
+  const toxPen = toxWinPenalty(toxic);
+  if (toxPen) apply(toxPen, 'toxic');
   const wounds = state.flags?.wounded || 0;
   if (wounds > 0) apply(-Math.min(15, wounds * 3), 'wound');
   if (tactic === 'aggro') apply(8, 'tactic');
@@ -1434,9 +1436,10 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
     if (act.skill === '风刃突袭') { finalRate = Math.min(95, finalRate + 5); logs.push(`「${act.name}」风刃突袭抢占先手，胜率 +5%。`); }
     else if (act.skill === '幻境迷心' && enemy.level > state.player.level) { finalRate = Math.min(95, finalRate + 8); logs.push(`「${act.name}」幻境迷心惑乱强敌，越级胜率 +8%。`); }
   }
-  // 丹毒过高降低胜率
+  // 丹毒过高降低胜率（阈值与惩罚量单一真源 codex.TOX_LEVELS）
   const toxic = Number(state.flags?.pillToxicity || 0);
-  if (toxic >= 85) { finalRate = Math.max(5, finalRate - 10); logs.push('丹毒深重，战力受限。'); }
+  const toxPen = toxWinPenalty(toxic);
+  if (toxPen) { finalRate = Math.max(5, finalRate + toxPen); logs.push('丹毒深重，战力受限。'); }
   // 伤势降低胜率（每月伤势 -3%，最高 -15%）
   const wounds = state.flags?.wounded || 0;
   if (wounds > 0) { const woundPen = Math.min(15, wounds * 3); finalRate = Math.max(5, finalRate - woundPen); logs.push(`伤势未愈，胜率 -${woundPen}%。`); }
@@ -3166,16 +3169,38 @@ export function itemUsePreview(state, it) {
  *  而批量最容易踩的坑是「一口气嗑到丹毒深重」，所以下肚之前必须先把
  *  颗数与丹毒代价摆出来。每份效果文本直接复用 itemUsePreview，与结算同口径。
  *  不可服用 / 当前服用无效 / 只剩一份时返回 null（无需批量入口）。 */
+/** 连服丹毒预算（纯函数、不改动 state）：算清「服到第几份会越过下一条警戒线」。
+ *  【为何存在】连服最大的坑是把丹毒一口气冲过 60/85 —— 修炼效率掉到 75%/55%、战斗胜率
+ *  -10%，而玩家按下「连服 20 份」前只看到「丹毒 0 → 120」这个抽象数字，没有止损点。
+ *  这里把安全份数算出来交给 UI 一键限量；阈值全部读 TOX_LEVELS，不写第二套。
+ *  safeCount=0：当前丹毒已在最高档，再服只会加深，不建议继续。 */
+export function batchToxicityPlan(state, it) {
+  const toxPer = (typeof it?.toxicity === 'number') ? it.toxicity : 0;
+  const toxNow = Number(state?.flags?.pillToxicity || 0);
+  const count = Math.max(1, Number(it?.数量) || 1);
+  const toxAfter = toxNow + toxPer * count;
+  if (toxPer <= 0) {
+    return { toxPer, toxNow, toxAfter: toxNow, count, safeCount: count, nextMin: null, nextText: '', overLine: false };
+  }
+  // 下一条尚未跨过的警戒线（TOX_LEVELS 降序，取离当前值最近的那条）
+  let nextMin = null; let nextText = '';
+  for (let i = TOX_LEVELS.length - 1; i >= 0; i -= 1) {
+    if (TOX_LEVELS[i].min > toxNow) { nextMin = TOX_LEVELS[i].min; nextText = TOX_LEVELS[i].text; break; }
+  }
+  const safeCount = nextMin == null ? 0 : Math.max(0, Math.floor((nextMin - 1 - toxNow) / toxPer));
+  return { toxPer, toxNow, toxAfter, count, safeCount, nextMin, nextText, overLine: safeCount < count };
+}
+
 export function useBatchPreview(state, it) {
   const pv = itemUsePreview(state, it);
   if (!pv || pv.mode !== 'use' || pv.usable === false) return null;
   const count = Math.max(1, Number(it?.数量) || 1);
   if (count < 2) return null;
-  const toxPer = (typeof it.toxicity === 'number') ? it.toxicity : 0;
-  const toxNow = Number(state?.flags?.pillToxicity || 0);
+  const plan = batchToxicityPlan(state, it);
   return {
     count, per: pv.text, label: pv.label,
-    toxPer, toxAdd: toxPer * count, toxNow, toxAfter: toxNow + toxPer * count,
+    toxPer: plan.toxPer, toxAdd: plan.toxPer * count, toxNow: plan.toxNow, toxAfter: plan.toxAfter,
+    safeCount: plan.safeCount, nextMin: plan.nextMin, nextText: plan.nextText, overLine: plan.overLine,
   };
 }
 
@@ -3219,15 +3244,17 @@ export function auctionItemHint(state, item) {
  *  【为何存在】批量最容易犯的错是「失效的那颗也被吃掉」—— 伤势已清还继续嗑疗伤丹、
  *  额度已满还继续服延寿丹、灵兽栏已满还继续吞契约。故这里逐颗走 useItem，
  *  完整复用它所有的 early return 守卫：只要某一颗没有被消耗掉，立刻停手，
- *  剩下的份数原样留在行囊，并把它「为何停下」的说明回传给玩家。 */
-export function useItemBatch(state, idx) {
+ *  剩下的份数原样留在行囊，并把它「为何停下」的说明回传给玩家。
+ *  limit（可选）：只服这么多份 —— 连服弹窗据此提供「只服到丹毒不越线」的安全选项。 */
+export function useItemBatch(state, idx, limit) {
   const it = state.items[idx];
   if (!it) return null;
   const logs = [];
   let used = 0;
   let stopMsg = '';
   const total = Math.max(1, Number(it.数量) || 1);
-  for (let k = 0; k < total; k += 1) {
+  const max = (typeof limit === 'number' && limit > 0) ? Math.min(total, limit) : total;
+  for (let k = 0; k < max; k += 1) {
     const curIdx = state.items.indexOf(it);
     if (curIdx < 0) break;
     const before = it.数量 || 1;
@@ -3669,6 +3696,19 @@ export function sectExchangeBlockReason(state, itemId) {
   const probe = { 名称: ex.item, 类型: '丹药', 数量: ex.qty || 1 };
   if (canStore(state, probe)) return null;
   return `储物袋空间不足，「${ex.item}」无处安放，请先出售杂物或扩容储物袋再行兑换。`;
+}
+
+/** 宗门兑换所「此刻换了能否起效」提示（纯函数，不消耗 RNG、不改动 state）。
+ *  【为何存在】兑换所是第三个「付代价换物品」场景（坊市 / 拍卖 / 宗门），前两个已各自
+ *  收口到 marketItemHint / auctionItemHint，这里此前完全没提示：玩家花 180 贡献换凝血丹
+ *  （当前无伤）、花 240 换凝神丹，回去一服不生效也不消耗 —— 贡献白扣。
+ *  同样复用 marketItemHint，与行囊置灰、useItem 结算严格同口径，不写第三套判定。 */
+export function sectExchangeItemHint(state, itemId) {
+  const ex = SECT_EXCHANGE.find((e) => e.id === itemId);
+  if (!ex || ex.type !== 'pill' || !ex.effect) return null;
+  return marketItemHint(state, {
+    名称: ex.item, 类型: '丹药', 数量: ex.qty || 1, effect: ex.effect, toxicity: ex.toxicity || 0,
+  });
 }
 
 /** 宗门兑换所：以宗门贡献兑换资源（确定性，无 RNG）。 */

@@ -609,13 +609,37 @@ export function rollPillQuality(artLevel, bonusFlags = {}) {
   return PILL_QUALITY[0];                         // 废品
 }
 
-/** 返回丹药副作用文案（丹毒过高时） */
+/** 丹毒分档 —— 全项目单一真源。
+ *  【为何存在】此前 35/60/85 三个阈值与其对应的修炼效率系数、战斗胜率惩罚被硬编码在五处
+ *  （codex: pillSideEffect 文案、systems: cultivate 结算、systems: cultivateGainPreview 预览、
+ *  systems: resolveBattle 结算、systems: previewBattle 预览），连服弹窗又写了一遍 60 ——
+ *  任何一处数值调整都会有地方对不上。现在结算侧与预览侧全部读这张表，改表即全改，
+ *  禁止再写裸数字阈值。降序排列。
+ *  crisis: 是否算「危机」（供危机预警横幅判定，轻档只提示不算危机）。 */
+export const TOX_LEVELS = [
+  { min: 85, level: 'danger', crisis: true, mul: 0.55, win: -10, text: '丹毒深重！修炼效率降至 55%，战斗胜率 -10%。请服用解毒丹或停止嗑药。' },
+  { min: 60, level: 'warn', crisis: true, mul: 0.75, win: 0, text: '丹毒累积，修炼效率降至 75%。建议服用解毒丹。' },
+  { min: 35, level: 'hint', crisis: false, mul: 0.9, win: 0, text: '体内略有丹毒淤积，修炼效率降至 90%。' },
+];
+/** 丹毒所处档位（纯函数，无档位返回 null） */
+export function toxLevelOf(toxic) {
+  const t = Number(toxic) || 0;
+  return TOX_LEVELS.find((l) => t >= l.min) || null;
+}
+/** 丹毒对修炼效率的系数（1 = 无影响）。结算（cultivate）与预览（cultivateGainPreview）共用。 */
+export function toxMul(toxic) { const lv = toxLevelOf(toxic); return lv ? lv.mul : 1; }
+/** 丹毒对战斗胜率的惩罚（0 或负数）。结算（resolveBattle）与预览（previewBattle）共用。 */
+export function toxWinPenalty(toxic) { const lv = toxLevelOf(toxic); return lv ? lv.win : 0; }
+/** 丹毒危机等级：'danger' / 'warn' / 'ok'（轻档与无丹毒均为 'ok'，供危机预警判定）。 */
+export function toxCrisisLevel(toxic) {
+  const lv = toxLevelOf(toxic);
+  return (lv && lv.crisis) ? lv.level : 'ok';
+}
+
+/** 返回丹药副作用文案（丹毒过高时）。判定与系数全部来自 TOX_LEVELS。 */
 export function pillSideEffect(state) {
-  const toxic = Number(state.flags?.pillToxicity || 0);
-  if (toxic >= 85) return { level: 'danger', text: '丹毒深重！修炼效率降至 55%，战斗胜率 -10%。请服用解毒丹或停止嗑药。' };
-  if (toxic >= 60) return { level: 'warn', text: '丹毒累积，修炼效率降至 75%。建议服用解毒丹。' };
-  if (toxic >= 35) return { level: 'hint', text: '体内略有丹毒淤积，修炼效率降至 90%。' };
-  return null;
+  const lv = toxLevelOf(state?.flags?.pillToxicity);
+  return lv ? { level: lv.level, text: lv.text } : null;
 }
 
 /** 服用丹药时累加丹毒，返回是否触发副作用 */
