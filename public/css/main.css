@@ -1042,6 +1042,13 @@ button { font-family: inherit; }
 /* 拍品额度角标：延寿丹/洗髓丹动辄上千灵石，落槌前先看还剩几颗额度 */
 .auc-quota { font-size: .68rem; color: var(--jade); border: 1px solid var(--jade-soft); border-radius: 999px; padding: 0 7px; margin-left: auto; }
 .auc-quota.full { color: #d98a82; border-color: rgba(190,80,70,.5); text-decoration: line-through; }
+/* 拍卖「落槌前说清楚」：此刻服用无效 / 时机自动消耗 / 装不下 / 灵石不足 */
+.auc-hint { font-size: .68rem; padding: 0 7px; border-radius: 999px; margin-left: 6px; cursor: help; }
+.auc-hint-dead { color: #e0916b; border: 1px solid rgba(224,145,107,.55); background: rgba(224,145,107,.12); }
+.auc-hint-auto { color: var(--text-dim); border: 1px solid var(--line-soft); background: rgba(255,255,255,.03); }
+.auction-warn { box-shadow: 0 0 0 1px rgba(224,145,107,.4) inset; }
+.auction-full { opacity: .6; }
+.auc-block { font-size: .78rem; color: #e0b06b; }
 @keyframes feedIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes aucIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes priceFlash { 0% { color: var(--danger); transform: scale(1.25); } 100% { color: inherit; transform: scale(1); } }

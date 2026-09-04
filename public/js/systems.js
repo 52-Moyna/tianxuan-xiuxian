@@ -3191,9 +3191,28 @@ export function marketItemHint(state, g) {
   const pv = itemUsePreview(state, g);
   if (pv.mode === 'auto') return { kind: 'auto', tag: '时机自动', text: pv.text, warn: false };
   if (pv.mode !== 'use') return null;
-  if (pv.usable === false) return { kind: 'dead', tag: '此刻服用无效', text: pv.text, warn: true };
-  if (pv.quota && pv.quota.taken > 0) return { kind: 'quota', tag: `已服 ${pv.quota.taken}/${pv.quota.max}`, text: pv.text, warn: false };
+  // quota 原样带出：拍卖页要显示「还能服几颗」，坊市只显示 tag，两处共用同一份口径
+  if (pv.usable === false) return { kind: 'dead', tag: '此刻服用无效', text: pv.text, warn: true, quota: pv.quota || null };
+  if (pv.quota && pv.quota.taken > 0) return { kind: 'quota', tag: `已服 ${pv.quota.taken}/${pv.quota.max}`, text: pv.text, warn: false, quota: pv.quota };
+  if (pv.quota) return { kind: 'quota', tag: `一生限 ${pv.quota.max} 颗`, text: pv.text, warn: false, quota: pv.quota };
   return null;
+}
+
+/** 拍卖拍品「此刻拍下能否起效」提示（纯函数，不消耗 RNG、不改动 state）。
+ *  【为何存在】拍卖是全场最贵的购买场景（延寿丹起拍 2000、洗髓丹 1500），拍下才发现
+ *  服不了是最贵的一种白扔。此前拍卖页只按丹名硬匹配额度（pillQuotaByName 只认
+ *  延寿/洗髓两个名字），与行囊置灰口径（itemUsePreview → useItem）是两套逻辑：
+ *  灵兽契约（灵兽栏已满）、聚灵阵旗（已有更强/更长增益）这类「非额度失效」完全没覆盖。
+ *  本函数把拍品映射成行囊物品形态后直接复用 marketItemHint，与 useItem 严格同口径。 */
+export function auctionItemHint(state, item) {
+  if (!item || !item.effect) return null;
+  return marketItemHint(state, {
+    名称: item.name,
+    类型: item.type || '杂物',
+    数量: 1,
+    effect: item.effect,
+    toxicity: (typeof item.toxicity === 'number') ? item.toxicity : 0,
+  });
 }
 
 /** 连续服用同一格物品，直到服完或「这一颗已无用」为止（真实改动 state）。

@@ -4194,7 +4194,10 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
     const h = S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } });
     ok(h && h.kind === 'quota' && h.warn === false && h.tag === '已服 1/3', '额度未满：只标余量不警示');
     st.player.lifespanPillsTaken = 0;
-    ok(S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } }) === null, '一颗未服：无需提示');
+    // 一颗未服也要标「一生限 3 颗」：这条硬约束玩家在掏钱前就该看到（拍卖页据此显示可再服几颗）
+    const h0 = S.marketItemHint(st, { 名称: '延寿丹', 类型: '丹药', effect: { lifespan: 20 } });
+    ok(h0 && h0.kind === 'quota' && h0.warn === false && h0.tag === '一生限 3 颗', '一颗未服：只标「一生限 3 颗」不警示');
+    ok(h0 && h0.quota && h0.quota.max === 3 && h0.quota.taken === 0, '额度余量随提示带出（供拍卖页显示可再服几颗）');
   }
   // ④ 自动消耗类：说清时机，别让玩家以为买了能主动嗑
   {
@@ -4247,6 +4250,98 @@ ok(codexEntries(state).some(c => c.id === 'pill_detox' && c.toxicity === -30), '
     ok(/marketItemHint\(/.test(src), 'ui.js 已接入 marketItemHint（购买页会显示服用提示）');
     const css = readFileSync(new URL('../public/css/main.css', import.meta.url), 'utf8');
     ok(/\.si-hint-dead\b/.test(css), '样式表已定义 .si-hint-dead 警示徽标');
+  }
+}
+
+/* ---------- 拍卖会「落槌前说清楚」auctionItemHint（2026-09-04）---------- */
+/* 【为何存在】拍卖是全场最贵的购买场景（延寿丹起拍 2000、洗髓丹 1500），拍下才发现服不了
+ * 是最贵的一种白扔。旧版拍卖页只按丹名硬匹配额度（pillQuotaByName 只认延寿/洗髓两个名字），
+ * 与行囊置灰口径（itemUsePreview → useItem）是两套逻辑：灵兽契约栏满、聚灵阵旗已有更长
+ * 增益这类「非额度失效」完全没有提示。现统一复用 marketItemHint，与结算严格同口径。 */
+{
+  const { readFileSync } = await import('node:fs');
+  const mkA = () => {
+    const st = S.createNewGame({ name: '拍卖', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 2, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+    ensureLifeState(st);
+    ensureBeastState(st);
+    st.flags = st.flags || {};
+    st.flags.wounded = 0;
+    st.flags.pillToxicity = 0;
+    return st;
+  };
+  const YANSHOU = { name: '延寿丹', type: '丹药', basePrice: 2000, rarity: '珍贵丹药', effect: { lifespan: 20 }, desc: '服之延寿。' };
+  const QIYUE = { name: '灵兽契约', type: '道具', basePrice: 800, rarity: '特殊道具', effect: { beastSlot: 1 }, desc: '驯兽凭证。' };
+  const ZHENQI = { name: '聚灵阵旗', type: '道具', basePrice: 200, rarity: '消耗品', effect: { cultivateBoostMonths: 1 }, desc: '下次修炼效率提升。' };
+
+  // ① 额度已满：两千灵石拍下却服不了 —— 落槌前必须先说清楚
+  {
+    const st = mkA();
+    st.player.lifespanPillsTaken = 3;
+    const h = S.auctionItemHint(st, YANSHOU);
+    ok(h && h.kind === 'dead' && h.warn === true, '延寿丹已服满：拍品标「此刻服用无效」并强警示');
+    ok(h && h.quota && h.quota.taken === 3 && h.quota.max === 3, '无效提示带出额度 3/3（UI 显示「已服满 · 再买无用」）');
+  }
+  // ② 额度未满：只标还能服几颗
+  {
+    const st = mkA();
+    st.player.lifespanPillsTaken = 1;
+    const h = S.auctionItemHint(st, YANSHOU);
+    ok(h && h.kind === 'quota' && h.warn === false && h.quota && h.quota.max === 3, '未服满：只标可再服几颗，不当作无效');
+  }
+  // ③ 灵兽契约：旧口径（按丹名匹配额度）完全覆盖不到的失效场景
+  {
+    const st = mkA();
+    st.beasts.maxSlots = S.BEAST_SLOT_CAP;
+    ok(S.auctionItemHint(st, QIYUE)?.kind === 'dead', '灵兽栏已满：灵兽契约标无效（此前拍卖页毫无提示）');
+    const st2 = mkA();
+    st2.beasts.maxSlots = 2;
+    ok(S.auctionItemHint(st2, QIYUE) === null, '灵兽栏未满：灵兽契约无需提示');
+  }
+  // ④ 聚灵阵旗：已有更长增益时拍下是零收益
+  {
+    const st = mkA();
+    st.flags.cultivateBoostMonths = 3;
+    ok(S.auctionItemHint(st, ZHENQI)?.kind === 'dead', '已有 3 月增益：1 月聚灵阵旗标无效');
+    const st2 = mkA();
+    ok(S.auctionItemHint(st2, ZHENQI) === null, '无增益时聚灵阵旗无需提示');
+  }
+  // ⑤ 不该提示的拍品：材料 / 法宝 / 空
+  {
+    const st = mkA();
+    ok(S.auctionItemHint(st, { name: '星砂', type: '材料', desc: '材料' }) === null, '材料类拍品不提示');
+    ok(S.auctionItemHint(st, { name: '青锋剑', type: '法宝', desc: '法宝' }) === null, '法宝类拍品不提示');
+    ok(S.auctionItemHint(st, null) === null, '空拍品不提示');
+  }
+  // ⑥ 元断言（最关键）：提示说「无效」的拍品，真拍下来服下去必须确实不消耗
+  {
+    const st = mkA();
+    st.player.lifespanPillsTaken = 3;
+    ok(S.auctionItemHint(st, YANSHOU)?.warn === true, '前置：延寿丹被判无效');
+    st.items.push({ 名称: '延寿丹', 类型: '丹药', 数量: 1, 描述: '延寿', effect: { lifespan: 20 } });
+    S.useItem(st, st.items.length - 1);
+    ok((st.items.find((i) => i.名称 === '延寿丹')?.数量 || 0) === 1, '标无效的延寿丹拍下服用确实不被消耗（提示与结算同口径）');
+    const st2 = mkA();
+    st2.beasts.maxSlots = S.BEAST_SLOT_CAP;
+    st2.items.push({ 名称: '灵兽契约', 类型: '道具', 数量: 1, 描述: '契约', effect: { beastSlot: 1 } });
+    S.useItem(st2, st2.items.length - 1);
+    ok((st2.items.find((i) => i.名称 === '灵兽契约')?.数量 || 0) === 1, '标无效的灵兽契约拍下服用确实不被消耗');
+  }
+  // ⑦ 满仓口径：UI 置灰判定必须与结算拦截一致（装备/法宝/功法不占格）
+  {
+    const st = mkA();
+    st.items = [{ 名称: '星砂', 类型: '材料', 数量: 1, 描述: '砂' }];
+    st.inventory.capacity = inventoryUsed(st); // 精确塞满（不能用 0，内部 ||100 会归一）
+    st.inventory.ringBonus = 0;
+    setStones(st, 100000);
+    ok(S.auctionBagBlockReason(st, YANSHOU) !== null, '满仓：丹药拍品被拦截');
+    ok(S.auctionBagBlockReason(st, { name: '青锋剑', type: '法宝' }) === null, '满仓：法宝入装备库，不占格');
+    ok(S.auctionBagBlockReason(st, { name: '残缺功法玉简', type: '功法' }) === null, '满仓：功法入功法栏，不占格');
+    const src = readFileSync(new URL('../public/js/ui.js', import.meta.url), 'utf8');
+    ok(/auctionBagBlockReason\(st, it\)/.test(src), '拍卖页满仓判定复用 auctionBagBlockReason（与结算同口径）');
+    ok(/auctionItemHint\(st, it\)/.test(src), '拍卖页已接入 auctionItemHint（落槌前显示服用提示）');
+    ok(!/pillQuotaByName\(st, it\.name\)/.test(src), '拍卖页不再按丹名硬匹配额度（旧口径只认延寿/洗髓两个名字）');
+    const css = readFileSync(new URL('../public/css/main.css', import.meta.url), 'utf8');
+    ok(/\.auc-hint-dead\b/.test(css), '样式表已定义 .auc-hint-dead 警示徽标');
   }
 }
 

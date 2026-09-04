@@ -1882,9 +1882,23 @@ async function flowMap() {
 }
 
 /* ---------------- 拍卖会 ---------------- */
-async function flowAuction() {
+export async function flowAuction(preset) {
   const st = GameState.data;
-  S.openAuction(st); // 整场拍卖只生成一次拍品，避免每次出价都重刷
+  // preset 供测试与复盘直接摆上指定拍品：否则整场拍卖只随机生成一次，避免每次出价都重刷
+  if (Array.isArray(preset) && preset.length) {
+    CX.ensureAuctionState(st);
+    st.auction.items = preset.map((it) => ({
+      currentBid: it.basePrice || 100, bidder: '起拍价',
+      buyout: Math.round((it.basePrice || 100) * 2),
+      rivalBudget: Math.round((it.basePrice || 100) * 1.5),
+      rivalName: '测试对手', ...it,
+    }));
+    st.auction.active = true;
+    st.auction.month = st.world.turns;
+    st.auction.bids = {};
+  } else {
+    S.openAuction(st);
+  }
   let done = false;
   const feed = [];
   const m = openModal(`
@@ -1902,24 +1916,46 @@ async function flowAuction() {
   };
   const renderList = () => {
     if (stonesEl) stonesEl.textContent = S.formatStones(st);
-    listEl.innerHTML = st.auction.items.length ? st.auction.items.map((it, i) => `
-      <div class="auction-item ${it._flash ? 'auction-rise' : ''}" data-i="${i}">
-        <div class="codex-name"><b>${it.name}</b> <span class="codex-rarity ${it.rarity}">${it.rarity}</span>${(() => {
-          // 额度类丹（延寿丹 3 / 洗髓丹 2）落槌前就摆明还剩几颗额度：
-          // 这类拍品动辄上千灵石，拍下才发现服不了是最贵的一种白扔。
-          const qh = S.pillQuotaByName(st, it.name);
-          return qh ? `<span class="auc-quota${qh.full ? ' full' : ''}" title="${qh.full ? qh.reason : `一生至多可服 ${qh.max} 颗`}">${qh.full ? `已服满 ${qh.taken}/${qh.max} · 再买无用` : `可再服 ${qh.left} 颗（已服 ${qh.taken}/${qh.max}）`}</span>` : '';
-        })()}</div>
+    // 落槌前就把三件事摆在台面上：此刻服用是否无效、储物袋装不装得下、灵石够不够。
+    // 口径全部取自结算侧同一批纯函数（auctionItemHint → marketItemHint → itemUsePreview → useItem、
+    // auctionBagBlockReason → canStore），不另写一套判定，免得提示与结算漂移。
+    const stones = S.totalStones(st);
+    const capNow = st.inventory.capacity || 100;
+    const usedNow = inventoryUsed(st);
+    listEl.innerHTML = st.auction.items.length ? st.auction.items.map((it, i) => {
+      const hint = S.auctionItemHint(st, it);
+      const noRoom = !!S.auctionBagBlockReason(st, it);
+      const lackBid = it.currentBid + 1 - stones;
+      const poorBid = lackBid > 0;
+      const poorBuyout = !!it.buyout && it.buyout > stones;
+      const blockBid = noRoom || poorBid;
+      const blockMsg = noRoom
+        ? `储物袋已满（${usedNow}/${capNow} 格），先清理或扩容再竞价`
+        : poorBid ? `灵石不足：至少需出 ${it.currentBid + 1}（尚缺 ${lackBid}）` : '';
+      // 额度徽标：延寿丹 3 / 洗髓丹 2 这类「一生 N 颗」拍品动辄上千灵石，
+      // 拍下才发现服不了是最贵的一种白扔 —— 连同「还能服几颗」一起写明。
+      const q = hint?.quota;
+      const qHtml = q
+        ? `<span class="auc-quota${q.taken >= q.max ? ' full' : ''}" title="${q.taken >= q.max ? '一生额度已服满，再买也无效' : `一生至多可服 ${q.max} 颗`}">${q.taken >= q.max ? `已服满 ${q.taken}/${q.max} · 再买无用` : `可再服 ${q.max - q.taken} 颗（已服 ${q.taken}/${q.max}）`}</span>`
+        : '';
+      const hHtml = hint && hint.kind !== 'quota'
+        ? `<span class="auc-hint auc-hint-${hint.kind}" title="${attr(hint.text)}">${hint.kind === 'dead' ? '此刻服用无效' : '时机自动消耗'}</span>`
+        : '';
+      return `
+      <div class="auction-item ${it._flash ? 'auction-rise' : ''}${hint && hint.warn ? ' auction-warn' : ''}${noRoom ? ' auction-full' : ''}" data-i="${i}">
+        <div class="codex-name"><b>${it.name}</b> <span class="codex-rarity ${it.rarity}">${it.rarity}</span>${qHtml}${hHtml}</div>
         <div class="codex-effect">${it.desc}</div>
         <div class="codex-source">起拍价：${it.basePrice} 灵石 ｜ 当前价：<span class="auc-price">${it.currentBid}</span>（${it.bidder}）</div>
         <div class="auction-rival">对手「${it.rivalName}」心理价位约 <b>${it.rivalBudget}</b> 灵石${it.buyout ? ` ｜ 一口价 <b class="auc-buyout">${it.buyout}</b>` : ''}</div>
+        ${blockMsg ? `<div class="auc-block">${blockMsg}</div>` : ''}
         <div class="auction-bid">
-          <input type="number" placeholder="出价" min="${it.currentBid + 1}" id="bid-${i}">
-          <button class="btn btn-sm btn-gold" data-bid="${i}">竞价</button>
-          ${it.buyout ? `<button class="btn btn-sm" data-buyout="${i}" title="以一口价直接拿下，对手不再竞价">一口价</button>` : ''}
+          <input type="number" placeholder="出价" min="${it.currentBid + 1}" id="bid-${i}" ${blockBid ? 'disabled' : ''}>
+          <button class="btn btn-sm ${blockBid ? '' : 'btn-gold'}" data-bid="${i}" ${blockBid ? `disabled title="${attr(blockMsg)}"` : ''}>竞价</button>
+          ${it.buyout ? `<button class="btn btn-sm" data-buyout="${i}" ${(poorBuyout || noRoom) ? `disabled title="${attr(noRoom ? blockMsg : `灵石不足：一口价需 ${it.buyout}`)}"` : 'title="以一口价直接拿下，对手不再竞价"'}>一口价</button>` : ''}
           <button class="btn btn-sm text-btn" data-withdraw="${i}">放弃（流拍）</button>
         </div>
-      </div>`).join('') : '<div class="opt-desc">所有拍品已成交或流拍，拍卖会圆满收场。</div>';
+      </div>`;
+    }).join('') : '<div class="opt-desc">所有拍品已成交或流拍，拍卖会圆满收场。</div>';
     listEl.querySelectorAll('[data-bid]').forEach((b) => b.addEventListener('click', () => onBid(Number(b.dataset.bid))));
     listEl.querySelectorAll('[data-buyout]').forEach((b) => b.addEventListener('click', () => onBuyout(Number(b.dataset.buyout))));
     listEl.querySelectorAll('[data-withdraw]').forEach((b) => b.addEventListener('click', () => onWithdraw(Number(b.dataset.withdraw))));

@@ -490,6 +490,55 @@ try {
     UI.renderAll(); await sleep(120);
   } catch (e) { ok(false, `行囊失效按钮: ${e.message}`); }
 
+  // —— 拍卖会：落槌前说清楚（此刻服用无效 / 装不下 / 灵石不足）——
+  // 元断言性质：断言的是「界面真的把这些话摆出来了」，而不只是源码里写过这个函数。
+  try {
+    const SS2 = await import(pathToFileURL(join(ROOT, 'public/js/systems.js')).href);
+    const LX2 = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const st8 = GameState.data;
+    LX2.ensureLifeState(st8);
+    st8.player.lifespanPillsTaken = 3;
+    st8.beasts = st8.beasts || { slots: [], maxSlots: 1, tamedCount: 0 };
+    st8.beasts.maxSlots = SS2.BEAST_SLOT_CAP;
+    st8.items = [{ 名称: '星砂', 类型: '材料', 数量: 1, 描述: '砂' }];
+    st8.inventory.capacity = LX2.inventoryUsed(st8); // 精确塞满
+    st8.inventory.ringBonus = 0;
+    // 只留 100 灵石：够看不能买，用来验证「尚缺多少」
+    st8.currencies = st8.currencies || {};
+    for (const k of Object.keys(st8.currencies)) st8.currencies[k] = 0;
+    LX2.lifeAddStones(st8, 100);
+    const preset = [
+      { name: '延寿丹', type: '丹药', basePrice: 2000, rarity: '珍贵丹药', effect: { lifespan: 20 }, desc: '服之延寿。' },
+      { name: '灵兽契约', type: '道具', basePrice: 800, rarity: '特殊道具', effect: { beastSlot: 1 }, desc: '驯兽凭证。' },
+      { name: '星砂', type: '材料', basePrice: 150, rarity: '稀有材料', desc: '高阶炼器材料。' },
+      // 法宝入装备库不占行囊格：满仓时它该说的是「灵石不足」而不是「装不下」
+      { name: '青锋剑', type: '法宝', basePrice: 3000, rarity: '法宝', desc: '等级 ×2 计入战力。' },
+    ];
+    const flow = UI.flowAuction(preset);
+    await sleep(360);
+    const listEl = $('#auction-list');
+    const rows = listEl ? [...listEl.querySelectorAll('.auction-item')] : [];
+    const rowOf8 = (nm) => rows.find((r) => r.textContent.includes(nm));
+    ok(rows.length === 4, `拍卖页渲染出 4 件指定拍品（实际 ${rows.length}）`);
+    const ys = rowOf8('延寿丹');
+    ok(!!ys && /auc-hint-dead/.test(ys.innerHTML), '延寿丹已服满：拍卖页标「此刻服用无效」');
+    ok(!!ys && /已服满 3\/3/.test(ys.textContent), '额度角标写明已服满 3/3 · 再买无用');
+    const qy = rowOf8('灵兽契约');
+    ok(!!qy && /auc-hint-dead/.test(qy.innerHTML), '灵兽栏已满：灵兽契约标无效（旧口径按丹名匹配，覆盖不到）');
+    // 灵石不足：法宝不占行囊格，满仓时它该说的是「灵石不足、尚缺多少」
+    const jian = rowOf8('青锋剑');
+    ok(!!jian && /灵石不足/.test(jian.textContent) && /尚缺/.test(jian.textContent), '买不起时写明灵石不足与尚缺数额');
+    const bidJian = jian ? jian.querySelector('[data-bid]') : null;
+    ok(!!bidJian && bidJian.disabled, '买不起：竞价按钮置灰（点了必定被拒）');
+    const sha = rowOf8('星砂');
+    ok(!!sha && /储物袋已满/.test(sha.textContent), '满仓：占格拍品写明储物袋已满');
+    const bidSha = sha ? sha.querySelector('[data-bid]') : null;
+    ok(!!bidSha && bidSha.disabled, '满仓：竞价按钮置灰（免得竞价半天才发现装不下）');
+    const leave = $('#btn-leave-auction');
+    if (leave) leave.click();
+    await Promise.race([flow, sleep(2500)]);
+  } catch (e) { ok(false, `拍卖落槌前提示: ${e.message}`); }
+
 } catch (e) {
   console.log('运行异常：', e.stack || e.message); fail++;
 } finally {
