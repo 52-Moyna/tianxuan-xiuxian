@@ -240,21 +240,21 @@ export const CODEX_ITEMS = [
   { id: 'artifact_qiankun_ding', category: '法宝', name: '乾坤鼎', rarity: '高阶法宝', source: '天命、丹道终局、上古遗府', effect: '炼丹、炼器和高阶材料转化效率提升。' },
 // 二、丹药（含瓶颈专属丹 + 商店丹）
   // ================================================================
-  { id: 'pill_qi', category: '丹药', name: '聚气丹', rarity: '消耗品', source: '坊市、炼丹', effect: '服用后修为 +80；连续服用会产生丹毒。', toxicity: 8 },
-  { id: 'pill_heal', category: '丹药', name: '凝血丹', rarity: '消耗品', source: '坊市、炼丹、道友回礼', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
+  { id: 'pill_qi', category: '丹药', name: '聚气丹', rarity: '消耗品', source: '坊市、炼丹、宗门兑换（贡献 150）', effect: '服用后修为 +80；连续服用会产生丹毒。', toxicity: 8 },
+  { id: 'pill_heal', category: '丹药', name: '凝血丹', rarity: '消耗品', source: '坊市、炼丹、道友回礼、宗门兑换（贡献 180）', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
   { id: 'pill_ningyuan', category: '丹药', name: '凝元丹', rarity: '消耗品', source: '百艺炼丹（妖兽灵草）', effect: '服用后修为 +100；连续服用会产生丹毒。', toxicity: 8 },
   { id: 'pill_shougu', category: '丹药', name: '兽骨续命丹', rarity: '消耗品', source: '百艺炼丹（妖兽兽骨）', effect: '立即清除全部伤势；无毒副作用。', toxicity: 0 },
   { id: 'pill_foundation', category: '丹药', name: '筑基丹', rarity: '关键丹药', source: '坊市、炼丹、天命', effect: '筑基渡劫成功率 +20%；仅在对应瓶颈消耗。', toxicity: 3 },
   // source 只写真实存在的产出路径：此前写的「秘境」在秘境奖励池中查无此物，玩家照图鉴去刷会白跑
   { id: 'pill_lifespan', category: '丹药', name: '延寿丹', rarity: '珍贵丹药', source: '丹炉炼制（金丹期以上，需露华玉液）、拍卖会', effect: '服用后寿元上限 +20 年；一生最多服用 3 颗。', toxicity: 15 },
-  { id: 'pill_marrow', category: '丹药', name: '洗髓丹', rarity: '珍贵丹药', source: '炼丹（筑基期以上）、天命', effect: '服用后随机提升「根骨/道心」之一 5~10 级；一生最多服用 2 颗。', toxicity: 20 },
-  { id: 'pill_breakthrough', category: '丹药', name: '破境丹', rarity: '关键丹药', source: '丹炉炼制（金丹期以上）', effect: '服用后立即获得大量修为经验，可能直接突破一级。', toxicity: 25 },
+  { id: 'pill_marrow', category: '丹药', name: '洗髓丹', rarity: '珍贵丹药', source: '炼丹（筑基期以上）、天命、拍卖会', effect: '服用后随机提升「根骨/道心」之一 5~10 级；一生最多服用 2 颗。', toxicity: 20 },
+  { id: 'pill_breakthrough', category: '丹药', name: '破境丹', rarity: '关键丹药', source: '丹炉炼制（金丹期以上）、岭南百越坊市', effect: '服用后立即获得大量修为经验，可能直接突破一级。', toxicity: 25 },
   { id: 'pill_mind', category: '丹药', name: '神识丹', rarity: '消耗品', source: '炼丹、坊市（元婴期以上）', effect: '服用后悟性经验增加；连续服用会产生丹毒。', toxicity: 10 },
   { id: 'pill_mana', category: '丹药', name: '法力丹', rarity: '消耗品', source: '炼丹、坊市', effect: '服用后下次战斗胜率 +5%；战斗后失效。', toxicity: 6 },
   { id: 'pill_detox', category: '丹药', name: '解毒丹', rarity: '消耗品', source: '炼丹、岭南百越坊市', effect: '服用后丹毒 -30；是连续嗑药的必备解药。', toxicity: -30 },
   { id: 'pill_tribulation', category: '丹药', name: '渡劫丹', rarity: '关键丹药', source: '坊市、炼丹', effect: '渡劫时服用，成功率 +15%；品质影响加成幅度。', toxicity: 5 },
   { id: 'pill_gather_spirit', category: '丹药', name: '聚灵丹', rarity: '消耗品', source: '丹炉炼制（炼气期 / 炼丹百艺）', effect: '服用后修为 +200，并令未来 2 月修炼效率提升；连续服用会产生丹毒。', toxicity: 6 },
-  { id: 'pill_concentrate', category: '丹药', name: '凝神丹', rarity: '消耗品', source: '丹炉炼制（筑基期 / 炼丹百艺小成）', effect: '服用后悟性经验 +120；连续服用会产生丹毒。', toxicity: 10 },
+  { id: 'pill_concentrate', category: '丹药', name: '凝神丹', rarity: '消耗品', source: '丹炉炼制（筑基期 / 炼丹百艺小成）、宗门兑换（贡献 240）', effect: '服用后悟性经验 +120；连续服用会产生丹毒。', toxicity: 10 },
   { id: 'pill_ninghuo', category: '丹药', name: '凝火丹', rarity: '高阶丹药', source: '丹炉炼制（需凝火奇实·灵草杂交）', effect: '服用后修为 +320，未来 1 月修炼效率提升；连续服用会产生丹毒。', toxicity: 12 },
   { id: 'pill_yanlu', category: '丹药', name: '炎玉丹', rarity: '高阶丹药', source: '丹炉炼制（需炎玉灵枣·灵草杂交）', effect: '服用后随机提升「根骨/道心」之一 4~8 级；连续服用会产生丹毒。', toxicity: 16 },
   { id: 'pill_yuhua', category: '丹药', name: '玉华丹', rarity: '圣品丹药', source: '丹炉炼制（需玉华灵髓·灵草杂交）', effect: '服用后随机提升「悟性/气运」之一 5~10 级；连续服用会产生丹毒。', toxicity: 18 },
@@ -273,7 +273,7 @@ export const CODEX_ITEMS = [
   { id: 'item_pelt_talisman', category: '道具', name: '兽皮护符', rarity: '消耗品', source: '百艺制符（妖兽皮毛）', effect: '下一次战斗失败时减轻损失（修为不跌、灵石不减）。' },
   { id: 'item_flag', category: '道具', name: '聚灵阵旗', rarity: '消耗品', source: '百艺阵法、拍卖会', effect: '下次修炼效率提升（+15%，持续1月）。' },
   { id: 'item_tame_incense', category: '道具', name: '驭兽香', rarity: '消耗品', source: '东荒坊市、御兽百艺', effect: '提高下一次收服灵兽的成功率 +20%。' },
-  { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
+  { id: 'item_relic_map', category: '道具', name: '海上遗府残图', rarity: '线索', source: '海外坊市、游历、道缘、拍卖会', effect: '集齐 3 张残图后开启一次遗府探索，必得高阶法宝。' },
   { id: 'item_sea_pass', category: '道具', name: '海岛通行令', rarity: '消耗品', source: '北冥瀚海坊市', effect: '降低海外遗府探索的费用 20%。' },
   { id: 'item_beast_contract', category: '道具', name: '灵兽契约', rarity: '特殊道具', source: '收服灵兽后自动获赠；拍卖会亦有出售', effect: '服用可拓宽灵兽栏（上限 +1，至多 6 栏）；亦是收服灵兽后获赠的驯兽凭证，见证你与灵兽的羁绊。' },
   { id: 'item_travel_pass', category: '道具', name: '旅行凭证', rarity: '消耗品', source: '坊市、宗门任务奖励', effect: '下次跨域旅行费用减半。' },
@@ -282,7 +282,7 @@ export const CODEX_ITEMS = [
   { id: 'item_simple_flag', category: '道具', name: '简易阵旗', rarity: '消耗品', source: '阵师道友敬赠、阵法百艺', effect: '战场布成临时护阵，下一次战斗失败时替你挡去重伤与失财。' },
   { id: 'item_bug_powder', category: '道具', name: '驱虫粉', rarity: '消耗品', source: '岭南百越坊市', effect: '降低雨林探索风险，防止毒虫侵扰。' },
   { id: 'item_tame_food', category: '道具', name: '驯兽口粮', rarity: '消耗品', source: '百艺御兽', effect: '提高下一次收服灵兽成功率 +15%；可用妖兽内丹+灵草炼制。' },
-  { id: 'item_fire_guide', category: '道具', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
+  { id: 'item_fire_guide', category: '道具', name: '地火引', rarity: '消耗品', source: '南明离火域坊市、火焰谷秘境', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
 
   // ================================================================
   // 四、容器（储物袋系列）
@@ -295,14 +295,14 @@ export const CODEX_ITEMS = [
   // 五、材料（通用类型 + 区域特产 + 战利品）
   // ================================================================
   // 通用材料类型
-  { id: 'mat_wolf_core', category: '材料', name: '青风狼内丹', rarity: '材料', source: '东荒妖兽战利品', effect: '炼丹主药，也可出售换灵石。' },
-  { id: 'mat_copper', category: '材料', name: '赤铜精', rarity: '材料', source: '南明离火域坊市', effect: '炼器辅材，火属性法器偏爱；地火套装组件。' },
-  { id: 'mat_ice_paper', category: '材料', name: '冰魄符纸', rarity: '材料', source: '西极玄冰域坊市', effect: '制符与阵法通用材料。' },
-  { id: 'mat_sea_pearl', category: '材料', name: '海灵珠', rarity: '材料', source: '北冥瀚海坊市', effect: '炼丹、阵法与地图旅行均可使用；海行套装组件。' },
-  { id: 'mat_herb', category: '材料', name: '百越灵草', rarity: '材料', source: '岭南百越坊市、采集', effect: '炼丹主药，灵植师最喜欢的材料。' },
+  { id: 'mat_wolf_core', category: '材料', name: '青风狼内丹', rarity: '材料', source: '东荒妖兽战利品、东荒坊市', effect: '炼丹主药，也可出售换灵石。' },
+  { id: 'mat_copper', category: '材料', name: '赤铜精', rarity: '材料', source: '南明离火域坊市、火焰谷秘境', effect: '炼器辅材，火属性法器偏爱；地火套装组件。' },
+  { id: 'mat_ice_paper', category: '材料', name: '冰魄符纸', rarity: '材料', source: '西极玄冰域坊市、青虚秘境、冰海遗迹', effect: '制符与阵法通用材料。' },
+  { id: 'mat_sea_pearl', category: '材料', name: '海灵珠', rarity: '材料', source: '北冥瀚海坊市、海上遗府秘境', effect: '炼丹、阵法与地图旅行均可使用；海行套装组件。' },
+  { id: 'mat_herb', category: '材料', name: '百越灵草', rarity: '材料', source: '岭南百越坊市、采集、青虚秘境', effect: '炼丹主药，灵植师最喜欢的材料。' },
   { id: 'mat_lingzhi', category: '材料', name: '百年灵芝', rarity: '材料', source: '百艺灵植、采集', effect: '炼丹主药，也可在坊市出售。' },
-  { id: 'mat_star_sand', category: '材料', name: '星砂', rarity: '稀有材料', source: '海外仙岛坊市', effect: '高阶炼器与法宝修复材料；星辉套装组件。' },
-  { id: 'mat_fire_guide', category: '材料', name: '地火引', rarity: '消耗品', source: '南明离火域坊市', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
+  { id: 'mat_star_sand', category: '材料', name: '星砂', rarity: '稀有材料', source: '海外仙岛坊市、冰海遗迹、海上遗府秘境、拍卖会', effect: '高阶炼器与法宝修复材料；星辉套装组件。' },
+  { id: 'mat_fire_guide', category: '材料', name: '地火引', rarity: '消耗品', source: '南明离火域坊市、火焰谷秘境', effect: '百艺配方制作时额外产出 1 件（自动消耗）；地火套装组件。' },
   { id: 'mat_voyage_pass', category: '材料', name: '远航凭证', rarity: '消耗品', source: '北冥瀚海坊市', effect: '下次跨域旅行费用减半；海行套装组件。' },
   // 材料大类（妖兽掉落通用名）
   { id: 'mat_yaodan', category: '材料', name: '妖丹', rarity: '材料', source: '妖兽战利品（各妖兽掉落专属内丹，如青风狼内丹；通用妖丹为旧称，现已不再掉落）', effect: '妖兽精华内丹，可出售。' },

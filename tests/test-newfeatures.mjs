@@ -1,5 +1,5 @@
 import * as S from '../public/js/systems.js';
-import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus } from '../public/js/life.js';
+import { ensureLifeState, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, findHerbHybrid, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_SPRING_LEVEL, HERB_IRRIGATE_YIELD_CAP, growHerbs, omenActive, omenMul, omenAdd, refinePill, settleRefine, decayPillToxicity, isRecipeUnlocked, alchemySlots, refineRate, storeItem, inventoryUsed, REGION_TRAVEL, REGION_MARKET, beastLevelRange, beastPowerOfLevel, startTravel, travelOptions, travelCost, ART_RECIPES, upgradeHerbSpring, HERB_SPRING_MAX, HERB_SPRING_COST_BASE, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, ARRAY_GROWTH_EVERY, ARRAY_GROWTH_MAX, herbMonthlyGrowth, herbArrayGrowth, storeItemOrNote, regionSellBonus, pillRefund, PILL_REFUND_RATE, PILL_REFUND_STONE_RATE } from '../public/js/life.js';
 import { DIVINATION, PILL_RECIPES, HERB_HYBRIDS, HERB_HYBRID_COST, DESTINY_LINES, HERB_TYPES, CURRENCIES } from '../public/js/data.js';
 import { achievementView, checkAchievements, codexEntries, ownedEquipPower, activeSetBonuses, setBonusFlags, SET_BONUSES, beastPowerBonus, ensureBeastState, canTameBeast, availableMysticRealms, SECT_EXCHANGE, AUCTION_ITEMS_POOL, ACHIEVEMENTS, ACH_MILESTONE_IDS, ACH_BASE_TOTAL, claimAllAchievements,
   TOX_LEVELS, toxLevelOf, toxMul, toxWinPenalty, toxCrisisLevel } from '../public/js/codex.js';
@@ -377,12 +377,15 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   const enemy = { name: '试炼傀儡', realm: '练气', level: 10, power: 500 };
   const pv0 = S.previewBattle(mk(), enemy, 'shengci', 'normal', false).finalRate;
   const pv1 = S.previewBattle(mk(), enemy, 'shengci', 'normal', true).finalRate;
-  ok(pv1 === Math.min(95, pv0 + 10), `天命加持使预估胜率 +10%（${pv0}→${pv1}）`);
+  // 阈值一律取常量：此前 50 / +10 硬编码散落五处（结算、预览、UI 三处文案与置灰判定），
+  // 测试若也写死 50，就等于把「数值恰好一致」当成契约 —— 改常量时测试全绿、UI 却谎报。
+  ok(S.BLESS_COST > 0 && S.BLESS_WIN_BONUS > 0, `天命加持常量已导出（耗 ${S.BLESS_COST} 灵石 / 胜率 +${S.BLESS_WIN_BONUS}%）`);
+  ok(pv1 === Math.min(95, pv0 + S.BLESS_WIN_BONUS), `天命加持使预估胜率 +${S.BLESS_WIN_BONUS}%（${pv0}→${pv1}）`);
   const g1 = mk();
   const before = S.totalStones(g1);
-  // 用 qiecuo（切磋）：胜败均不增减灵石，故唯一灵石变动即天命加持 -50，结论与掷骰无关
+  // 用 qiecuo（切磋）：胜败均不增减灵石，故唯一灵石变动即天命加持 -BLESS_COST，结论与掷骰无关
   const rep = S.resolveBattle(g1, enemy, 'qiecuo', false, 'normal', true);
-  ok(S.totalStones(g1) === before - 50, '天命加持消耗 50 灵石（总量守恒，按阶重分）');
+  ok(S.totalStones(g1) === before - S.BLESS_COST, `天命加持消耗 ${S.BLESS_COST} 灵石（总量守恒，按阶重分）`);
   ok(rep.logs.some((l) => l.includes('天命加持')), '战报含天命加持文案');
   // 灵石不足：刻意置总量为 10（清空各阶后仅留下品 10）
   const g2 = mk(); g2.currencies = { '下品灵石': 10, '中品灵石': 0, '上品灵石': 0 };
@@ -390,6 +393,26 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   const rep2 = S.resolveBattle(g2, enemy, 'qiecuo', false, 'normal', true);
   ok(S.totalStones(g2) === before2, '灵石不足时天命加持不扣灵石');
   ok(rep2.logs.some((l) => l.includes('灵石不足')), '灵石不足提示正确');
+  /* 门槛边界：canBless 是 UI 置灰与结算扣款的共用判定。
+   * 卡在 COST-1 与 COST 两个点上逐一验证「两侧结论相反」，任何一侧漂移都会被抓住 ——
+   * 这正是家族型缺陷 #4（UI 门槛与结算不一致）的钉死方式。
+   * 【场景必须压低胜率】毒丸验证时踩过一次假绿灯：同阶同战力下基础胜率已顶到 95 上限，
+   * 加持的 +N% 被 clamp 吃掉，于是「钱不够却仍给加成」的缺陷完全测不出来。
+   * 故先断言场景胜率远离上限，再比对门槛两侧。 */
+  const mkWeak = () => { const g = mk(); g.player.power = 100; return g; }; // 战力远逊 → 基础胜率低
+  const gEdge1 = mkWeak(); setStones(gEdge1, S.BLESS_COST - 1);
+  const gEdge2 = mkWeak(); setStones(gEdge2, S.BLESS_COST);
+  ok(S.canBless(gEdge1) === false, `总资产 ${S.BLESS_COST - 1} 时 canBless 为假`);
+  ok(S.canBless(gEdge2) === true, `总资产 ${S.BLESS_COST} 时 canBless 为真`);
+  const pvEdge0 = S.previewBattle(gEdge1, enemy, 'qiecuo', 'normal', false).finalRate;
+  ok(pvEdge0 + S.BLESS_WIN_BONUS < 95, `场景胜率 ${pvEdge0}% 未被 95 上限截断（否则门槛断言会被 clamp 掩盖成假绿灯）`);
+  const pvEdge1 = S.previewBattle(gEdge1, enemy, 'qiecuo', 'normal', true).finalRate;
+  ok(pvEdge1 === pvEdge0, '钱差一块时预览不再虚增胜率（预览与结算同门槛）');
+  const beforeE = S.totalStones(gEdge1);
+  S.resolveBattle(gEdge1, enemy, 'qiecuo', false, 'normal', true);
+  ok(S.totalStones(gEdge1) === beforeE, '钱差一块时结算不扣灵石（与 canBless 同门槛）');
+  const pvEdge2 = S.previewBattle(gEdge2, enemy, 'qiecuo', 'normal', true).finalRate;
+  ok(pvEdge2 === pvEdge0 + S.BLESS_WIN_BONUS, `正好够钱时预览给出 +${S.BLESS_WIN_BONUS}%（${pvEdge0}→${pvEdge2}）`);
 }
 
 /* ---------- R7：道友援护（心腹/道侣级临阵相助） ---------- */
@@ -877,6 +900,61 @@ ok(!upPoor.ok && state.beasts.slots[state.beasts.slots.length - 1].star === 1, '
   ok(d.items.find((x) => x.名称 === '海灵珠').数量 >= dPearlBefore - 1, '废丹退还部分海灵珠（可逆惩罚）');
   ok(d.cave.alchemy.length === 0, '失败结算后丹炉清空');
   ok((d.flags.pillToxicity || 0) === 0, '失败无丹毒');
+
+  /* ---------- 炸炉代价明细（pillRefund）：「说的」必须等于「给的」 ----------
+   * 退还规则是「每味材料退 floor(数量×0.5)」，于是只投 1 份的材料退还 0 份＝全额损失。
+   * 这条规则此前只埋在 settleRefine 内部，玩家开炉前只能看到成丹率、看不到代价：
+   * 攒齐「露华玉液×1 ＋ 月华露×2 ＋ 玉髓芝×2」、花 320 灵石炼延寿丹，一旦炸炉，
+   * 最贵也最难得的露华玉液无声蒸发，日志里只有一句「化为废丹」。
+   * 抽成纯函数后，结算与丹炉面板共用同一张表；测试盯的是两张嘴说不说一样的话。 */
+  {
+    const pr = pillRefund('凝血丹');
+    ok(!!(pr && pr.refund && pr.lost && typeof pr.stoneBack === 'number'), 'pillRefund 返回完整结构（refund/lost/stoneBack/hasLoss）');
+    ok(Object.keys(pr.refund).length === 0, '凝血丹两味各 1 份 → 无退还（floor(1×0.5)=0）');
+    ok(pr.lost['百年灵芝'] === 1 && pr.lost['青风狼内丹'] === 1, '单份材料全额计入失败损失');
+    ok(pr.hasLoss === true, 'hasLoss 为真（丹炉面板据此出红色警示）');
+    const pr2 = pillRefund('聚气丹');
+    // 数额一律按常量推导，不写死 —— 写死就等于把「数值恰好一致」当契约，改表时测试全绿而 UI 谎报。
+    const back2 = Math.floor(2 * PILL_REFUND_RATE), back1 = Math.floor(1 * PILL_REFUND_RATE);
+    ok(pr2.refund['百越灵草'] === (back2 || undefined) && pr2.lost['百越灵草'] === 2 - back2, `2 份材料退 ${back2} 损 ${2 - back2}`);
+    ok(pr2.refund['海灵珠'] === (back1 || undefined) && pr2.lost['海灵珠'] === 1 - back1, `1 份材料退 ${back1} 损 ${1 - back1}（最容易被悄悄吞掉的一味）`);
+    ok(pr2.stoneBack === Math.floor(PILL_RECIPES.聚气丹.stoneCost * PILL_REFUND_STONE_RATE), `灵石按 ${PILL_REFUND_STONE_RATE} 退还（${PILL_RECIPES.聚气丹.stoneCost}→${pr2.stoneBack}）`);
+    ok(PILL_REFUND_RATE > 0 && PILL_REFUND_RATE < 1 && PILL_REFUND_STONE_RATE > 0 && PILL_REFUND_STONE_RATE < 1,
+      `退还比例已导出且在 (0,1) 区间（材料 ${PILL_REFUND_RATE} / 灵石 ${PILL_REFUND_STONE_RATE}）`);
+    ok(back1 === 0, '退还比例 <1 ⇒ 只投 1 份的材料退还为 0（这是藏得最深的一刀：稀有材料无声蒸发）');
+    ok(pillRefund('不存在的丹') === null, '未知丹方返回 null（调用方可兜底）');
+
+    /* 元断言：逐个丹方对账「面板声明的代价」与「结算真扣掉的量」。
+     * 这是本收口的全部意义 —— 只改一侧（改了退还规则却忘了 UI，或反过来）立刻报红。
+     * 全部用常量与 pillRefund 推导，不写死任何数字，否则等于把「恰好一致」当契约。 */
+    const ids = Object.keys(PILL_RECIPES);
+    const mismatched = [];
+    for (const id of ids) {
+      const r = PILL_RECIPES[id];
+      const w = S.createNewGame({ name: '炸炉对账', gender: '男', raceId: 'human', ageId: 'young', regionId: 'zhongzhou', packId: 1, yunId: 'qihuo', spiritRoot: S.rollSpiritRoot() });
+      ensureLifeState(w);
+      w.player.level = 99; w.sect = { rank: 9 }; // 全丹方解锁，避免被解锁门槛跳过
+      w.inventory.capacity = 9999; w.inventory.ringBonus = 0; // 退还材料必须入得了袋，否则对账被满仓污染
+      setStones(w, 5000);
+      for (const [n, c] of Object.entries(r.need)) storeItem(w, { 名称: n, 类型: '材料', 数量: c, 描述: '对账材料', 价值: 5 });
+      const before = {};
+      for (const n of Object.keys(r.need)) before[n] = w.items.find((x) => x.名称 === n)?.数量 || 0;
+      const stoneBefore = S.totalStones(w);
+      const opened = refinePill(w, id);
+      if (!opened.ok) { mismatched.push(`${id}:开炉被拒(${opened.logs[0]})`); continue; }
+      settleRefine(w, [], 'fail');
+      const plan = pillRefund(id);
+      for (const [n] of Object.entries(r.need)) {
+        const actual = (w.items.find((x) => x.名称 === n)?.数量 || 0) - before[n]; // 负数＝净损失
+        const declared = -(plan.lost[n] || 0);
+        if (actual !== declared) mismatched.push(`${id}/${n}: 声明${declared} 实际${actual}`);
+      }
+      const stoneActual = S.totalStones(w) - stoneBefore;
+      const stoneDeclared = -(r.stoneCost - plan.stoneBack);
+      if (stoneActual !== stoneDeclared) mismatched.push(`${id}/灵石: 声明${stoneDeclared} 实际${stoneActual}`);
+    }
+    ok(mismatched.length === 0, `全部 ${ids.length} 个丹方：面板声明的炸炉代价 == 结算实际代价${mismatched.length ? '（差异：' + mismatched.join('; ') + '）' : ''}`);
+  }
 
   // 4) 丹毒月度衰减
   const e = JSON.parse(JSON.stringify(c)); ensureLifeState(e);

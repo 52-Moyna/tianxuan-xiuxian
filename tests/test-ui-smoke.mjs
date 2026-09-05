@@ -539,6 +539,100 @@ try {
     await Promise.race([flow, sleep(2500)]);
   } catch (e) { ok(false, `拍卖落槌前提示: ${e.message}`); }
 
+  /* 战斗弹窗：天命加持的「门槛」与「文案」必须都来自常量。
+   * 家族型缺陷 #4（UI 门槛与结算不一致）就长在这里：按钮亮着、点下去才发现钱不够，
+   * 或按钮写着耗 50、实际扣 80。静态断言抓不到，必须在 jsdom 里渲染出来对数字。 */
+  try {
+    const S4 = await import(pathToFileURL(join(ROOT, 'public/js/systems.js')).href);
+    const s4 = GameState.data;
+    const mkBattle = () => ({ intro: '测试傀儡拦路。', type: 'qiecuo', enemy: { name: '试炼傀儡', realm: '练气', level: 10, power: 500, danger: 1 } });
+    // 1) 灵石充足：按钮可点、文案里的两个数字取自常量
+    const keepCur4 = JSON.parse(JSON.stringify(s4.currencies || {}));
+    const L4 = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    L4.ensureLifeState(s4);
+    for (const k of Object.keys(s4.currencies)) s4.currencies[k] = 0;
+    L4.lifeAddStones(s4, S4.BLESS_COST);
+    let flow4 = UI.battleModal(mkBattle());
+    await sleep(120);
+    const blessBtn = $('[data-bless]');
+    ok(!!blessBtn, '战斗弹窗渲染出天命加持按钮');
+    ok(!!blessBtn && !blessBtn.disabled, `总资产 ${S4.BLESS_COST}（正好够）时加持按钮可点`);
+    ok(!!blessBtn && blessBtn.textContent.includes(`耗${S4.BLESS_COST}灵石`) && blessBtn.textContent.includes(`胜+${S4.BLESS_WIN_BONUS}%`),
+      `按钮文案取自常量（耗${S4.BLESS_COST}灵石 / 胜+${S4.BLESS_WIN_BONUS}%）`);
+    const tips1 = $$('.blessed-tip');
+    const tip1 = tips1.length ? tips1[tips1.length - 1].textContent : '(未找到元素)';
+    ok(tip1.includes('可邀'), `钱够时提示为「可邀天命相助」（实际：${tip1}）`);
+    // 点下去：预估明细里真的出现「天命加持 +N%」
+    if (blessBtn) blessBtn.click();
+    await sleep(80);
+    const pvHtml = $('#battle-preview-rate') ? $('#battle-preview-rate').innerHTML : '';
+    ok(/天命加持/.test(pvHtml) && pvHtml.includes(`+${S4.BLESS_WIN_BONUS}%`), `勾选加持后预估明细写明「天命加持 +${S4.BLESS_WIN_BONUS}%」`);
+    // 收尾：点遁走关闭弹窗（切磋遁走无副作用）
+    const fleeBtn = $('#btn-flee');
+    if (fleeBtn) fleeBtn.click();
+    await Promise.race([flow4, sleep(1200)]);
+
+    // 2) 差 1 块灵石：按钮必须置灰并写明还差多少，点了也不生效
+    for (const k of Object.keys(s4.currencies)) s4.currencies[k] = 0;
+    L4.lifeAddStones(s4, S4.BLESS_COST - 1);
+    flow4 = UI.battleModal(mkBattle());
+    await sleep(120);
+    const blessBtn2 = $('[data-bless]');
+    ok(!!blessBtn2 && blessBtn2.disabled, `总资产 ${S4.BLESS_COST - 1}（差一块）时加持按钮置灰`);
+    const tips2 = $$('.blessed-tip');
+    const tip2 = tips2.length ? tips2[tips2.length - 1].textContent : '(未找到元素)';
+    ok(tip2.includes(`灵石不足${S4.BLESS_COST}`), `钱不够时提示写明「灵石不足${S4.BLESS_COST}」（实际：${tip2}）`);
+    if (blessBtn2) blessBtn2.click();
+    await sleep(80);
+    const pvHtml2 = $('#battle-preview-rate') ? $('#battle-preview-rate').innerHTML : '';
+    ok(!/天命加持/.test(pvHtml2), '置灰时点击不生效：预估明细不得虚增「天命加持」');
+    const fleeBtn2 = $('#btn-flee');
+    if (fleeBtn2) fleeBtn2.click();
+    await Promise.race([flow4, sleep(1200)]);
+    s4.currencies = keepCur4;
+  } catch (e) { ok(false, `战斗弹窗·天命加持门槛: ${e.message}`); }
+
+  // 丹炉：炸炉代价明示 —— 成丹率只说「有多少概率拿到」，不说「拿不到会损失什么」。
+  // 静态断言只能防「整个函数被删」；这里逐丹方对账卡片文本与 pillRefund 表，
+  // 才能防住「UI 另写一套算法、改了规则忘了改文案」这个家族型缺陷。
+  try {
+    const L3 = await import(pathToFileURL(join(ROOT, 'public/js/life.js')).href);
+    const { PILL_RECIPES: PR3 } = await import(pathToFileURL(join(ROOT, 'public/js/data.js')).href);
+    const s3 = GameState.data;
+    L3.ensureLifeState(s3);
+    const keepLevel = s3.player.level, keepSect = s3.sect;
+    s3.player.level = 99; s3.sect = { rank: 9 }; // 全丹方解锁，卡片才带完整代价信息
+    UI.setSideTab('cave'); await sleep(180);
+    const caveHtml3 = $('#center-body') ? $('#center-body').innerHTML : '';
+    ok(/失败损失/.test(caveHtml3), '丹炉面板明示炸炉损失（此前只给成丹率，代价全靠玩家心算）');
+    const cards = $$('.alchemy-recipe');
+    const wrong = [];
+    let checked = 0;
+    for (const id of Object.keys(PR3)) {
+      const plan = L3.pillRefund(id);
+      if (!plan) continue;
+      const card = cards.find((c) => c.querySelector(`[data-refine="${id}"]`));
+      if (!card) continue;
+      checked++;
+      for (const [n, c] of Object.entries(plan.lost)) {
+        if (!card.textContent.includes(`${n}×${c}`)) wrong.push(`${id} 少写损失 ${n}×${c}`);
+      }
+      for (const [n, c] of Object.entries(plan.refund)) {
+        if (!card.textContent.includes(`${n}×${c}`)) wrong.push(`${id} 少写退还 ${n}×${c}`);
+      }
+    }
+    ok(checked > 0, `丹炉渲染出 ${checked} 张丹方卡可读`);
+    ok(wrong.length === 0, `每张丹方卡的损失/退还数额与 pillRefund 表一致${wrong.length ? '（差异：' + wrong.join('; ') + '）' : ''}`);
+    // 凝血丹两味各 1 份：只要退还率 <1，就必定「只标损失、不标退还」。
+    // 判据按表推导而非写死文案，否则调高退还率时这条会假红，把数值当契约。
+    const nx = cards.find((c) => c.querySelector('[data-refine="凝血丹"]'));
+    const nxPlan = L3.pillRefund('凝血丹');
+    const nxLost = Object.keys(nxPlan.lost).length > 0, nxBack = Object.keys(nxPlan.refund).length > 0;
+    ok(!!nx && /失败损失/.test(nx.textContent) === nxLost && /失败退还 百年灵芝/.test(nx.textContent) === nxBack,
+      `凝血丹单份材料：${nxLost && !nxBack ? '只标损失、不标退还（投单份＝全额损失）' : '损失/退还按表展示'}`);
+    s3.player.level = keepLevel; s3.sect = keepSect;
+  } catch (e) { ok(false, `丹炉炸炉代价展示: ${e.message}`); }
+
 } catch (e) {
   console.log('运行异常：', e.stack || e.message); fail++;
 } finally {

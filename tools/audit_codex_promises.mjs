@@ -8,7 +8,7 @@
  * 判定规则集中在 tools/codex_pools.mjs（与测试共用同一份，避免假绿灯）。
  * 用法：node tools/audit_codex_promises.mjs
  */
-import { buildPools, findBrokenPromises, ABSTRACT_CATEGORIES } from './codex_pools.mjs';
+import { buildPools, findBrokenPromises, findUnadvertisedPaths, ABSTRACT_CATEGORIES } from './codex_pools.mjs';
 
 const { POOLS, CODEX_ITEMS } = await buildPools();
 
@@ -24,4 +24,16 @@ for (const b of broken) {
 const uniq = new Set(broken.map((b) => b.name)).size;
 console.log(`\n合计 ${CODEX_ITEMS.length} 条图鉴，命中 ${broken.length} 条可疑承诺（涉及 ${uniq} 个条目）。`);
 if (skip.length) console.log(`已跳过抽象分类：${skip.join('、')}（它们的真实掉落名带随机前缀，加 --all 可查看）`);
+
+// 反向：数据表里明明有这条路，图鉴却没提 —— 玩家不知道去哪刷，等于功能埋没。
+// findBrokenPromises 只防「白跑一趟」，这一半防「根本不知道有这条路」。
+const hidden = findUnadvertisedPaths(POOLS, CODEX_ITEMS, { skipCategories: skip });
+console.log('');
+console.log('=== 图鉴「数据表里有路、文案却没写」===');
+if (!hidden.length) console.log('（无）');
+for (const h of hidden) {
+  console.log(`- [${h.category}] ${h.name}(${h.id || '无id'}) ｜ 漏写「${h.missing.join('、')}」｜ source：${h.source}`);
+}
+console.log('');
+console.log(`合计 ${CODEX_ITEMS.length} 条图鉴，漏写获取途径 ${hidden.length} 条。`);
 console.log('注意：本脚本是只读摸底，命中项必须人工复核后再动手 —— 池名与图鉴名不同名会造成误判。');

@@ -1308,6 +1308,18 @@ export function activeBeastSkillEffect(state, key) {
   return eff ? eff[key] : undefined;
 }
 
+/** 天命加持（焚香燃灯）的代价与收益 —— 单一真源。
+ *  【为何收口】此前 50 灵石这个数散落在五处：resolveBattle 的 bCost、previewBattle 的
+ *  可邀判定、UI 按钮文案、UI 置灰判定、UI 提示文案；胜率 +10 也各写一遍。
+ *  数值当前一致，所以测试全绿；但只要以后改一处，UI 就会显示「耗 50 灵石」而实际扣 80，
+ *  或按钮亮着、点下去才发现钱不够 —— 属「UI 门槛与结算不一致」家族。 */
+export const BLESS_COST = 50;      // 邀天命加持所需灵石（总资产口径）
+export const BLESS_WIN_BONUS = 10; // 加持带来的胜率增量（百分点）
+/** 「此刻能否邀得天命加持」——UI 置灰与结算扣款共用同一判定，杜绝两套门槛。 */
+export function canBless(state) {
+  return totalStones(state) >= BLESS_COST;
+}
+
 /** 预估战斗最终胜率（纯函数，不修改任何状态，供战前展示）。
  *  与 resolveBattle 的加成口径保持一致，但不掷命运骰子（战前未知），也不触发胜负副作用。 */
 export function previewBattle(state, enemy, type, tactic = 'normal', blessed = false) {
@@ -1347,7 +1359,7 @@ export function previewBattle(state, enemy, type, tactic = 'normal', blessed = f
   if (wounds > 0) apply(-Math.min(15, wounds * 3), 'wound');
   if (tactic === 'aggro') apply(8, 'tactic');
   else if (tactic === 'defend') apply(-5, 'tactic');
-  if (blessed && totalStones(state) >= 50) apply(10, 'blessed');
+  if (blessed && canBless(state)) apply(BLESS_WIN_BONUS, 'blessed');
   // 战前增益（法力丹等）：下次战斗胜率提升，预览同口径展示
   if (state.flags?.nextBattleWin) apply(state.flags.nextBattleWin, 'buff');
   return { rate: Math.round(rate), finalRate: Math.round(cur), sameLevel, breakdown: bd };
@@ -1449,8 +1461,8 @@ export function resolveBattle(state, enemy, type, fled = false, tactic = 'normal
   else if (tactic === 'defend') { finalRate = Math.max(5, finalRate - 5); logs.push('稳守战术：步步为营，胜率 -5%，然败则轻伤。'); }
   // 天命加持：焚香燃灯，耗灵石换胜率（需足灵石，且非遁走）
   if (blessed && !fled) {
-    const bCost = 50;
-    if (totalStones(state) >= bCost) { spendStones(state, bCost); finalRate = Math.min(95, finalRate + 10); logs.push(`你燃灯焚香，邀得天命加持，胜率 +10%（耗灵石${bCost}）。`); }
+    const bCost = BLESS_COST;
+    if (canBless(state)) { spendStones(state, bCost); finalRate = Math.min(95, finalRate + BLESS_WIN_BONUS); logs.push(`你燃灯焚香，邀得天命加持，胜率 +${BLESS_WIN_BONUS}%（耗灵石${bCost}）。`); }
     else logs.push('灵石不足，无力邀得天命加持。');
   }
   // 战前增益（法力丹等）：下次战斗胜率提升，战后清零（遁走则保留）

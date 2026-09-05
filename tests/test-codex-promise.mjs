@@ -19,7 +19,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { buildPools, findBrokenPromises, ABSTRACT_CATEGORIES, CLAIMS } from '../tools/codex_pools.mjs';
+import { buildPools, findBrokenPromises, findUnadvertisedPaths, ABSTRACT_CATEGORIES, CLAIMS, ADVERTISE_LABELS } from '../tools/codex_pools.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let pass = 0, fail = 0;
@@ -45,6 +45,32 @@ ok(broken.length === 0,
 const abstractCount = CODEX_ITEMS.filter((i) => ABSTRACT_CATEGORIES.includes(i.category)).length;
 ok(abstractCount > 0, `应存在被跳过的抽象条目（实得 ${abstractCount}）`);
 ok(!broken.some((b) => ABSTRACT_CATEGORIES.includes(b.category)), '抽象分类不应出现在落空清单里');
+
+/* ---------- 2b. 反向断言：拿得到、却没写进图鉴 ----------
+ * 上一节只防「玩家照图鉴白跑一趟」。这一节防反过来 —— 明明有这条路，
+ * 图鉴却只字不提，玩家压根不知道去哪刷。首轮摸底出 14 条真缺口：
+ * 宗门兑换（聚气丹/凝血丹/凝神丹）、拍卖会（洗髓丹/星砂/遗府残图）、
+ * 秘境（地火引/赤铜精/冰魄符纸/海灵珠/百越灵草/星砂）、坊市（破境丹/青风狼内丹）。 */
+const unadvertised = findUnadvertisedPaths(POOLS, CODEX_ITEMS, { skipCategories: ABSTRACT_CATEGORIES });
+ok(unadvertised.length === 0,
+  `${CODEX_ITEMS.length} 条图鉴中有 ${unadvertised.length} 条漏写获取途径：\n    ` +
+  unadvertised.map((b) => `[${b.category}]${b.name} 数据表里有「${b.missing.join('/')}」却没写（source：${b.source}）`).join('\n    '));
+// 元断言：反向标签集本身得覆盖到真实条目，否则「零命中」又是假绿灯
+for (const c of ADVERTISE_LABELS) {
+  const covered = CODEX_ITEMS.filter((i) => !ABSTRACT_CATEGORIES.includes(i.category)
+    && (POOLS[i.name]?.includes(c.label))).length;
+  ok(covered > 0, `反向标签「${c.label}」应能匹配到真实图鉴条目（实得 ${covered}）`);
+}
+// 毒丸：把星砂的 source 改回只写坊市，反向检查必须报出「秘境 / 拍卖」
+const poisonBack = CODEX_ITEMS.map((i) => (i.id === 'mat_star_sand' ? { ...i, source: '海外仙岛坊市' } : i));
+const pbHits = findUnadvertisedPaths(POOLS, poisonBack, { skipCategories: ABSTRACT_CATEGORIES })
+  .filter((b) => b.name === '星砂');
+ok(pbHits.length === 1 && pbHits[0].missing.includes('秘境') && pbHits[0].missing.includes('拍卖'),
+  `毒丸：星砂只写坊市时应报出漏写的秘境与拍卖（实得 ${JSON.stringify(pbHits.map((b) => b.missing))}）`);
+// 反向毒丸：灵兽名不得被同名材料误判（inPool 的双向包含会把青风狼匹配到坊市卖的青风狼内丹）
+const beasts = CODEX_ITEMS.filter((i) => i.category === '灵兽');
+ok(findUnadvertisedPaths(POOLS, beasts, { skipCategories: ABSTRACT_CATEGORIES }).length === 0,
+  '灵兽条目不应因同名材料（青风狼内丹）被误判为「坊市可买」');
 
 /* ---------- 3. 元断言：检测器本身必须抓得住落空承诺（毒丸） ---------- */
 const poison = [{ id: 'x', category: '丹药', name: '不存在的虚构丹', source: '丹炉炼制（炼气期）、秘境' }];

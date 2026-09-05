@@ -129,3 +129,52 @@ export function findBrokenPromises(POOLS, items, opts = {}) {
   }
   return out;
 }
+
+/* ============================================================
+ * 反向检查：「拿得到、却没写进图鉴」
+ * ------------------------------------------------------------
+ * findBrokenPromises 只防「写了却拿不到」（玩家白跑一趟）；
+ * 这一半防的是反过来 —— 明明有这条产出路径，图鉴却只字未提，
+ * 玩家压根不知道去哪刷。这正是本项目头号家族故障「实现了但玩家碰不到」，
+ * 只是发生在文案层：秘境里明明掉星砂与海灵珠，图鉴只写「海外仙岛坊市」，
+ * 于是不想去海外的人永远不知道还有第二条路。
+ *
+ * 首轮摸底出 14 条真缺口（宗门兑换 3 / 拍卖 3 / 秘境 5 / 坊市 3），已补进 source。
+ * ============================================================ */
+
+/** 反向检查覆盖的途径标签。比 CLAIMS 多了「宗门」，少了两类不适合反向断言的：
+ *   ① 「开局」—— 开局包是一次性给予，不是可反复刷取的途径，图鉴不写不算缺陷；
+ *   ② 「妖兽」—— 图鉴写「妖兽战利品 / 东荒妖兽」等多种说法，反向断言会误伤一批。 */
+export const ADVERTISE_LABELS = [
+  { re: /丹炉|炼丹/, label: '丹方' },
+  { re: /杂交/, label: '杂交' },
+  { re: /拍卖/, label: '拍卖' },
+  { re: /秘境/, label: '秘境' },
+  { re: /坊市/, label: '坊市' },
+  { re: /宗门/, label: '宗门' },
+];
+
+/** 这些分类只认「图鉴名 == 数据表名」的精确命中。
+ *  【为何】inPool 的双向包含是为「妖丹 vs 青风狼内丹」这类带前缀的掉落物设计的，
+ *  但用到灵兽身上就会把「青风狼」匹配到坊市卖的「青风狼内丹」——
+ *  灵兽当然不能从坊市买，属误报。 */
+export const STRICT_CATEGORIES = ['灵兽'];
+
+const exactInPool = (POOLS, label, name) => !!(POOLS[name] && POOLS[name].includes(label));
+
+/** 找出「数据表里有实据、图鉴 source 却没提」的条目。
+ *  @returns {Array<{name, id, category, missing: string[], source: string}>} */
+export function findUnadvertisedPaths(POOLS, items, opts = {}) {
+  const skip = opts.skipCategories || [];
+  const out = [];
+  for (const it of items) {
+    if (!it?.name || !it?.source) continue;
+    if (skip.includes(it.category)) continue;
+    const src = stripParens(it.source);
+    const exact = STRICT_CATEGORIES.includes(it.category);
+    const has = (label) => (exact ? exactInPool(POOLS, label, it.name) : inPool(POOLS, label, it.name));
+    const missing = ADVERTISE_LABELS.filter((c) => has(c.label) && !c.re.test(src)).map((c) => c.label);
+    if (missing.length) out.push({ name: it.name, id: it.id, category: it.category, missing, source: it.source });
+  }
+  return out;
+}

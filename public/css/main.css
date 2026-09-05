@@ -1811,6 +1811,10 @@ button { font-family: inherit; }
 .ar-mat.ok { color: var(--jade); border-color: var(--jade-soft); }
 .ar-mat.no { color: #d98a82; border-color: rgba(190,80,70,.5); }
 .ar-hint { font-size: .68rem; color: var(--text-faint); line-height: 1.4; }
+/* 炸炉代价：损失用警示红、退还用青玉色，让玩家在开炉前一秒就能权衡「值不值得赌」 */
+.ar-refund { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1px; }
+.ar-loss { font-size: .68rem; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(190,80,70,.5); color: #d98a82; background: rgba(190,80,70,.08); cursor: help; }
+.ar-back { font-size: .68rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-soft); color: var(--text-faint); cursor: help; }
 .alchemy-recipe .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* O. 装备淬炼小按钮 */

@@ -19,7 +19,7 @@ import * as CX from './codex.js';
 import { GameState, bus, Rng } from './state.js';
 import { saveGame, serialize, uploadAvatar, removeAvatar, avatarUrl } from './save.js';
 import { listSlots, setSaveSlot, getSaveSlot, deleteSlot, checkSaveExists, listBackups, restoreBackup } from './save.js';
-import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, travelOptions, bagGradeInfo, nextBagGrade, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots } from './life.js';
+import { ensureLifeState, REGION_TRAVEL, REGION_MARKET, ART_RECIPES, relationBenefit, relationIndex, startTravel, travelCost, travelOptions, bagGradeInfo, nextBagGrade, craftRecipe, inventoryUsed, organizeBag, gardenCapacity, herbQuality, plantHerb, plantHerbFill, harvestHerb, harvestAllHerbs, irrigateHerb, irrigateAllHerbs, crossbreedHerbs, HERB_IRRIGATE_COST, HERB_IRRIGATE_CAP_PER_MONTH, herbSpringBonus, HERB_IRRIGATE_YIELD_CAP, ARRAY_BONUS_PER_LEVEL, ARRAY_MAX_LEVEL, herbMonthlyGrowth, herbArrayGrowth, omenActive, refineRate, refinePill, isRecipeUnlocked, alchemySlots, pillRefund } from './life.js';
 import { EQUIP_SLOTS } from './data.js';
 
 // HTML 属性转义：任何插进 title="..." 的动态文本都必须过这一层，否则文案里的引号会截断属性。
@@ -1518,12 +1518,16 @@ function battleSummaryHtml(rep) {
     </div>`;
 }
 
-/* ---------------- 战斗弹窗 ---------------- */
-function battleModal(battle) {
+/* ---------------- 战斗弹窗 ----------------
+ * 导出是为了让 UI 测试能固定场景做真实渲染断言（与 flowAuction(preset) 同一手法）：
+ * 「静态断言只能防整个函数被删」，文案与置灰口径这类缺陷必须在 jsdom 里渲染一遍才抓得到。 */
+export function battleModal(battle) {
   const st = GameState.data;
   let tactic = 'normal';
   let blessed = false;
-  const canBless = () => S.totalStones(st) >= 50;
+  // 置灰门槛与结算扣款共用 systems.canBless（BLESS_COST 单一真源），避免两套门槛。
+  // 文案里的「耗 X 灵石」「胜 +Y%」也一律取常量，改一处即可全局生效。
+  const canBless = () => S.canBless(st);
   return new Promise((resolve) => {
     const m = openModal(`
       <div class="battle-intro">${battle.intro}</div>
@@ -1540,8 +1544,8 @@ function battleModal(battle) {
         <button class="tactic-btn" data-tactic="defend">稳守·胜↓败轻</button>
       </div>
       <div class="blessed-row" id="blessed-row">
-        <button class="tactic-btn ${canBless() ? '' : 'btn-dim'}" data-bless ${canBless() ? '' : 'disabled'}>🔥 天命加持 · 胜+10%（耗50灵石）</button>
-        <span class="blessed-tip">${canBless() ? '可邀天命相助' : '灵石不足50，暂不可邀'}</span>
+        <button class="tactic-btn ${canBless() ? '' : 'btn-dim'}" data-bless ${canBless() ? '' : 'disabled'}>🔥 天命加持 · 胜+${S.BLESS_WIN_BONUS}%（耗${S.BLESS_COST}灵石）</button>
+        <span class="blessed-tip">${canBless() ? '可邀天命相助' : `灵石不足${S.BLESS_COST}，暂不可邀`}</span>
       </div>
       <div class="dice-stage hidden" id="dice-stage"><div class="dice-roller" id="dice-roller">🎲</div><div class="dice-result" id="dice-result"></div></div>
       <div class="battle-result hidden" id="battle-result"></div>
@@ -3265,6 +3269,15 @@ function alchemyCatalystBlock(st) {
             const quotaHtml = qh
               ? `<span class="ar-quota${qh.full ? ' full' : ''}" title="${qh.full ? qh.reason : `一生至多可服 ${qh.max} 颗`}">${qh.full ? `已服满 ${qh.taken}/${qh.max} · 再炼无益` : `已服 ${qh.taken}/${qh.max}`}</span>`
               : '';
+            // 炸炉代价明示：成丹率只说「有多少概率拿到」，不说「拿不到会损失什么」。
+            // 单份材料退 floor(1×0.5)=0 即全额损失，是藏得最深的一刀 —— 稀有材料无声蒸发。
+            const rf = pillRefund(r.id) || { lost: {}, refund: {}, stoneBack: 0 };
+            const lossList = Object.entries(rf.lost).map(([n, c]) => `${n}×${c}`);
+            const backList = Object.entries(rf.refund).map(([n, c]) => `${n}×${c}`);
+            if (rf.stoneBack) backList.push(`灵石${rf.stoneBack}`);
+            const refundHtml = (lossList.length || backList.length)
+              ? `<div class="ar-refund">${lossList.length ? `<span class="ar-loss" title="炼制失败时这几味材料不予退还">🔥失败损失 ${lossList.join('、')}</span>` : ''}${backList.length ? `<span class="ar-back" title="炼制失败时退回的残余">失败退还 ${backList.join('、')}</span>` : ''}</div>`
+              : '';
             return `
             <div class="alchemy-recipe ${cls}">
               <div class="ar-head"><b>${r.icon} ${r.name}</b><span class="ar-tier">${r.tier}品</span>${quotaHtml}</div>
@@ -3276,6 +3289,7 @@ function alchemyCatalystBlock(st) {
                 }).join('')}
                 ${r.stoneCost ? `<span class="ar-mat ${stoneOk ? 'ok' : 'no'}">灵石 ${S.totalStones(st)}/${r.stoneCost}</span>` : ''}
               </div>
+              ${refundHtml}
               <button class="btn btn-sm btn-gold" data-refine="${r.id}" ${(!unlocked || !matsOk || !stoneOk || full) ? 'disabled' : ''}>${unlocked ? (full ? '丹炉已满' : '开炉炼制') : '未解锁'}</button>
               ${!unlocked ? `<div class="ar-hint">${D.PILL_UNLOCK_HINT[r.id] || ''}</div>` : ''}
             </div>`;

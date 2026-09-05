@@ -980,6 +980,34 @@ export function refineRate(state, recipeId) {
   return { baseRate, caveBonus, catalystBonus, arrayBonus, rate };
 }
 
+/** 废丹退还比例（单一真源）：材料退半数、灵石退三成。 */
+export const PILL_REFUND_RATE = 0.5;
+export const PILL_REFUND_STONE_RATE = 0.3;
+
+/**
+ * 废丹退还结算表（纯函数，不消耗 RNG、不改动 state）。
+ * 【为何存在】退还规则是「每种材料退 floor(数量×0.5)」，于是**只投 1 份的材料退还数 = 0，
+ * 即失败时全额损失**。此前这条规则只埋在 settleRefine 内部，玩家开炉前完全看不见：
+ * 攒齐「露华玉液×1 ＋ 天材地宝·月华露×2 ＋ 玉髓芝×2」、花 5 个月炼延寿丹（成丹率 58%），
+ * 一旦炸炉，最贵也最难得的「露华玉液」无声蒸发，日志里只有一句「化为废丹」。
+ * 抽成纯函数后，丹炉面板可在开炉前明示「失败损失：露华玉液×1（无退还）」，
+ * 结算与展示共用同一张表，杜绝「改了规则忘了改文案」的第二套口径。
+ * 返回 { refund, lost, stoneBack, hasLoss }，均为 {材料名: 数量} 形态。
+ */
+export function pillRefund(recipeId) {
+  const r = PILL_RECIPES[recipeId];
+  if (!r) return null;
+  const refund = {};
+  const lost = {};
+  for (const [name, count] of Object.entries(r.need)) {
+    const back = Math.floor(count * PILL_REFUND_RATE);
+    if (back > 0) refund[name] = back;
+    if (count - back > 0) lost[name] = count - back;
+  }
+  const stoneBack = r.stoneCost ? Math.floor(r.stoneCost * PILL_REFUND_STONE_RATE) : 0;
+  return { refund, lost, stoneBack, hasLoss: Object.keys(lost).length > 0 };
+}
+
 /** 开炉炼制：校验解锁/材料/灵石 → 扣材料与灵石 → 写入「炼制中」队列 */
 export function refinePill(state, recipeId, opts = {}) {
   ensureLifeState(state);
@@ -1076,15 +1104,16 @@ export function settleRefine(state, logs = [], force) {
       if (stored) logs.push(`🔥 开炉！「${r.name}」炼成（${q.grade}），已收入储物袋。`);
       else logs.push(`🔥 「${r.name}」炼成，但储物袋已满，丹药散逸。`);
     } else {
-      // 废丹：退还约半数材料（可逆惩罚）+ 少量灵石
+      // 废丹：退还约半数材料（可逆惩罚）+ 少量灵石。
+      // 退还数额一律查 pillRefund 表，与丹炉面板开炉前展示的「失败损失」同源于一处。
       logs.push(`💨 「${r.name}」炼制失败，化为废丹。`);
-      for (const [name, count] of Object.entries(r.need)) {
-        const refund = Math.floor(count / 2);
+      const plan = pillRefund(p.recipeId) || { refund: {}, stoneBack: 0 };
+      for (const [name, back] of Object.entries(plan.refund)) {
         // 满仓提示：退还材料入袋失败时明确告知，否则玩家只看到「炼制失败」，
         // 却不知道本该退回的半份材料也没了（静默双重损失）。
-        if (refund > 0) storeItemOrNote(state, { 名称: name, 类型: '材料', 数量: refund, 描述: '废丹回收的残余材料。', 价值: 10 }, logs);
+        if (back > 0) storeItemOrNote(state, { 名称: name, 类型: '材料', 数量: back, 描述: '废丹回收的残余材料。', 价值: 10 }, logs);
       }
-      if (r.stoneCost) lifeAddStones(state, Math.floor(r.stoneCost * 0.3));
+      if (plan.stoneBack) lifeAddStones(state, plan.stoneBack);
     }
     removeFromAlchemy(state, p);
   }
